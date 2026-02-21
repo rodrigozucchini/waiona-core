@@ -3,7 +3,7 @@ import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
 export class UpdateTaxTypeDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(50)
+  @MaxLength(20)
   code: string;
 
   @IsString()
