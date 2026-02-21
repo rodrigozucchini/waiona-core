@@ -3,11 +3,11 @@ import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
 export class CreateTaxTypeDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(50)
+  @MaxLength(20)
   code: string;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
+  @MaxLength(150)
   name: string;
 }
