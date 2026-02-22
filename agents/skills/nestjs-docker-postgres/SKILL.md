@@ -144,7 +144,7 @@ project-root/
 ├── .env.example            # placeholders only — committed
 ├── .gitignore              # includes .env
 └── src/database/
-    └── data-source.ts      # reads from env, synchronize: false
+    └── ormconfig.ts      # reads from env, synchronize: false
 ```
 
 A correct setup: `docker compose up -d` runs clean, postgres is `healthy`, NestJS connects on first start, no credentials in any committed file.
