@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 import { TaxationModule } from './modules/taxation/taxation.module';
+import { MarginsModule } from './modules/margins/margins.module';
 
 @Module({
   imports: [
@@ -30,8 +31,8 @@ import { TaxationModule } from './modules/taxation/taxation.module';
       }),
     }),
 
-    // 🔥 Tu dominio
     TaxationModule,
+    MarginsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
