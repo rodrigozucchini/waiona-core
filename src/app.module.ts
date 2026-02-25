@@ -7,6 +7,8 @@ import { AppService } from './app.service';
 
 import { TaxationModule } from './modules/taxation/taxation.module';
 import { MarginsModule } from './modules/margins/margins.module';
+import { DiscountsModule } from './discounts/discounts.module';
+import { DiscountsModule } from './modules/discounts/discounts.module';
 
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { MarginsModule } from './modules/margins/margins.module';
 
     TaxationModule,
     MarginsModule,
+    DiscountsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
