@@ -1,0 +1,15 @@
+export enum DiscountConditionType {
+    PRODUCT = 'product',
+    CATEGORY = 'category',
+    COMBO = 'combo',
+    USER = 'user',
+    USER_SEGMENT = 'user_segment',
+    CART_AMOUNT = 'cart_amount',
+    CART_QUANTITY = 'cart_quantity',
+    DATE_RANGE = 'date_range',
+    DAY_OF_WEEK = 'day_of_week',
+    PAYMENT_METHOD = 'payment_method',
+    FIRST_PURCHASE = 'first_purchase',
+    ORDER_COUNT = 'order_count',
+    GEOGRAPHIC = 'geographic',
+  }

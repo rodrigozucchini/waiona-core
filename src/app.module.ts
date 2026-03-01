@@ -9,6 +9,7 @@ import { TaxationModule } from './modules/taxation/taxation.module';
 import { MarginsModule } from './modules/margins/margins.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { DiscountsModule } from './modules/discounts/discounts.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { DiscountsModule } from './modules/discounts/discounts.module';
     TaxationModule,
     MarginsModule,
     DiscountsModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
