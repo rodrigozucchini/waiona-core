@@ -9,10 +9,10 @@ import {
     ParseIntPipe,
   } from '@nestjs/common';
   
-  import { DiscountsService } from './services/discounts.service';
-  import { CreateDiscountDto } from './dto/create-discount.dto';
-  import { UpdateDiscountDto } from './dto/update-discount.dto';
-  import { DiscountResponseDto } from './dto/response-discount.dto';
+  import { DiscountsService } from '../services/discounts.service';
+  import { CreateDiscountDto } from '../dto/create-discount.dto';
+  import { UpdateDiscountDto } from '../dto/update-discount.dto';
+  import { DiscountResponseDto } from '../dto/response-discount.dto';
   
   @Controller('discounts')
   export class DiscountsController {

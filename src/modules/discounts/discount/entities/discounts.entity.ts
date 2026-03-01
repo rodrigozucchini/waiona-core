@@ -10,34 +10,32 @@ import {
   @Entity('discounts')
   @Index(['status'])
   @Index(['startsAt'])
-  @Index(['endAt'])
+  @Index(['endsAt'])
   export class DiscountEntity extends BaseEntity {
-  
-    @Column({
-      type: 'varchar',
-      length: 100,
-      nullable: false,
-    })
-    name: string;
   
     @Column({
       type: 'varchar',
       length: 255,
       nullable: false,
     })
-    description: string;
+    name: string;
+  
+    @Column({
+      type: 'varchar',
+      length: 500,
+      nullable: true,
+    })
+    description?: string;
   
     @Column({
       type: 'enum',
       enum: DiscountStatus,
-      default: DiscountStatus.INACTIVE,
       nullable: false,
     })
     status: DiscountStatus;
   
     @Column({
       type: 'boolean',
-      default: false,
       nullable: false,
     })
     exclusive: boolean;
@@ -52,7 +50,6 @@ import {
     @Column({
       name: 'usage_count',
       type: 'int',
-      default: 0,
       nullable: false,
     })
     usageCount: number;
@@ -65,9 +62,9 @@ import {
     startsAt?: Date;
   
     @Column({
-      name: 'end_at',
+      name: 'ends_at',
       type: 'timestamp',
       nullable: true,
     })
-    endAt?: Date;
+    endsAt?: Date;
   }
