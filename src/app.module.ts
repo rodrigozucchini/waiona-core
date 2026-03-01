@@ -10,6 +10,7 @@ import { MarginsModule } from './modules/margins/margins.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { DiscountsModule } from './modules/discounts/discounts.module';
 import { ProductsModule } from './modules/products/products.module';
+import { DiscountActionsService } from './discounts/actions/discount-actions.service';
 
 @Module({
   imports: [
@@ -40,6 +41,6 @@ import { ProductsModule } from './modules/products/products.module';
     ProductsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, DiscountActionsService],
 })
 export class AppModule {}
