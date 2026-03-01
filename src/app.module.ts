@@ -7,10 +7,8 @@ import { AppService } from './app.service';
 
 import { TaxationModule } from './modules/taxation/taxation.module';
 import { MarginsModule } from './modules/margins/margins.module';
-import { DiscountsModule } from './discounts/discounts.module';
 import { DiscountsModule } from './modules/discounts/discounts.module';
 import { ProductsModule } from './modules/products/products.module';
-import { DiscountActionsService } from './discounts/actions/discount-actions.service';
 
 @Module({
   imports: [
@@ -41,6 +39,6 @@ import { DiscountActionsService } from './discounts/actions/discount-actions.ser
     ProductsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, DiscountActionsService],
+  providers: [AppService],
 })
 export class AppModule {}
