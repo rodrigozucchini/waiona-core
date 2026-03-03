@@ -8,11 +8,29 @@ import {
 import { BaseEntity } from '../../../../common/entities/base.entity';
 import { ProductImageEntity } from '../../product-images/entities/product-image.entity';
 import { ComboItemEntity } from '../../combos/entities/combo-item.entity';
+import { ProductMeasurementUnit } from '../enums/product-measurement-unit.enum';
 
 @Entity('products')
 @Index(['name'])
 @Index(['isActive'])
+@Index(['sku'], { unique: true })
 export class ProductEntity extends BaseEntity {
+
+  // ==========================
+  // Identificación
+  // ==========================
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    nullable: false,
+    unique: true,
+  })
+  sku: string;
+
+  // ==========================
+  // Información básica
+  // ==========================
 
   @Column({
     type: 'varchar',
@@ -28,19 +46,6 @@ export class ProductEntity extends BaseEntity {
   })
   description: string;
 
-  @Column('decimal', {
-    precision: 12,
-    scale: 2,
-    nullable: false,
-  })
-  price: number;
-
-  @Column({
-    type: 'int',
-    nullable: false,
-  })
-  stock: number;
-
   @Column({
     type: 'boolean',
     default: true,
@@ -48,14 +53,36 @@ export class ProductEntity extends BaseEntity {
   })
   isActive: boolean;
 
-  // relación con imágenes
+  // ==========================
+  // Unidad de medida
+  // ==========================
+
+  @Column({
+    type: 'enum',
+    enum: ProductMeasurementUnit,
+    default: ProductMeasurementUnit.UNIT,
+    nullable: false,
+  })
+  measurementUnit: ProductMeasurementUnit;
+
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  measurementValue?: number;
+
+  // ==========================
+  // Relaciones
+  // ==========================
+
   @OneToMany(
     () => ProductImageEntity,
     (image) => image.product,
   )
   images: ProductImageEntity[];
 
-  // relación con combos
   @OneToMany(
     () => ComboItemEntity,
     (item) => item.product,
