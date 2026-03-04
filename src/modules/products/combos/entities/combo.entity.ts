@@ -13,6 +13,10 @@ import { ComboItemEntity } from './combo-item.entity';
 @Index(['isActive'])
 export class ComboEntity extends BaseEntity {
 
+  // ==========================
+  // Información básica
+  // ==========================
+
   @Column({
     type: 'varchar',
     length: 150,
@@ -27,19 +31,16 @@ export class ComboEntity extends BaseEntity {
   })
   description: string;
 
-  @Column('decimal', {
-    precision: 12,
-    scale: 2,
-    nullable: false,
-  })
-  price: number;
-
   @Column({
     type: 'boolean',
     default: true,
     nullable: false,
   })
   isActive: boolean;
+
+  // ==========================
+  // Relaciones
+  // ==========================
 
   @OneToMany(
     () => ComboItemEntity,
