@@ -14,6 +14,11 @@ import { CategoryController } from './categories/controllers/category.controller
 import { ProductController } from './product/controllers/product.controller';
 import { ComboController } from './combos/controllers/combo.controller';
 import { ProductImageEntity } from './product-images/entities/product-image.entity';
+import { ProductImageService } from './product-images/services/product-image.service';
+import { ProductImageController } from './product-images/controllers/product-image.controller';
+import { ComboImageEntity } from './combo-images/entities/combo-image.entity';
+import { ComboImageService } from './combo-images/services/combo-image.service';
+import { ComboImageController } from './combo-images/controllers/combo-image.controller';
 
 @Module({
   imports: [
@@ -23,22 +28,29 @@ import { ProductImageEntity } from './product-images/entities/product-image.enti
       ComboEntity,
       ComboItemEntity,
       ProductImageEntity,
+      ComboImageEntity,
     ]),
   ],
   providers: [
     CategoryService,
     ProductService,
     ComboService,
+    ProductImageService,
+    ComboImageService,
   ],
   controllers: [
     CategoryController,
     ProductController,
     ComboController,
+    ProductImageController,
+    ComboImageController,
   ],
   exports: [
     CategoryService,
     ProductService,
-    ComboService,
+    ComboService, 
+    ProductImageService,
+    ComboImageService,
   ],
 })
 export class ProductsModule {}
