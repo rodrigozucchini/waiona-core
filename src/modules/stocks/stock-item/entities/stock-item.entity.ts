@@ -1,0 +1,80 @@
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+
+import { BaseEntity } from '../../../../common/entities/base.entity';
+import { StockLocationEntity } from '../../stock-locations/entities/stock-locations.entity';
+
+@Entity('stock_items')
+@Index(['productId', 'locationId'], { unique: true })
+export class StockItemEntity extends BaseEntity {
+
+  // =============================
+  // PRODUCT
+  // =============================
+
+  @Column({
+    type: 'int',
+    nullable: false,
+  })
+  productId: number;
+
+  // =============================
+  // LOCATION
+  // =============================
+
+  @Column({
+    type: 'int',
+    nullable: false,
+  })
+  locationId: number;
+
+  @ManyToOne(() => StockLocationEntity, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'locationId' })
+  location: StockLocationEntity;
+
+  // =============================
+  // STOCK
+  // =============================
+
+  @Column({
+    type: 'int',
+    default: 0,
+    nullable: false,
+  })
+  quantityCurrent: number;
+
+  // Campo calculado (no persistido)
+  get quantityAvailable(): number {
+    return this.quantityCurrent;
+  }
+
+  // =============================
+  // UMBRALES
+  // =============================
+
+  @Column({
+    type: 'int',
+    nullable: false,
+  })
+  stockMin: number;
+
+  @Column({
+    type: 'int',
+    nullable: false,
+  })
+  stockCritical: number;
+
+  @Column({
+    type: 'int',
+    nullable: true,
+  })
+  stockMax: number;
+}
