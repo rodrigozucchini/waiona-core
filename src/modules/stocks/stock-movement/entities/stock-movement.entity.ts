@@ -52,11 +52,6 @@ import {
     })
     quantity: number;
   
-    @Column({
-      type: 'int',
-      nullable: false,
-    })
-    quantityAfter: number;
   
     @Column({
       type: 'enum',
@@ -64,10 +59,4 @@ import {
       nullable: false,
     })
     referenceType: StockReferenceType;
-  
-    @Column({
-      type: 'uuid',
-      nullable: true,
-    })
-    referenceId: string;
   }

@@ -39,25 +39,34 @@ export class StockItemEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'locationId' })
   location: StockLocationEntity;
-
+  
   // =============================
   // STOCK
   // =============================
 
+  // stock físico real
   @Column({
     type: 'int',
     default: 0,
     nullable: false,
   })
-  quantityCurrent: number;
+  quantity: number;
 
-  // Campo calculado (no persistido)
+  // stock reservado para órdenes
+  @Column({
+    type: 'int',
+    default: 0,
+    nullable: false,
+  })
+  quantityReserved: number;
+
+  // stock disponible para vender
   get quantityAvailable(): number {
-    return this.quantityCurrent;
+    return this.quantity - this.quantityReserved;
   }
 
   // =============================
-  // UMBRALES
+  // STOCK THRESHOLDS
   // =============================
 
   @Column({
@@ -76,5 +85,5 @@ export class StockItemEntity extends BaseEntity {
     type: 'int',
     nullable: true,
   })
-  stockMax: number;
+  stockMax?: number;
 }
