@@ -4,10 +4,13 @@ import {
   Index,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 
 import { BaseEntity } from '../../../../common/entities/base.entity';
 import { StockLocationEntity } from '../../stock-locations/entities/stock-locations.entity';
+import { ProductEntity } from 'src/modules/products/product/entities/product.entity';
+import { StockMovementEntity } from '../../stock-movement/entities/stock-movement.entity';
 
 @Entity('stock_items')
 @Index(['productId', 'locationId'], { unique: true })
@@ -22,6 +25,13 @@ export class StockItemEntity extends BaseEntity {
     nullable: false,
   })
   productId: number;
+  
+  @ManyToOne(() => ProductEntity, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'productId' })
+  product: ProductEntity;
 
   // =============================
   // LOCATION
@@ -86,4 +96,10 @@ export class StockItemEntity extends BaseEntity {
     nullable: true,
   })
   stockMax?: number;
+
+  @OneToMany(
+    () => StockMovementEntity,
+    movement => movement.stockItem,
+  )
+  movements: StockMovementEntity[];
 }

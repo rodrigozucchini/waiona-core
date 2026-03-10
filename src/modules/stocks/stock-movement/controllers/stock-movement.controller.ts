@@ -24,7 +24,7 @@ export class StockMovementController {
 
   @Get('stock-item/:stockItemId')
   async findByStockItemId(
-    @Param('stockItemId') stockItemId: string,
+    @Param('stockItemId') stockItemId: number,
   ): Promise<StockMovementResponseDto[]> {
     return this.stockMovementService.findByStockItemId(stockItemId);
   }

@@ -37,7 +37,7 @@ export class StockMovementService {
     return new StockMovementResponseDto(movement);
   }
 
-  async findByStockItemId(stockItemId: string): Promise<StockMovementResponseDto[]> {
+  async findByStockItemId(stockItemId: number): Promise<StockMovementResponseDto[]> {
 
     const movements = await this.stockMovementRepository.find({
       where: { stockItemId },
