@@ -11,6 +11,7 @@ import { StockItemEntity } from '../entities/stock-item.entity';
 import { StockMovementEntity } from '../../stock-movement/entities/stock-movement.entity';
 
 import { CreateStockItemDto } from '../dto/create-stock-item.dto';
+import { UpdateStockThresholdsDto } from '../dto/update-stock-thresholds.dto';
 
 import { StockItemResponseDto } from '../dto/stock-item-response.dto';
 import { StockItemWithMovementsResponseDto } from '../dto/stock-item-with-movements-response.dto';
@@ -62,12 +63,12 @@ export class StockItemsService {
   }
 
   // ==========================
-  // CREATE INITIAL STOCK
+  // CREATE STOCK ITEM
   // ==========================
 
   async create(
     dto: CreateStockItemDto,
-  ): Promise<StockItemWithMovementsResponseDto> {
+  ): Promise<StockItemResponseDto> {
 
     const existing = await this.stockItemRepository.findOne({
       where: {
@@ -88,41 +89,104 @@ export class StockItemsService {
       dto.stockMax,
     );
 
-    const quantity = dto.quantity ?? 0;
-    const quantityReserved = dto.quantityReserved ?? 0;
-
     const stockItem = this.stockItemRepository.create({
       productId: dto.productId,
       locationId: dto.locationId,
-      quantity,
-      quantityReserved,
+      quantityCurrent: 0,
+      quantityReserved: 0,
       stockMin: dto.stockMin,
       stockCritical: dto.stockCritical,
       stockMax: dto.stockMax,
     });
 
-    const savedStockItem = await this.stockItemRepository.save(stockItem);
+    const saved = await this.stockItemRepository.save(stockItem);
 
-    // ==========================
-    // MOVIMIENTO INICIAL
-    // ==========================
+    return new StockItemResponseDto(saved);
+  }
 
-    if (quantity > 0) {
+  // ==========================
+  // ADD STOCK
+  // ==========================
 
-      const movement = this.stockMovementRepository.create({
-        stockItemId: savedStockItem.id,
-        operationType: StockOperationType.INITIAL,
-        stockFlow: StockFlow.INBOUND,
-        quantity: quantity,
-        referenceType: StockReferenceType.MANUAL,
-      });
+  async addStock(
+    productId: number,
+    locationId: number,
+    quantity: number,
+  ): Promise<StockItemWithMovementsResponseDto> {
 
-      await this.stockMovementRepository.save(movement);
+    if (quantity <= 0) {
+      throw new BadRequestException(
+        'Quantity must be greater than 0',
+      );
     }
 
-    const entity = await this.findOne(savedStockItem.id);
+    const stockItem = await this.stockItemRepository.findOne({
+      where: { productId, locationId },
+    });
+
+    if (!stockItem) {
+      throw new NotFoundException(
+        'StockItem does not exist for this product and location',
+      );
+    }
+
+    // actualizar stock
+    stockItem.quantityCurrent += quantity;
+
+    await this.stockItemRepository.save(stockItem);
+
+    // crear movimiento
+    const movement = this.stockMovementRepository.create({
+      stockItemId: stockItem.id,
+      operationType: StockOperationType.INITIAL,
+      stockFlow: StockFlow.INBOUND,
+      quantity: quantity,
+      referenceType: StockReferenceType.MANUAL,
+    });
+
+    await this.stockMovementRepository.save(movement);
+
+    const entity = await this.findOne(stockItem.id);
 
     return new StockItemWithMovementsResponseDto(entity);
+  }
+
+  // ==========================
+  // UPDATE STOCK THRESHOLDS
+  // ==========================
+
+  async updateThresholds(
+    id: number,
+    dto: UpdateStockThresholdsDto,
+  ): Promise<StockItemResponseDto> {
+
+    const stockItem = await this.stockItemRepository.findOne({
+      where: { id },
+      relations: ['location', 'product'],
+    });
+
+    if (!stockItem) {
+      throw new NotFoundException(
+        `StockItem with id ${id} not found`,
+      );
+    }
+
+    this.validateThresholds(
+      dto.stockMin,
+      dto.stockCritical,
+      dto.stockMax,
+    );
+
+    stockItem.stockMin = dto.stockMin;
+    stockItem.stockCritical = dto.stockCritical;
+
+    if (dto.stockMax !== undefined) {
+      stockItem.stockMax = dto.stockMax;
+    }
+
+    const saved = await this.stockItemRepository.save(stockItem);
+
+    return new StockItemResponseDto(saved);
   }
 
   // ==========================
@@ -140,6 +204,11 @@ export class StockItemsService {
         'product',
         'movements',
       ],
+      order: {
+        movements: {
+          createdAt: 'DESC',
+        },
+      },
     });
 
     if (!stockItem) {
@@ -173,5 +242,4 @@ export class StockItemsService {
       );
     }
   }
-
 }
