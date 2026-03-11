@@ -4,17 +4,16 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { StockItemEntity } from '../../stock-item/entities/stock-item.entity';
 import { StockMovementEntity } from '../../stock-movement/entities/stock-movement.entity';
 
-import { DamageCondition } from '../enums/damage-condition.enum';
+import { StockWriteOffReason } from '../enums/stock-writeoff-reason.enum';
 
-@Entity('stock_damages')
+@Entity('stock_write_offs')
 @Index(['stockItemId'])
 @Index(['movementId'])
-export class StockDamageEntity extends BaseEntity {
+export class StockWriteOffEntity extends BaseEntity {
 
   @Column({
     name: 'stock_item_id',
     type: 'int',
-    nullable: false,
   })
   stockItemId: number;
 
@@ -28,7 +27,6 @@ export class StockDamageEntity extends BaseEntity {
   @Column({
     name: 'movement_id',
     type: 'int',
-    nullable: false,
   })
   movementId: number;
 
@@ -41,22 +39,19 @@ export class StockDamageEntity extends BaseEntity {
 
   @Column({
     type: 'int',
-    nullable: false,
   })
   quantity: number;
 
   @Column({
     type: 'enum',
-    enum: DamageCondition,
-    nullable: false,
+    enum: StockWriteOffReason,
   })
-  condition: DamageCondition;
+  reason: StockWriteOffReason;
 
   @Column({
     type: 'text',
-    nullable: false,
   })
-  reason: string;
+  description: string;
 
   @Column({
     type: 'jsonb',
@@ -67,7 +62,6 @@ export class StockDamageEntity extends BaseEntity {
   @Column({
     name: 'reported_by',
     type: 'int',
-    nullable: false,
   })
   reportedBy: number;
 }
