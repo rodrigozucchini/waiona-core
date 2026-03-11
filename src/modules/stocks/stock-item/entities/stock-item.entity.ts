@@ -16,26 +16,18 @@ import { StockMovementEntity } from '../../stock-movement/entities/stock-movemen
 @Index(['productId', 'locationId'], { unique: true })
 export class StockItemEntity extends BaseEntity {
 
-  // =============================
-  // PRODUCT
-  // =============================
-
   @Column({
     type: 'int',
     nullable: false,
   })
   productId: number;
-  
+
   @ManyToOne(() => ProductEntity, {
     nullable: false,
     onDelete: 'RESTRICT',
   })
   @JoinColumn({ name: 'productId' })
   product: ProductEntity;
-
-  // =============================
-  // LOCATION
-  // =============================
 
   @Column({
     type: 'int',
@@ -49,46 +41,35 @@ export class StockItemEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'locationId' })
   location: StockLocationEntity;
-  
+
   // =============================
   // STOCK
   // =============================
 
-  // stock físico real
   @Column({
     type: 'int',
     default: 0,
-    nullable: false,
   })
-  quantity: number;
+  quantityCurrent: number;
 
-  // stock reservado para órdenes
   @Column({
     type: 'int',
     default: 0,
-    nullable: false,
   })
   quantityReserved: number;
 
-  // stock disponible para vender
   get quantityAvailable(): number {
-    return this.quantity - this.quantityReserved;
+    return this.quantityCurrent - this.quantityReserved;
   }
 
   // =============================
-  // STOCK THRESHOLDS
+  // THRESHOLDS
   // =============================
 
-  @Column({
-    type: 'int',
-    nullable: false,
-  })
+  @Column({ type: 'int' })
   stockMin: number;
 
-  @Column({
-    type: 'int',
-    nullable: false,
-  })
+  @Column({ type: 'int' })
   stockCritical: number;
 
   @Column({
@@ -96,6 +77,10 @@ export class StockItemEntity extends BaseEntity {
     nullable: true,
   })
   stockMax?: number;
+
+  // =============================
+  // RELATIONS
+  // =============================
 
   @OneToMany(
     () => StockMovementEntity,

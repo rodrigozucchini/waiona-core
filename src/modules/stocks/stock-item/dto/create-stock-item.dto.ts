@@ -17,21 +17,7 @@ export class CreateStockItemDto {
   locationId: number;
 
   // ==========================
-  // Estado del stock
-  // ==========================
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  quantity?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  quantityReserved?: number;
-
-  // ==========================
-  // Umbrales de stock
+  // Umbrales
   // ==========================
 
   @IsNumber()

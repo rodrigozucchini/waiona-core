@@ -9,7 +9,7 @@ export class StockItemResponseDto {
   locationId: number;
   locationName: string;
 
-  quantity: number;
+  quantityCurrent: number;
   quantityReserved: number;
   quantityAvailable: number;
 
@@ -28,7 +28,7 @@ export class StockItemResponseDto {
     this.locationId = entity.locationId;
     this.locationName = entity.location?.name ?? '';
 
-    this.quantity = entity.quantity;
+    this.quantityCurrent = entity.quantityCurrent;
     this.quantityReserved = entity.quantityReserved;
     this.quantityAvailable = entity.quantityAvailable;
 
