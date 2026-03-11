@@ -16,6 +16,10 @@ import { UpdateStockThresholdsDto } from '../dto/update-stock-thresholds.dto';
 import { StockItemResponseDto } from '../dto/stock-item-response.dto';
 import { StockItemWithMovementsResponseDto } from '../dto/stock-item-with-movements-response.dto';
 
+import { CreateStockWriteOffDto } from '../../stock-writeoff/dto/create-stock-writeoff.dto';
+import { UpdateStockWriteOffDto } from '../../stock-writeoff/dto/update-stock-writeoff.dto';
+import { StockWriteOffEntity } from '../../stock-writeoff/entities/stock-writeoff.entity';
+
 @Controller('stock-items')
 export class StockItemsController {
 
@@ -72,6 +76,43 @@ export class StockItemsController {
       locationId,
       quantity,
     );
+  }
+
+  // ==========================
+  // WRITE OFF SIMPLE
+  // ==========================
+
+  @Post('write-off')
+  async writeOff(
+    @Body('stockItemId', ParseIntPipe) stockItemId: number,
+    @Body('quantity', ParseIntPipe) quantity: number,
+  ): Promise<StockItemWithMovementsResponseDto> {
+
+    return this.stockItemsService.writeOff(
+      stockItemId,
+      quantity,
+    );
+  }
+
+  // ==========================
+  // WRITE OFF DAMAGE
+  // ==========================
+
+  @Post('write-off-damage')
+  async writeOffDamage(
+    @Body() dto: CreateStockWriteOffDto,
+  ): Promise<StockItemWithMovementsResponseDto> {
+
+    return this.stockItemsService.writeOffDamage(dto);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStockWriteOffDto,
+  ): Promise<StockWriteOffEntity> {
+
+    return this.stockItemsService.update(id, dto);
   }
 
   // ==========================

@@ -9,9 +9,11 @@ import { Repository } from 'typeorm';
 
 import { StockItemEntity } from '../entities/stock-item.entity';
 import { StockMovementEntity } from '../../stock-movement/entities/stock-movement.entity';
+import { StockWriteOffEntity } from '../../stock-writeoff/entities/stock-writeoff.entity';
 
 import { CreateStockItemDto } from '../dto/create-stock-item.dto';
 import { UpdateStockThresholdsDto } from '../dto/update-stock-thresholds.dto';
+import { CreateStockWriteOffDto } from '../../stock-writeoff/dto/create-stock-writeoff.dto';
 
 import { StockItemResponseDto } from '../dto/stock-item-response.dto';
 import { StockItemWithMovementsResponseDto } from '../dto/stock-item-with-movements-response.dto';
@@ -19,6 +21,7 @@ import { StockItemWithMovementsResponseDto } from '../dto/stock-item-with-moveme
 import { StockOperationType } from '../../stock-movement/enums/stock-operation-type.enum';
 import { StockFlow } from '../../stock-movement/enums/stock-flow.enum';
 import { StockReferenceType } from '../../stock-movement/enums/stock-reference.enum';
+import { UpdateStockWriteOffDto } from '../../stock-writeoff/dto/update-stock-writeoff.dto';
 
 @Injectable()
 export class StockItemsService {
@@ -29,6 +32,9 @@ export class StockItemsService {
 
     @InjectRepository(StockMovementEntity)
     private readonly stockMovementRepository: Repository<StockMovementEntity>,
+
+    @InjectRepository(StockWriteOffEntity)
+    private readonly stockWriteOffRepository: Repository<StockWriteOffEntity>,
   ) {}
 
   // ==========================
@@ -130,12 +136,10 @@ export class StockItemsService {
       );
     }
 
-    // actualizar stock
     stockItem.quantityCurrent += quantity;
 
     await this.stockItemRepository.save(stockItem);
 
-    // crear movimiento
     const movement = this.stockMovementRepository.create({
       stockItemId: stockItem.id,
       operationType: StockOperationType.INITIAL,
@@ -150,6 +154,156 @@ export class StockItemsService {
 
     return new StockItemWithMovementsResponseDto(entity);
   }
+
+  // ==========================
+  // WRITE OFF SIMPLE
+  // ==========================
+
+  async writeOff(
+    stockItemId: number,
+    quantity: number,
+  ): Promise<StockItemWithMovementsResponseDto> {
+
+    if (quantity <= 0) {
+      throw new BadRequestException(
+        'Quantity must be greater than 0',
+      );
+    }
+
+    const stockItem = await this.stockItemRepository.findOne({
+      where: { id: stockItemId },
+    });
+
+    if (!stockItem) {
+      throw new NotFoundException(
+        `StockItem with id ${stockItemId} not found`,
+      );
+    }
+
+    if (stockItem.quantityCurrent < quantity) {
+      throw new BadRequestException(
+        'Insufficient stock',
+      );
+    }
+
+    stockItem.quantityCurrent -= quantity;
+
+    await this.stockItemRepository.save(stockItem);
+
+    const movement = this.stockMovementRepository.create({
+      stockItemId: stockItem.id,
+      operationType: StockOperationType.ADJUSTMENT,
+      stockFlow: StockFlow.OUTBOUND,
+      quantity: quantity,
+      referenceType: StockReferenceType.MANUAL,
+    });
+
+    await this.stockMovementRepository.save(movement);
+
+    const entity = await this.findOne(stockItem.id);
+
+    return new StockItemWithMovementsResponseDto(entity);
+  }
+
+  // ==========================
+  // WRITE OFF DAMAGE
+  // ==========================
+
+  async writeOffDamage(
+    dto: CreateStockWriteOffDto,
+  ): Promise<StockItemWithMovementsResponseDto> {
+
+    if (dto.quantity <= 0) {
+      throw new BadRequestException(
+        'Quantity must be greater than 0',
+      );
+    }
+
+    const stockItem = await this.stockItemRepository.findOne({
+      where: { id: dto.stockItemId },
+    });
+
+    if (!stockItem) {
+      throw new NotFoundException(
+        `StockItem with id ${dto.stockItemId} not found`,
+      );
+    }
+
+    if (stockItem.quantityCurrent < dto.quantity) {
+      throw new BadRequestException(
+        'Insufficient stock',
+      );
+    }
+
+    stockItem.quantityCurrent -= dto.quantity;
+
+    await this.stockItemRepository.save(stockItem);
+
+    const movement = this.stockMovementRepository.create({
+      stockItemId: stockItem.id,
+      operationType: StockOperationType.DAMAGE,
+      stockFlow: StockFlow.OUTBOUND,
+      quantity: dto.quantity,
+      referenceType: StockReferenceType.MANUAL,
+    });
+
+    const savedMovement = await this.stockMovementRepository.save(movement);
+
+    const writeOff = this.stockWriteOffRepository.create({
+      stockItemId: dto.stockItemId,
+      movementId: savedMovement.id,
+      quantity: dto.quantity,
+      reason: dto.reason,
+      description: dto.description,
+      attachments: dto.attachments,
+      reportedBy: dto.reportedBy,
+    });
+
+    await this.stockWriteOffRepository.save(writeOff);
+
+    const entity = await this.findOne(stockItem.id);
+
+    return new StockItemWithMovementsResponseDto(entity);
+  }
+
+
+   // ==========================
+  // UPDATE WRITE OFF
+  // ==========================
+
+  async update(
+    id: number,
+    dto: UpdateStockWriteOffDto,
+  ): Promise<StockWriteOffEntity> {
+
+    const writeOff = await this.stockWriteOffRepository.findOne({
+      where: { id },
+    });
+
+    if (!writeOff) {
+      throw new NotFoundException(
+        `StockWriteOff with id ${id} not found`,
+      );
+    }
+
+    // actualizar solo campos permitidos
+    if (dto.reason !== undefined) {
+      writeOff.reason = dto.reason;
+    }
+
+    if (dto.description !== undefined) {
+      writeOff.description = dto.description;
+    }
+
+    if (dto.attachments !== undefined) {
+      writeOff.attachments = dto.attachments;
+    }
+
+    const saved = await this.stockWriteOffRepository.save(writeOff);
+
+    return saved;
+  }
+
 
   // ==========================
   // UPDATE STOCK THRESHOLDS
