@@ -10,6 +10,7 @@ import { MarginsModule } from './modules/margins/margins.module';
 import { DiscountsModule } from './modules/discounts/discounts.module';
 import { ProductsModule } from './modules/products/products.module';
 import { StocksModule } from './modules/stocks/stocks.module';
+import { PricingModule } from './modules/pricing/pricing.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { StocksModule } from './modules/stocks/stocks.module';
     DiscountsModule,
     ProductsModule,
     StocksModule,
+    PricingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
