@@ -12,6 +12,7 @@ import { StockMovementEntity } from './stock-movement/entities/stock-movement.en
 import { StockItemEntity } from './stock-item/entities/stock-item.entity';
 import { StockItemsService } from './stock-item/services/stock-item.service';
 import { StockItemsController } from './stock-item/controllers/stock-item.controller';
+import { StockWriteOffEntity } from './stock-writeoff/entities/stock-writeoff.entity';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { StockItemsController } from './stock-item/controllers/stock-item.contro
       StockLocationEntity,
       StockMovementEntity,
       StockItemEntity,
+      StockWriteOffEntity
     ]),
   ],
   providers: [
