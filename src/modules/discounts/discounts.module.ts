@@ -18,6 +18,10 @@ import { DiscountUsageController } from './usage/controllers/discount-usage.cont
 import { DiscountConditionController } from './conditions/controllers/discount-condition.controller';
 import { DiscountActionsController } from './actions/controllers/discount-actions.controller';
 import { CouponController } from './coupon/controllers/coupon.controller';
+import { DiscountProductTargetService } from './discount-product-target/services/discount-product-target.service';
+import { DiscountProductTargetController } from './discount-product-target/controllers/discount-product-target.controller';
+import { DiscountCategoryTargetService } from './discount-category-target/services/discount-category-target.service';
+import { DiscountCategoryTargetController } from './discount-category-target/controllers/discount-category-target.controller';
 
 @Module({
   imports: [
@@ -35,6 +39,8 @@ import { CouponController } from './coupon/controllers/coupon.controller';
     CouponService,
     DiscountUsageService,
     DiscountConditionService,
+    DiscountProductTargetService,
+    DiscountCategoryTargetService,
   ],
   controllers: [
     DiscountsController,
@@ -42,6 +48,8 @@ import { CouponController } from './coupon/controllers/coupon.controller';
     CouponController,
     DiscountUsageController,
     DiscountConditionController,
+    DiscountProductTargetController,
+    DiscountCategoryTargetController,
   ],
   exports: [
     DiscountsService,

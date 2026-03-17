@@ -1,4 +1,4 @@
-import { ProductTaxEntity } from '../entities/product-tax.entity';
+import { ProductTaxEntity } from "../entities/product-taxes.entity";
 
 export class ProductTaxResponseDto {
 
