@@ -15,11 +15,17 @@ import { ProductMeasurementUnit } from '../enums/product-measurement-unit.enum';
 @Index(['isActive'])
 @Index(['sku'], { unique: true })
 export class ProductEntity extends BaseEntity {
+<<<<<<< HEAD
+  // ==========================
+  // Identificación
+  // ==========================
+=======
 
   // ==========================
   // Identificación
   // ==========================
 
+>>>>>>> 8d060ec7631c162058031ac7e376e3bdbd83e340
   @Column({
     type: 'varchar',
     length: 50,
