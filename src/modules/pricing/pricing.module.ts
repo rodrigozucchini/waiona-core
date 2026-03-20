@@ -5,8 +5,8 @@ import { ProductPricingEntity } from './entities/product-pricing.entity';
 import { ComboPricingEntity } from './entities/combo-pricing.entity';
 import { ProductPricingService } from './services/product-pricing.service';
 import { ComboPricingService } from './services/combo-pricing.service';
-import { ComboPricingController } from './combo-pricing.controller';
-import { ProductPricingController } from './product-pricing.controller';
+import { ComboPricingController } from './controllers/combo-pricing.controller';
+import { ProductPricingController } from './controllers/product-pricing.controller';
 
 @Module({
   imports: [

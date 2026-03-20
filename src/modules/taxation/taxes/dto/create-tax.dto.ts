@@ -1,4 +1,5 @@
-import { IsInt, IsNumber, IsBoolean, Min } from 'class-validator';
+import { IsInt, IsNumber, IsBoolean, Min, IsOptional, IsEnum } from 'class-validator';
+import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 export class CreateTaxDto {
 
@@ -11,5 +12,9 @@ export class CreateTaxDto {
 
   @IsBoolean()
   isPercentage: boolean;
+
+  @IsOptional()
+  @IsEnum(CurrencyCode)
+  currency?: CurrencyCode;
 
 }

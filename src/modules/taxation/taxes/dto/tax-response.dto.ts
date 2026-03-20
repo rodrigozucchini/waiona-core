@@ -1,15 +1,17 @@
 import { TaxEntity } from '../entities/tax.entity';
 import { TaxTypeResponseDto } from '../../tax-types/dto/tax-type-response.dto';
+import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 export class TaxResponseDto {
   id: number;
   taxTypeId: number;
   value: number;
   isPercentage: boolean;
+  currency?: CurrencyCode;
+
   createdAt: Date;
   updatedAt: Date;
 
-  // incluimos la relación completa
   taxType?: TaxTypeResponseDto;
 
   constructor(entity: TaxEntity) {
@@ -17,10 +19,11 @@ export class TaxResponseDto {
     this.taxTypeId = entity.taxTypeId;
     this.value = Number(entity.value);
     this.isPercentage = entity.isPercentage;
+    this.currency = entity.currency;
+
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
 
-    // mapear la relación si existe
     if (entity.taxType) {
       this.taxType = new TaxTypeResponseDto(entity.taxType);
     }
