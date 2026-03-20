@@ -22,6 +22,9 @@ import { DiscountProductTargetService } from './discount-product-target/services
 import { DiscountProductTargetController } from './discount-product-target/controllers/discount-product-target.controller';
 import { DiscountCategoryTargetService } from './discount-category-target/services/discount-category-target.service';
 import { DiscountCategoryTargetController } from './discount-category-target/controllers/discount-category-target.controller';
+import { DiscountComboTargetEntity } from './discount-combo-target/entities/discount-combo-target.entity';
+import { DiscountProductTargetEntity } from './discount-product-target/entities/discount-product-target.entity';
+import { DiscountCategoryTargetEntity } from './discount-category-target/entities/discount-category-target.entity';
 
 @Module({
   imports: [
@@ -31,6 +34,9 @@ import { DiscountCategoryTargetController } from './discount-category-target/con
       CouponEntity,
       DiscountUsageEntity,
       DiscountConditionEntity,
+      DiscountProductTargetEntity,
+      DiscountComboTargetEntity,
+      DiscountCategoryTargetEntity
     ]),
   ],
   providers: [
@@ -41,6 +47,7 @@ import { DiscountCategoryTargetController } from './discount-category-target/con
     DiscountConditionService,
     DiscountProductTargetService,
     DiscountCategoryTargetService,
+    DiscountComboTargetEntity,
   ],
   controllers: [
     DiscountsController,

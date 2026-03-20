@@ -11,10 +11,6 @@ import { DiscountsModule } from './modules/discounts/discounts.module';
 import { ProductsModule } from './modules/products/products.module';
 import { StocksModule } from './modules/stocks/stocks.module';
 import { PricingModule } from './modules/pricing/pricing.module';
-<<<<<<< HEAD
-import { ProductTaxesModule } from './modules/product-taxes/product-taxes.module';
-=======
->>>>>>> 8d060ec7631c162058031ac7e376e3bdbd83e340
 
 @Module({
   imports: [
@@ -45,10 +41,6 @@ import { ProductTaxesModule } from './modules/product-taxes/product-taxes.module
     ProductsModule,
     StocksModule,
     PricingModule,
-<<<<<<< HEAD
-    ProductTaxesModule,
-=======
->>>>>>> 8d060ec7631c162058031ac7e376e3bdbd83e340
   ],
   controllers: [AppController],
   providers: [AppService],
