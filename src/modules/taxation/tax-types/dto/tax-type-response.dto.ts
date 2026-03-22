@@ -4,15 +4,16 @@ export class TaxTypeResponseDto {
   id: number;
   code: string;
   name: string;
-
   createdAt: Date;
   updatedAt: Date;
 
-  constructor(entity: TaxTypeEntity) {
-    this.id = entity.id;
-    this.code = entity.code;
-    this.name = entity.name;
-    this.createdAt = entity.createdAt;
-    this.updatedAt = entity.updatedAt;
+  static fromEntity(entity: TaxTypeEntity): TaxTypeResponseDto {
+    return {
+      id: entity.id,
+      code: entity.code,
+      name: entity.name,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+    };
   }
 }

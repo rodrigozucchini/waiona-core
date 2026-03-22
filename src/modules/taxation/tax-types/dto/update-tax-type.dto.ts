@@ -1,13 +1,13 @@
-import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, Length } from 'class-validator';
 
 export class UpdateTaxTypeDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(20)
+  @Length(2, 20)
   code: string;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
+  @Length(3, 150)
   name: string;
 }

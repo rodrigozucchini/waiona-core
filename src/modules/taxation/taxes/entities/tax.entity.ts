@@ -33,7 +33,7 @@ export class TaxEntity extends BaseEntity {
   @Column({
     type: 'enum',
     enum: CurrencyCode,
-    nullable: true, // 🔥 importante
+    nullable: true,
   })
   currency?: CurrencyCode;
 }
