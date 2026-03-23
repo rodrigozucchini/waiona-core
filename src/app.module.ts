@@ -32,6 +32,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
 
         autoLoadEntities: true,
         synchronize: true,
+        //dropSchema: true,
       }),
     }),
 

@@ -17,7 +17,7 @@ import {
   
   @Injectable()
   export class DiscountUsageService {
-  
+/*  
     constructor(
       @InjectRepository(DiscountUsageEntity)
       private discountUsageRepository: Repository<DiscountUsageEntity>,
@@ -159,4 +159,5 @@ import {
   
       return entity;
     }
+      */
   }
