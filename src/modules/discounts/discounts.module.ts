@@ -2,16 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { DiscountEntity } from './discount/entities/discounts.entity';
-import { CouponEntity } from './coupon/entities/coupon.entity';
-import { DiscountUsageEntity } from './usage/entities/discount-usage.entity';
+import { DiscountUsageEntity } from '../coupons/usage/entities/discount-usage.entity';
 
 import { DiscountsService } from './discount/services/discounts.service';
-import { CouponService } from './coupon/services/coupon.service';
-import { DiscountUsageService } from './usage/services/discount-usage.service';
+import { DiscountUsageService } from '../coupons/usage/services/discount-usage.service';
 
 import { DiscountsController } from './discount/controllers/discounts.controller';
-import { DiscountUsageController } from './usage/controllers/discount-usage.controller';
-import { CouponController } from './coupon/controllers/coupon.controller';
+import { DiscountUsageController } from '../coupons/usage/controllers/discount-usage.controller';
 import { DiscountProductTargetService } from './discount-product-target/services/discount-product-target.service';
 import { DiscountProductTargetController } from './discount-product-target/controllers/discount-product-target.controller';
 import { DiscountCategoryTargetService } from './discount-category-target/services/discount-category-target.service';
@@ -24,7 +21,6 @@ import { DiscountCategoryTargetEntity } from './discount-category-target/entitie
   imports: [
     TypeOrmModule.forFeature([
       DiscountEntity,
-      CouponEntity,
   //    DiscountUsageEntity,
       DiscountProductTargetEntity,
       DiscountComboTargetEntity,
@@ -33,7 +29,6 @@ import { DiscountCategoryTargetEntity } from './discount-category-target/entitie
   ],
   providers: [
     DiscountsService,
-    CouponService,
 //    DiscountUsageService,
     DiscountProductTargetService,
     DiscountCategoryTargetService,
@@ -41,7 +36,6 @@ import { DiscountCategoryTargetEntity } from './discount-category-target/entitie
   ],
   controllers: [
     DiscountsController,
-    CouponController,
  //   DiscountUsageController,
     DiscountProductTargetController,
     DiscountCategoryTargetController,

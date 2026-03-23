@@ -9,6 +9,7 @@ import {
   Max,
   IsEnum,
   IsDate,
+  IsEmpty,
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -48,10 +49,7 @@ export class UpdateDiscountDto {
   @IsBoolean()
   isPercentage?: boolean;
 
-  // currency es requerida si isPercentage viene explícitamente como false,
-  // e inválida si isPercentage viene como true.
-  // Si isPercentage no viene, currency es opcional (lógica de negocio en el service).
-  @ValidateIf((o) => o.isPercentage === false)
+  @IsOptional()
   @IsEnum(CurrencyCode)
   currency?: CurrencyCode;
 

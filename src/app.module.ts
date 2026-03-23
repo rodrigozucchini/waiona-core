@@ -11,6 +11,7 @@ import { DiscountsModule } from './modules/discounts/discounts.module';
 import { ProductsModule } from './modules/products/products.module';
 import { StocksModule } from './modules/stocks/stocks.module';
 import { PricingModule } from './modules/pricing/pricing.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
     ProductsModule,
     StocksModule,
     PricingModule,
+    CouponsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
