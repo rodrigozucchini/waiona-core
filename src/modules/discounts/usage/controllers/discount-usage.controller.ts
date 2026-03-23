@@ -17,7 +17,7 @@ import {
   
   @Controller('discount-usage')
   export class DiscountUsageController {
-  
+  /*
     constructor(
       private discountUsageService: DiscountUsageService,
     ) {}
@@ -55,4 +55,5 @@ import {
     ): Promise<void> {
       return this.discountUsageService.delete(id);
     }
+      */
   }

@@ -24,8 +24,8 @@ export class TaxResponseDto {
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
 
-    if (entity.taxType) {
+    /*if (entity.taxType) {
       this.taxType = new TaxTypeResponseDto(entity.taxType);
-    }
+    }*/
   }
 }
