@@ -1,109 +1,126 @@
 import {
-    Injectable,
-    NotFoundException,
-    BadRequestException,
-  } from '@nestjs/common';
-  import { InjectRepository } from '@nestjs/typeorm';
-  import { Repository } from 'typeorm';
-  
-  import { DiscountProductTargetEntity } from '../entities/discount-product-target.entity';
-  import { CreateDiscountProductTargetDto } from '../dto/create-discount-product-target.dto';
-  import { UpdateDiscountProductTargetDto } from '../dto/update-discount-product-target.dto';
-  
-  @Injectable()
-  export class DiscountProductTargetService {
-  
-    constructor(
-      @InjectRepository(DiscountProductTargetEntity)
-      private readonly repo: Repository<DiscountProductTargetEntity>,
-    ) {}
-  
-    // 🟢 CREATE
-    async create(dto: CreateDiscountProductTargetDto) {
-  
-      const existing = await this.repo.findOne({
-        where: {
-          productId: dto.productId,
-          isDeleted: false,
-        },
-      });
-  
-      if (existing) {
-        throw new BadRequestException(
-          'Product already has an active discount',
-        );
-      }
-  
-      const entity = this.repo.create(dto);
-      return this.repo.save(entity);
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { DiscountProductTargetEntity } from '../entities/discount-product-target.entity';
+import { DiscountEntity } from '../../discount/entities/discounts.entity';
+import { CreateDiscountProductTargetDto } from '../dto/create-discount-product-target.dto';
+import { DiscountProductTargetResponseDto } from '../dto/discount-target-response.dto';
+
+@Injectable()
+export class DiscountProductTargetService {
+
+  constructor(
+    @InjectRepository(DiscountProductTargetEntity)
+    private readonly repo: Repository<DiscountProductTargetEntity>,
+    @InjectRepository(DiscountEntity)
+    private readonly discountRepository: Repository<DiscountEntity>,
+  ) {}
+
+  // ==========================
+  // CREATE
+  // ==========================
+
+  async create(
+    discountId: number,
+    dto: CreateDiscountProductTargetDto,
+  ): Promise<DiscountProductTargetResponseDto> {
+    await this.findDiscount(discountId);
+    await this.validateUniqueTarget(discountId, dto.productId);
+
+    // 🔥 el producto no puede tener otro descuento activo (de cualquier descuento)
+    await this.validateProductHasNoActiveDiscount(dto.productId);
+
+    const entity = this.repo.create({
+      discountId,
+      productId: dto.productId,
+    });
+
+    const saved = await this.repo.save(entity);
+
+    return new DiscountProductTargetResponseDto(saved);
+  }
+
+  // ==========================
+  // GET ALL BY DISCOUNT
+  // ==========================
+
+  async findAll(discountId: number): Promise<DiscountProductTargetResponseDto[]> {
+    await this.findDiscount(discountId);
+
+    const targets = await this.repo.find({
+      where: { discountId, isDeleted: false },
+    });
+
+    return targets.map((t) => new DiscountProductTargetResponseDto(t));
+  }
+
+  // ==========================
+  // DELETE (soft)
+  // ==========================
+
+  async remove(discountId: number, productId: number): Promise<void> {
+    await this.findDiscount(discountId);
+
+    const entity = await this.repo.findOne({
+      where: { discountId, productId, isDeleted: false },
+    });
+
+    if (!entity) {
+      throw new NotFoundException(
+        `Product target ${productId} not found for discount ${discountId}`,
+      );
     }
-  
-    // 🟡 UPDATE
-    async update(id: number, dto: UpdateDiscountProductTargetDto) {
-  
-      const entity = await this.repo.findOne({
-        where: { id, isDeleted: false },
-      });
-  
-      if (!entity) {
-        throw new NotFoundException('Discount product target not found');
-      }
-  
-      // si cambia el productId, validar regla
-      if (dto.productId && dto.productId !== entity.productId) {
-        const existing = await this.repo.findOne({
-          where: {
-            productId: dto.productId,
-            isDeleted: false,
-          },
-        });
-  
-        if (existing) {
-          throw new BadRequestException(
-            'Product already has an active discount',
-          );
-        }
-      }
-  
-      Object.assign(entity, dto);
-      return this.repo.save(entity);
+
+    entity.isDeleted = true;
+    await this.repo.save(entity);
+  }
+
+  // ==========================
+  // PRIVATE HELPERS
+  // ==========================
+
+  private async findDiscount(discountId: number): Promise<DiscountEntity> {
+    const discount = await this.discountRepository.findOne({
+      where: { id: discountId, isDeleted: false },
+    });
+
+    if (!discount) {
+      throw new NotFoundException(`Discount with id ${discountId} not found`);
     }
-  
-    // 🔵 GET ALL
-    async findAll() {
-      return this.repo.find({
-        where: { isDeleted: false },
-      });
-    }
-  
-    // 🔵 GET ONE
-    async findOne(id: number) {
-      const entity = await this.repo.findOne({
-        where: { id, isDeleted: false },
-      });
-  
-      if (!entity) {
-        throw new NotFoundException('Discount product target not found');
-      }
-  
-      return entity;
-    }
-  
-    // 🔥 GET BY PRODUCT (clave para pricing)
-    async findByProduct(productId: number) {
-      return this.repo.findOne({
-        where: {
-          productId,
-          isDeleted: false,
-        },
-      });
-    }
-  
-    // 🔴 SOFT DELETE
-    async remove(id: number) {
-      const entity = await this.findOne(id);
-  
-      entity.isDeleted = true;
-      return this.repo.save(entity);
+
+    return discount;
+  }
+
+  private async validateUniqueTarget(
+    discountId: number,
+    productId: number,
+  ): Promise<void> {
+    const existing = await this.repo.findOne({
+      where: { discountId, productId, isDeleted: false },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Product ${productId} is already a target of discount ${discountId}`,
+      );
     }
   }
+
+  // 🔥 chequea que el producto no esté asociado a NINGÚN descuento activo
+  private async validateProductHasNoActiveDiscount(productId: number): Promise<void> {
+    const existing = await this.repo.findOne({
+      where: { productId, isDeleted: false },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Product ${productId} already has an active discount assigned`,
+      );
+    }
+  }
+}

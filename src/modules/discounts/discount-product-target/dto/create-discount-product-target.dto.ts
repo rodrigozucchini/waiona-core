@@ -1,11 +1,8 @@
-import { IsInt } from 'class-validator';
+import { IsInt, Min } from 'class-validator';
 
 export class CreateDiscountProductTargetDto {
 
   @IsInt()
-  discountId: number;
-
-  @IsInt()
+  @Min(1)
   productId: number;
-
 }
