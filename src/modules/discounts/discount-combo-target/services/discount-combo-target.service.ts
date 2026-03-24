@@ -1,102 +1,126 @@
 import {
-    Injectable,
-    NotFoundException,
-    BadRequestException,
-  } from '@nestjs/common';
-  import { InjectRepository } from '@nestjs/typeorm';
-  import { Repository } from 'typeorm';
-  
-  import { DiscountComboTargetEntity } from '../entities/discount-combo-target.entity';
-  import { CreateDiscountComboTargetDto } from '../dto/create-discount-combo-target.dto';
-  import { UpdateDiscountComboTargetDto } from '../dto/update-discount-combo-target.dto';
-  
-  @Injectable()
-  export class DiscountComboTargetService {
-  
-    constructor(
-      @InjectRepository(DiscountComboTargetEntity)
-      private readonly repo: Repository<DiscountComboTargetEntity>,
-    ) {}
-  
-    async create(dto: CreateDiscountComboTargetDto) {
-  
-      const existing = await this.repo.findOne({
-        where: {
-          comboId: dto.comboId,
-          isDeleted: false,
-        },
-      });
-  
-      if (existing) {
-        throw new BadRequestException(
-          'Combo already has an active discount',
-        );
-      }
-  
-      const entity = this.repo.create(dto);
-      return this.repo.save(entity);
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { DiscountComboTargetEntity } from '../entities/discount-combo-target.entity';
+import { DiscountEntity } from '../../discount/entities/discounts.entity';
+import { CreateDiscountComboTargetDto } from '../dto/create-discount-combo-target.dto';
+import { DiscountComboTargetResponseDto } from '../dto/discount-combo-target.dto';
+
+@Injectable()
+export class DiscountComboTargetService {
+
+  constructor(
+    @InjectRepository(DiscountComboTargetEntity)
+    private readonly repo: Repository<DiscountComboTargetEntity>,
+    @InjectRepository(DiscountEntity)
+    private readonly discountRepository: Repository<DiscountEntity>,
+  ) {}
+
+  // ==========================
+  // CREATE
+  // ==========================
+
+  async create(
+    discountId: number,
+    dto: CreateDiscountComboTargetDto,
+  ): Promise<DiscountComboTargetResponseDto> {
+    await this.findDiscount(discountId);
+    await this.validateUniqueTarget(discountId, dto.comboId);
+
+    // 🔥 el combo no puede tener otro descuento activo (de cualquier descuento)
+    await this.validateComboHasNoActiveDiscount(dto.comboId);
+
+    const entity = this.repo.create({
+      discountId,
+      comboId: dto.comboId,
+    });
+
+    const saved = await this.repo.save(entity);
+
+    return new DiscountComboTargetResponseDto(saved);
+  }
+
+  // ==========================
+  // GET ALL BY DISCOUNT
+  // ==========================
+
+  async findAll(discountId: number): Promise<DiscountComboTargetResponseDto[]> {
+    await this.findDiscount(discountId);
+
+    const targets = await this.repo.find({
+      where: { discountId, isDeleted: false },
+    });
+
+    return targets.map((t) => new DiscountComboTargetResponseDto(t));
+  }
+
+  // ==========================
+  // DELETE (soft)
+  // ==========================
+
+  async remove(discountId: number, comboId: number): Promise<void> {
+    await this.findDiscount(discountId);
+
+    const entity = await this.repo.findOne({
+      where: { discountId, comboId, isDeleted: false },
+    });
+
+    if (!entity) {
+      throw new NotFoundException(
+        `Combo target ${comboId} not found for discount ${discountId}`,
+      );
     }
-  
-    async update(id: number, dto: UpdateDiscountComboTargetDto) {
-  
-      const entity = await this.repo.findOne({
-        where: { id, isDeleted: false },
-      });
-  
-      if (!entity) {
-        throw new NotFoundException('Discount combo target not found');
-      }
-  
-      if (dto.comboId && dto.comboId !== entity.comboId) {
-        const existing = await this.repo.findOne({
-          where: {
-            comboId: dto.comboId,
-            isDeleted: false,
-          },
-        });
-  
-        if (existing) {
-          throw new BadRequestException(
-            'Combo already has an active discount',
-          );
-        }
-      }
-  
-      Object.assign(entity, dto);
-      return this.repo.save(entity);
+
+    entity.isDeleted = true;
+    await this.repo.save(entity);
+  }
+
+  // ==========================
+  // PRIVATE HELPERS
+  // ==========================
+
+  private async findDiscount(discountId: number): Promise<DiscountEntity> {
+    const discount = await this.discountRepository.findOne({
+      where: { id: discountId, isDeleted: false },
+    });
+
+    if (!discount) {
+      throw new NotFoundException(`Discount with id ${discountId} not found`);
     }
-  
-    async findAll() {
-      return this.repo.find({
-        where: { isDeleted: false },
-      });
-    }
-  
-    async findOne(id: number) {
-      const entity = await this.repo.findOne({
-        where: { id, isDeleted: false },
-      });
-  
-      if (!entity) {
-        throw new NotFoundException('Discount combo target not found');
-      }
-  
-      return entity;
-    }
-  
-    async findByCombo(comboId: number) {
-      return this.repo.findOne({
-        where: {
-          comboId,
-          isDeleted: false,
-        },
-      });
-    }
-  
-    async remove(id: number) {
-      const entity = await this.findOne(id);
-  
-      entity.isDeleted = true;
-      return this.repo.save(entity);
+
+    return discount;
+  }
+
+  private async validateUniqueTarget(
+    discountId: number,
+    comboId: number,
+  ): Promise<void> {
+    const existing = await this.repo.findOne({
+      where: { discountId, comboId, isDeleted: false },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Combo ${comboId} is already a target of discount ${discountId}`,
+      );
     }
   }
+
+  // 🔥 chequea que el combo no esté asociado a NINGÚN descuento activo
+  private async validateComboHasNoActiveDiscount(comboId: number): Promise<void> {
+    const existing = await this.repo.findOne({
+      where: { comboId, isDeleted: false },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Combo ${comboId} already has an active discount assigned`,
+      );
+    }
+  }
+}

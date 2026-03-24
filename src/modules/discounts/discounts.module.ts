@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { DiscountEntity } from './discount/entities/discounts.entity';
-import { DiscountUsageEntity } from '../coupons/usage/entities/discount-usage.entity';
+import { DiscountUsageEntity } from '../coupons/usage/entities/coupon-usage.entity';
 
 import { DiscountsService } from './discount/services/discounts.service';
 import { DiscountUsageService } from '../coupons/usage/services/discount-usage.service';

@@ -6,17 +6,17 @@ import {
   import { InjectRepository } from '@nestjs/typeorm';
   import { Repository } from 'typeorm';
   
-  import { CouponCategoryTargetEntity } from '../../coupon-category-target/entities/coupon-category-target.entity';
+  import { CouponComboTargetEntity } from '../entities/coupon-combo-target.entity';
   import { CouponEntity } from '../../coupon/entities/coupon.entity';
-  import { CreateCouponCategoryTargetDto } from '../../coupon-category-target/dto/create-coupon-category-target.dto';
-  import { CouponCategoryTargetResponseDto } from '../../coupon-category-target/dto/coupon-category-target-response.dto';
+  import { CreateCouponComboTargetDto } from '../dto/create-coupon-combo-target.dto';
+  import { CouponComboTargetResponseDto } from '../dto/coupon-combo-target-response.dto';
   
   @Injectable()
-  export class CouponCategoryTargetService {
+  export class CouponComboTargetService {
   
     constructor(
-      @InjectRepository(CouponCategoryTargetEntity)
-      private readonly repo: Repository<CouponCategoryTargetEntity>,
+      @InjectRepository(CouponComboTargetEntity)
+      private readonly repo: Repository<CouponComboTargetEntity>,
       @InjectRepository(CouponEntity)
       private readonly couponRepository: Repository<CouponEntity>,
     ) {}
@@ -27,56 +27,50 @@ import {
   
     async create(
       couponId: number,
-      dto: CreateCouponCategoryTargetDto,
-    ): Promise<CouponCategoryTargetResponseDto> {
-  
-      // 🔥 validar que el cupón exista y no esté eliminado
+      dto: CreateCouponComboTargetDto,
+    ): Promise<CouponComboTargetResponseDto> {
       await this.findCoupon(couponId);
-  
-      // 🔥 validar que el cupón no sea global — no tiene sentido asignar targets a uno global
       await this.validateCouponNotGlobal(couponId);
-  
-      // 🔥 validar que no exista ya este par couponId + categoryId
-      await this.validateUniqueTarget(couponId, dto.categoryId);
+      await this.validateUniqueTarget(couponId, dto.comboId);
   
       const entity = this.repo.create({
         couponId,
-        categoryId: dto.categoryId,
+        comboId: dto.comboId,
       });
   
       const saved = await this.repo.save(entity);
   
-      return new CouponCategoryTargetResponseDto(saved);
+      return new CouponComboTargetResponseDto(saved);
     }
   
     // ==========================
     // GET ALL BY COUPON
     // ==========================
   
-    async findAll(couponId: number): Promise<CouponCategoryTargetResponseDto[]> {
+    async findAll(couponId: number): Promise<CouponComboTargetResponseDto[]> {
       await this.findCoupon(couponId);
   
       const targets = await this.repo.find({
         where: { couponId, isDeleted: false },
       });
   
-      return targets.map((t) => new CouponCategoryTargetResponseDto(t));
+      return targets.map((t) => new CouponComboTargetResponseDto(t));
     }
   
     // ==========================
     // DELETE (soft)
     // ==========================
   
-    async remove(couponId: number, categoryId: number): Promise<void> {
+    async remove(couponId: number, comboId: number): Promise<void> {
       await this.findCoupon(couponId);
   
       const entity = await this.repo.findOne({
-        where: { couponId, categoryId, isDeleted: false },
+        where: { couponId, comboId, isDeleted: false },
       });
   
       if (!entity) {
         throw new NotFoundException(
-          `Category target ${categoryId} not found for coupon ${couponId}`,
+          `Combo target ${comboId} not found for coupon ${couponId}`,
         );
       }
   
@@ -112,15 +106,15 @@ import {
   
     private async validateUniqueTarget(
       couponId: number,
-      categoryId: number,
+      comboId: number,
     ): Promise<void> {
       const existing = await this.repo.findOne({
-        where: { couponId, categoryId, isDeleted: false },
+        where: { couponId, comboId, isDeleted: false },
       });
   
       if (existing) {
         throw new ConflictException(
-          `Category ${categoryId} is already a target of coupon ${couponId}`,
+          `Combo ${comboId} is already a target of coupon ${couponId}`,
         );
       }
     }

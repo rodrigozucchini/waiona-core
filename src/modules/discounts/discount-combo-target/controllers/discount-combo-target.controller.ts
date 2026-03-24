@@ -1,66 +1,59 @@
 import {
-    Controller,
-    Get,
-    Post,
-    Body,
-    Patch,
-    Param,
-    Delete,
-    ParseIntPipe,
-  } from '@nestjs/common';
-  
-  import { DiscountComboTargetService } from '../services/discount-combo-target.service';
-  import { CreateDiscountComboTargetDto } from '../dto/create-discount-combo-target.dto';
-  import { UpdateDiscountComboTargetDto } from '../dto/update-discount-combo-target.dto';
-  import { DiscountComboTargetResponseDto } from '../dto/discount-combo-target.dto';
-  
-  @Controller('discount-combo-targets')
-  export class DiscountComboTargetController {
-  
-    constructor(
-      private readonly service: DiscountComboTargetService,
-    ) {}
-  
-    @Post()
-    async create(@Body() dto: CreateDiscountComboTargetDto) {
-      const entity = await this.service.create(dto);
-      return new DiscountComboTargetResponseDto(entity);
-    }
-  
-    @Get()
-    async findAll() {
-      const entities = await this.service.findAll();
-      return entities.map(e => new DiscountComboTargetResponseDto(e));
-    }
-  
-    @Get(':id')
-    async findOne(@Param('id', ParseIntPipe) id: number) {
-      const entity = await this.service.findOne(id);
-      return new DiscountComboTargetResponseDto(entity);
-    }
-  
-    @Get('combo/:comboId')
-    async findByCombo(
-      @Param('comboId', ParseIntPipe) comboId: number,
-    ) {
-      const entity = await this.service.findByCombo(comboId);
-      return entity
-        ? new DiscountComboTargetResponseDto(entity)
-        : null;
-    }
-  
-    @Patch(':id')
-    async update(
-      @Param('id', ParseIntPipe) id: number,
-      @Body() dto: UpdateDiscountComboTargetDto,
-    ) {
-      const entity = await this.service.update(id, dto);
-      return new DiscountComboTargetResponseDto(entity);
-    }
-  
-    @Delete(':id')
-    async remove(@Param('id', ParseIntPipe) id: number) {
-      const entity = await this.service.remove(id);
-      return new DiscountComboTargetResponseDto(entity);
-    }
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+
+import { DiscountComboTargetService } from '../services/discount-combo-target.service';
+import { CreateDiscountComboTargetDto } from '../dto/create-discount-combo-target.dto';
+import { DiscountComboTargetResponseDto } from '../dto/discount-combo-target.dto';
+
+@Controller('discounts/:discountId/targets/combos')
+export class DiscountComboTargetController {
+
+  constructor(
+    private readonly service: DiscountComboTargetService,
+  ) {}
+
+  // ==========================
+  // CREATE
+  // ==========================
+
+  @Post()
+  async create(
+    @Param('discountId', ParseIntPipe) discountId: number,
+    @Body() dto: CreateDiscountComboTargetDto,
+  ): Promise<DiscountComboTargetResponseDto> {
+    return this.service.create(discountId, dto);
   }
+
+  // ==========================
+  // GET ALL BY DISCOUNT
+  // ==========================
+
+  @Get()
+  async findAll(
+    @Param('discountId', ParseIntPipe) discountId: number,
+  ): Promise<DiscountComboTargetResponseDto[]> {
+    return this.service.findAll(discountId);
+  }
+
+  // ==========================
+  // DELETE
+  // ==========================
+
+  @Delete(':comboId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Param('discountId', ParseIntPipe) discountId: number,
+    @Param('comboId', ParseIntPipe) comboId: number,
+  ): Promise<void> {
+    return this.service.remove(discountId, comboId);
+  }
+}

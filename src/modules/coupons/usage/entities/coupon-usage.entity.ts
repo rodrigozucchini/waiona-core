@@ -2,27 +2,27 @@ import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/entities/base.entity';
 import { CouponEntity } from '../../coupon/entities/coupon.entity';
 
-@Entity('discount_usages')
+@Entity('coupon_usages')
 @Index(['couponId'])
 @Index(['orderId'])
 @Index(['userId'])
-export class DiscountUsageEntity extends BaseEntity {
-  // FK opcional al cupón
+export class CouponUsageEntity extends BaseEntity {
+
   @Column({
     name: 'coupon_id',
     type: 'int',
-    nullable: true,
+    nullable: false,
   })
-  couponId?: number;
+  couponId: number;
 
   @ManyToOne(() => CouponEntity, {
-    nullable: true,
+    nullable: false,
     onDelete: 'RESTRICT',
   })
   @JoinColumn({ name: 'coupon_id' })
-  coupon?: CouponEntity;
+  coupon: CouponEntity;
 
-  // Pedido donde se aplicó
+  // 🔥 referencia lógica — OrderEntity no existe aún
   @Column({
     name: 'order_id',
     type: 'int',
@@ -30,7 +30,7 @@ export class DiscountUsageEntity extends BaseEntity {
   })
   orderId: number;
 
-  // Usuario que lo usó
+  // 🔥 referencia lógica — UserEntity no existe aún
   @Column({
     name: 'user_id',
     type: 'int',
@@ -42,6 +42,7 @@ export class DiscountUsageEntity extends BaseEntity {
     name: 'applied_at',
     type: 'timestamp',
     nullable: false,
+    default: () => 'CURRENT_TIMESTAMP',
   })
   appliedAt: Date;
 }
