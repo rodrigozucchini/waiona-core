@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
 
 import { StockMovementService } from '../services/stock-movement.service';
 import { StockMovementResponseDto } from '../dto/stock-movement-respose.dto';
@@ -15,18 +15,17 @@ export class StockMovementController {
     return this.stockMovementService.findAll();
   }
 
-  @Get(':id')
-  async findById(
-    @Param('id') id: number,
-  ): Promise<StockMovementResponseDto> {
-    return this.stockMovementService.findById(id);
-  }
-
-  @Get('stock-item/:stockItemId')
+  @Get('stock-item/:stockItemId') // 🔥 antes que :id para evitar conflicto de rutas
   async findByStockItemId(
-    @Param('stockItemId') stockItemId: number,
+    @Param('stockItemId', ParseIntPipe) stockItemId: number,
   ): Promise<StockMovementResponseDto[]> {
     return this.stockMovementService.findByStockItemId(stockItemId);
   }
 
+  @Get(':id')
+  async findById(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StockMovementResponseDto> {
+    return this.stockMovementService.findById(id);
+  }
 }

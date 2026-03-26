@@ -17,6 +17,7 @@ import { StockMovementEntity } from '../../stock-movement/entities/stock-movemen
 export class StockItemEntity extends BaseEntity {
 
   @Column({
+    name: 'product_id', // 🔥 snake_case
     type: 'int',
     nullable: false,
   })
@@ -26,10 +27,11 @@ export class StockItemEntity extends BaseEntity {
     nullable: false,
     onDelete: 'RESTRICT',
   })
-  @JoinColumn({ name: 'productId' })
+  @JoinColumn({ name: 'product_id' })
   product: ProductEntity;
 
   @Column({
+    name: 'location_id', // 🔥 snake_case
     type: 'int',
     nullable: false,
   })
@@ -39,7 +41,7 @@ export class StockItemEntity extends BaseEntity {
     nullable: false,
     onDelete: 'RESTRICT',
   })
-  @JoinColumn({ name: 'locationId' })
+  @JoinColumn({ name: 'location_id' })
   location: StockLocationEntity;
 
   // =============================
@@ -47,13 +49,17 @@ export class StockItemEntity extends BaseEntity {
   // =============================
 
   @Column({
+    name: 'quantity_current',
     type: 'int',
+    nullable: false,
     default: 0,
   })
   quantityCurrent: number;
 
   @Column({
+    name: 'quantity_reserved',
     type: 'int',
+    nullable: false,
     default: 0,
   })
   quantityReserved: number;
@@ -66,17 +72,29 @@ export class StockItemEntity extends BaseEntity {
   // THRESHOLDS
   // =============================
 
-  @Column({ type: 'int' })
+  @Column({
+    name: 'stock_min',
+    type: 'int',
+    nullable: false,
+    default: 0,
+  })
   stockMin: number;
 
-  @Column({ type: 'int' })
+  @Column({
+    name: 'stock_critical',
+    type: 'int',
+    nullable: false,
+    default: 0,
+  })
   stockCritical: number;
 
   @Column({
+    name: 'stock_max',
     type: 'int',
     nullable: true,
+    default: null,
   })
-  stockMax?: number;
+  stockMax?: number | null;
 
   // =============================
   // RELATIONS

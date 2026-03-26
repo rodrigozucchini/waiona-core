@@ -1,4 +1,4 @@
-import { StockLocationEntity } from "../entities/stock-locations.entity";
+import { StockLocationEntity } from '../entities/stock-locations.entity';
 import { StockLocationType } from '../enums/stock-location-type.enum';
 
 export class StockLocationResponseDto {
@@ -15,7 +15,7 @@ export class StockLocationResponseDto {
     this.id = entity.id;
     this.name = entity.name;
     this.type = entity.type;
-    this.address = entity.address;
+    this.address = entity.address ?? undefined; // 🔥 null → undefined
 
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
