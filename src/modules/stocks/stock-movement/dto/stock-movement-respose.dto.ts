@@ -6,16 +6,12 @@ import { StockReferenceType } from '../enums/stock-reference.enum';
 export class StockMovementResponseDto {
 
   id: number;
-
   stockItemId: number;
-
   operationType: StockOperationType;
-
   stockFlow: StockFlow;
-
   quantity: number;
-
   referenceType: StockReferenceType;
+  referenceId?: number; // 🔥 agregado
 
   createdAt: Date;
 
@@ -26,6 +22,7 @@ export class StockMovementResponseDto {
     this.stockFlow = entity.stockFlow;
     this.quantity = entity.quantity;
     this.referenceType = entity.referenceType;
+    this.referenceId = entity.referenceId ?? undefined; // 🔥 agregado
     this.createdAt = entity.createdAt;
   }
 }

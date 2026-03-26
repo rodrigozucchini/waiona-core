@@ -1,5 +1,5 @@
 import {
-  IsNumber,
+  IsInt,
   IsOptional,
   Min,
 } from 'class-validator';
@@ -7,29 +7,31 @@ import {
 export class CreateStockItemDto {
 
   // ==========================
-  // Relaciones
+  // RELACIONES
   // ==========================
 
-  @IsNumber()
+  @IsInt() // 🔥 IsInt en lugar de IsNumber — son IDs
+  @Min(1)
   productId: number;
 
-  @IsNumber()
+  @IsInt()
+  @Min(1)
   locationId: number;
 
   // ==========================
-  // Umbrales
+  // UMBRALES
   // ==========================
 
-  @IsNumber()
+  @IsInt()
   @Min(0)
   stockMin: number;
 
-  @IsNumber()
+  @IsInt()
   @Min(0)
   stockCritical: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
   stockMax?: number;
 }

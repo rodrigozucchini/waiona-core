@@ -12,13 +12,13 @@ import { StockItemsService } from '../services/stock-item.service';
 
 import { CreateStockItemDto } from '../dto/create-stock-item.dto';
 import { UpdateStockThresholdsDto } from '../dto/update-stock-thresholds.dto';
+import { StockItemAddStockDto } from '../dto/stock-item-add-stock.dto'; // 🔥
+import { StockItemWriteOffDto } from '../dto/stock-item-write-off.dto'; // 🔥
 
 import { StockItemResponseDto } from '../dto/stock-item-response.dto';
 import { StockItemWithMovementsResponseDto } from '../dto/stock-item-with-movements-response.dto';
 
 import { CreateStockWriteOffDto } from '../../stock-writeoff/dto/create-stock-writeoff.dto';
-import { UpdateStockWriteOffDto } from '../../stock-writeoff/dto/update-stock-writeoff.dto';
-import { StockWriteOffEntity } from '../../stock-writeoff/entities/stock-writeoff.entity';
 
 @Controller('stock-items')
 export class StockItemsController {
@@ -27,105 +27,58 @@ export class StockItemsController {
     private readonly stockItemsService: StockItemsService,
   ) {}
 
-  // ==========================
-  // GET ALL
-  // ==========================
-
   @Get()
   async findAll(): Promise<StockItemResponseDto[]> {
     return this.stockItemsService.findAll();
   }
 
-  // ==========================
-  // GET BY ID (WITH MOVEMENTS)
-  // ==========================
-
   @Get(':id')
   async findById(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<StockItemWithMovementsResponseDto> {
-
     return this.stockItemsService.findById(id);
   }
-
-  // ==========================
-  // CREATE STOCK ITEM
-  // ==========================
 
   @Post()
   async create(
     @Body() dto: CreateStockItemDto,
   ): Promise<StockItemResponseDto> {
-
     return this.stockItemsService.create(dto);
   }
 
-  // ==========================
-  // ADD STOCK
-  // ==========================
-
   @Post('add-stock')
   async addStock(
-    @Body('productId', ParseIntPipe) productId: number,
-    @Body('locationId', ParseIntPipe) locationId: number,
-    @Body('quantity', ParseIntPipe) quantity: number,
+    @Body() dto: StockItemAddStockDto, // 🔥
   ): Promise<StockItemWithMovementsResponseDto> {
-
     return this.stockItemsService.addStock(
-      productId,
-      locationId,
-      quantity,
+      dto.productId,
+      dto.locationId,
+      dto.quantity,
     );
   }
-
-  // ==========================
-  // WRITE OFF SIMPLE
-  // ==========================
 
   @Post('write-off')
   async writeOff(
-    @Body('stockItemId', ParseIntPipe) stockItemId: number,
-    @Body('quantity', ParseIntPipe) quantity: number,
+    @Body() dto: StockItemWriteOffDto, // 🔥
   ): Promise<StockItemWithMovementsResponseDto> {
-
     return this.stockItemsService.writeOff(
-      stockItemId,
-      quantity,
+      dto.stockItemId,
+      dto.quantity,
     );
   }
-
-  // ==========================
-  // WRITE OFF DAMAGE
-  // ==========================
 
   @Post('write-off-damage')
   async writeOffDamage(
     @Body() dto: CreateStockWriteOffDto,
   ): Promise<StockItemWithMovementsResponseDto> {
-
     return this.stockItemsService.writeOffDamage(dto);
   }
-
-  @Patch(':id')
-  async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateStockWriteOffDto,
-  ): Promise<StockWriteOffEntity> {
-
-    return this.stockItemsService.update(id, dto);
-  }
-
-  // ==========================
-  // UPDATE STOCK THRESHOLDS
-  // ==========================
 
   @Patch(':id/thresholds')
   async updateThresholds(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateStockThresholdsDto,
   ): Promise<StockItemResponseDto> {
-
     return this.stockItemsService.updateThresholds(id, dto);
   }
-
 }

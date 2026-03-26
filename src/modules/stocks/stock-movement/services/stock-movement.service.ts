@@ -13,19 +13,23 @@ export class StockMovementService {
     private readonly stockMovementRepository: Repository<StockMovementEntity>,
   ) {}
 
-  async findAll(): Promise<StockMovementResponseDto[]> {
+  // ==========================
+  // GET ALL
+  // ==========================
 
+  async findAll(): Promise<StockMovementResponseDto[]> {
     const movements = await this.stockMovementRepository.find({
       order: { createdAt: 'DESC' },
     });
 
-    return movements.map(
-      (movement) => new StockMovementResponseDto(movement),
-    );
+    return movements.map((movement) => new StockMovementResponseDto(movement));
   }
 
-  async findById(id: number): Promise<StockMovementResponseDto> {
+  // ==========================
+  // GET BY ID
+  // ==========================
 
+  async findById(id: number): Promise<StockMovementResponseDto> {
     const movement = await this.stockMovementRepository.findOne({
       where: { id },
     });
@@ -37,16 +41,16 @@ export class StockMovementService {
     return new StockMovementResponseDto(movement);
   }
 
-  async findByStockItemId(stockItemId: number): Promise<StockMovementResponseDto[]> {
+  // ==========================
+  // GET BY STOCK ITEM
+  // ==========================
 
+  async findByStockItemId(stockItemId: number): Promise<StockMovementResponseDto[]> {
     const movements = await this.stockMovementRepository.find({
       where: { stockItemId },
       order: { createdAt: 'DESC' },
     });
 
-    return movements.map(
-      (movement) => new StockMovementResponseDto(movement),
-    );
+    return movements.map((movement) => new StockMovementResponseDto(movement));
   }
-
 }

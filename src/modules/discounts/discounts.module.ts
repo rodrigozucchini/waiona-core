@@ -2,13 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { DiscountEntity } from './discount/entities/discounts.entity';
-import { DiscountUsageEntity } from '../coupons/usage/entities/coupon-usage.entity';
 
 import { DiscountsService } from './discount/services/discounts.service';
-import { DiscountUsageService } from '../coupons/usage/services/discount-usage.service';
 
 import { DiscountsController } from './discount/controllers/discounts.controller';
-import { DiscountUsageController } from '../coupons/usage/controllers/discount-usage.controller';
 import { DiscountProductTargetService } from './discount-product-target/services/discount-product-target.service';
 import { DiscountProductTargetController } from './discount-product-target/controllers/discount-product-target.controller';
 import { DiscountCategoryTargetService } from './discount-category-target/services/discount-category-target.service';
