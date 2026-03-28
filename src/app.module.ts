@@ -12,6 +12,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { StocksModule } from './modules/stocks/stocks.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CouponsModule } from './modules/coupons/coupons.module';
     StocksModule,
     PricingModule,
     CouponsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
