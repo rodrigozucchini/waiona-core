@@ -7,4 +7,7 @@ export interface Env {
     POSTGRES_USER: string;
     POSTGRES_PASSWORD: string;
     JWT_SECRET: string;
+
+    SUPERADMIN_EMAIL: string;
+    SUPERADMIN_PASSWORD: string;
   }

@@ -14,6 +14,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { SeedModule } from './modules/seed/seed.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { AuthModule } from './modules/auth/auth.module';
     CouponsModule,
     UsersModule,
     AuthModule,
+    SeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],
