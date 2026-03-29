@@ -1,8 +1,9 @@
-import { Entity, Column, OneToOne, JoinColumn, BeforeInsert } from 'typeorm';
+import { Entity, Column, OneToOne, JoinColumn, BeforeInsert, ManyToOne } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Exclude } from 'class-transformer';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { ProfileEntity } from './profile.entity';
+import { RoleEntity } from './role.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -21,6 +22,11 @@ export class UserEntity extends BaseEntity {
   @OneToOne(() => ProfileEntity, { nullable: false, cascade: true, eager: true })
   @JoinColumn({ name: 'profile_id' })
   profile: ProfileEntity;
+
+
+  @ManyToOne(() => RoleEntity, { nullable: true, eager: true })
+  @JoinColumn({ name: 'role_id' })
+  role?: RoleEntity | null;
 
   // ==========================
   // Hooks
