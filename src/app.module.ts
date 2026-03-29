@@ -13,6 +13,7 @@ import { StocksModule } from './modules/stocks/stocks.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { UsersModule } from './modules/users/users.module';
     PricingModule,
     CouponsModule,
     UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
