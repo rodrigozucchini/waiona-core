@@ -36,4 +36,7 @@ export class TaxEntity extends BaseEntity {
     nullable: true,
   })
   currency?: CurrencyCode;
+
+  @Column({ type: 'boolean', default: false, name: 'is_global' })
+  isGlobal: boolean;
 }
