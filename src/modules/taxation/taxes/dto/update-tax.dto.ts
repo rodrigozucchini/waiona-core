@@ -10,6 +10,7 @@ export class UpdateTaxDto {
 
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   value?: number;
 
   @IsOptional()
@@ -20,4 +21,7 @@ export class UpdateTaxDto {
   @IsEnum(CurrencyCode)
   currency?: CurrencyCode;
 
+  @IsOptional()
+  @IsBoolean()
+  isGlobal?: boolean;
 }

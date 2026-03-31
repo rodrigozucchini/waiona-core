@@ -7,6 +7,7 @@ import { ProductPricingService } from './services/product-pricing.service';
 import { ComboPricingService } from './services/combo-pricing.service';
 import { ComboPricingController } from './controllers/combo-pricing.controller';
 import { ProductPricingController } from './controllers/product-pricing.controller';
+import { CalculationModule } from './calculation/calculation.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ProductPricingController } from './controllers/product-pricing.controll
       ProductPricingEntity,
       ComboPricingEntity,
     ]),
+    CalculationModule,
   ],
   providers: [ProductPricingService, ComboPricingService],
   controllers: [ComboPricingController, ProductPricingController],

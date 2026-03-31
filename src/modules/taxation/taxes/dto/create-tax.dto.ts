@@ -8,6 +8,7 @@ export class CreateTaxDto {
   taxTypeId: number;
 
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   value: number;
 
   @IsBoolean()
@@ -17,4 +18,7 @@ export class CreateTaxDto {
   @IsEnum(CurrencyCode)
   currency?: CurrencyCode;
 
+  @IsOptional()
+  @IsBoolean()
+  isGlobal?: boolean;
 }

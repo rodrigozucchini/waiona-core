@@ -1,6 +1,5 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 
-import { BaseAuditEntity } from 'src/common/entities/base.audit.entity';
 
 import { ProductEntity } from 'src/modules/products/product/entities/product.entity';
 import { TaxEntity } from 'src/modules/taxation/taxes/entities/tax.entity';

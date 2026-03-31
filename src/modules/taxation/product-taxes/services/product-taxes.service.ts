@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { ProductTaxEntity } from '../entities/product-taxes.entity';
+import { TaxEntity } from 'src/modules/taxation/taxes/entities/tax.entity';
 
 import { CreateProductTaxDto } from '../dto/create-product-tax.dto';
 import { UpdateProductTaxDto } from '../dto/update-product-tax.dto';
@@ -14,6 +15,9 @@ export class ProductTaxesService {
   constructor(
     @InjectRepository(ProductTaxEntity)
     private readonly productTaxRepository: Repository<ProductTaxEntity>,
+
+    @InjectRepository(TaxEntity)
+    private readonly taxRepository: Repository<TaxEntity>,
   ) {}
 
   // ==========================
@@ -22,15 +26,25 @@ export class ProductTaxesService {
 
   async create(dto: CreateProductTaxDto): Promise<ProductTaxResponseDto> {
 
+    const tax = await this.taxRepository.findOne({
+      where: { id: dto.taxId, isDeleted: false },
+    });
+
+    if (!tax) {
+      throw new NotFoundException(`Tax with id ${dto.taxId} not found`);
+    }
+
+    if (tax.isGlobal) {
+      throw new BadRequestException('A global tax cannot be assigned to a specific product');
+    }
+
     const productTax = this.productTaxRepository.create(dto);
-
     const saved = await this.productTaxRepository.save(productTax);
-
     return new ProductTaxResponseDto(saved);
   }
 
   // ==========================
-  // GET ALL (no eliminados)
+  // GET ALL
   // ==========================
 
   async findAll(): Promise<ProductTaxResponseDto[]> {
@@ -66,10 +80,7 @@ export class ProductTaxesService {
   // UPDATE
   // ==========================
 
-  async update(
-    id: number,
-    dto: UpdateProductTaxDto,
-  ): Promise<ProductTaxResponseDto> {
+  async update(id: number, dto: UpdateProductTaxDto): Promise<ProductTaxResponseDto> {
 
     const productTax = await this.productTaxRepository.findOne({
       where: { id, isDeleted: false },
@@ -80,9 +91,7 @@ export class ProductTaxesService {
     }
 
     const merged = this.productTaxRepository.merge(productTax, dto);
-
     const updated = await this.productTaxRepository.save(merged);
-
     return new ProductTaxResponseDto(updated);
   }
 
@@ -101,8 +110,6 @@ export class ProductTaxesService {
     }
 
     productTax.isDeleted = true;
-
     await this.productTaxRepository.save(productTax);
   }
-
 }

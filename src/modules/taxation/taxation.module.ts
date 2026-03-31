@@ -12,11 +12,8 @@ import { TaxTypesService } from './tax-types/services/tax-types.service';
 import { TaxTypeEntity } from './tax-types/entities/tax-types.entity';
 import { ComboTaxesService } from './combo-taxes/services/combo-taxes.service';
 import { ComboTaxesController } from './combo-taxes/controllers/combo-taxes.controller';
-import { CategoryTaxesController } from './category-taxes/controllers/category-taxes.controller';
-import { CategoryTaxesService } from './category-taxes/services/category-taxes.service';
 import { ProductTaxEntity } from './product-taxes/entities/product-taxes.entity';
 import { ComboTaxEntity } from './combo-taxes/entities/combo.-taxes.entity';
-import { CategoryTaxEntity } from './category-taxes/entities/category-taxes.entity';
 
 @Module({
   imports: [
@@ -25,20 +22,17 @@ import { CategoryTaxEntity } from './category-taxes/entities/category-taxes.enti
       TaxTypeEntity,
       ProductTaxEntity,
       ComboTaxEntity,
-      CategoryTaxEntity
     ]),
   ],
   controllers: [
     TaxesController,
     TaxTypesController,
     ComboTaxesController,
-    CategoryTaxesController,
   ],
   providers: [
     TaxesService,
     TaxTypesService,
     ComboTaxesService,
-    CategoryTaxesService,
   ],
   exports: [
     TaxesService,

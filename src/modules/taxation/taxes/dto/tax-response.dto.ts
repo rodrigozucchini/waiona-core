@@ -8,6 +8,7 @@ export class TaxResponseDto {
   value: number;
   isPercentage: boolean;
   currency?: CurrencyCode;
+  isGlobal: boolean;
 
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +21,7 @@ export class TaxResponseDto {
     this.value = Number(entity.value);
     this.isPercentage = entity.isPercentage;
     this.currency = entity.currency;
+    this.isGlobal = entity.isGlobal;
 
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;

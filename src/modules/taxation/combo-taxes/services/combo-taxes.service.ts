@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { ComboTaxEntity } from '../entities/combo.-taxes.entity';
+import { TaxEntity } from 'src/modules/taxation/taxes/entities/tax.entity';
 
 import { CreateComboTaxDto } from '../dto/create-combo-taxes.dto';
 import { UpdateComboTaxDto } from '../dto/update-combo-taxes.dto';
@@ -14,6 +15,9 @@ export class ComboTaxesService {
   constructor(
     @InjectRepository(ComboTaxEntity)
     private readonly comboTaxRepository: Repository<ComboTaxEntity>,
+
+    @InjectRepository(TaxEntity)
+    private readonly taxRepository: Repository<TaxEntity>,
   ) {}
 
   // ==========================
@@ -22,15 +26,25 @@ export class ComboTaxesService {
 
   async create(dto: CreateComboTaxDto): Promise<ComboTaxResponseDto> {
 
+    const tax = await this.taxRepository.findOne({
+      where: { id: dto.taxId, isDeleted: false },
+    });
+
+    if (!tax) {
+      throw new NotFoundException(`Tax with id ${dto.taxId} not found`);
+    }
+
+    if (tax.isGlobal) {
+      throw new BadRequestException('A global tax cannot be assigned to a specific combo');
+    }
+
     const comboTax = this.comboTaxRepository.create(dto);
-
     const saved = await this.comboTaxRepository.save(comboTax);
-
     return new ComboTaxResponseDto(saved);
   }
 
   // ==========================
-  // GET ALL (no eliminados)
+  // GET ALL
   // ==========================
 
   async findAll(): Promise<ComboTaxResponseDto[]> {
@@ -66,10 +80,7 @@ export class ComboTaxesService {
   // UPDATE
   // ==========================
 
-  async update(
-    id: number,
-    dto: UpdateComboTaxDto,
-  ): Promise<ComboTaxResponseDto> {
+  async update(id: number, dto: UpdateComboTaxDto): Promise<ComboTaxResponseDto> {
 
     const comboTax = await this.comboTaxRepository.findOne({
       where: { id, isDeleted: false },
@@ -80,9 +91,7 @@ export class ComboTaxesService {
     }
 
     const merged = this.comboTaxRepository.merge(comboTax, dto);
-
     const updated = await this.comboTaxRepository.save(merged);
-
     return new ComboTaxResponseDto(updated);
   }
 
@@ -101,8 +110,6 @@ export class ComboTaxesService {
     }
 
     comboTax.isDeleted = true;
-
     await this.comboTaxRepository.save(comboTax);
   }
-
 }
