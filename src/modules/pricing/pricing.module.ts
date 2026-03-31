@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { ProductPricingEntity } from './entities/product-pricing.entity';
 import { ComboPricingEntity } from './entities/combo-pricing.entity';
+import { MarginEntity } from 'src/modules/margins/entities/margin.entity';
+
 import { ProductPricingService } from './services/product-pricing.service';
 import { ComboPricingService } from './services/combo-pricing.service';
 import { ComboPricingController } from './controllers/combo-pricing.controller';
@@ -14,6 +16,7 @@ import { CalculationModule } from './calculation/calculation.module';
     TypeOrmModule.forFeature([
       ProductPricingEntity,
       ComboPricingEntity,
+      MarginEntity,
     ]),
     CalculationModule,
   ],
