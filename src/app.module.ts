@@ -15,6 +15,7 @@ import { CouponsModule } from './modules/coupons/coupons.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SeedModule } from './modules/seed/seed.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { SeedModule } from './modules/seed/seed.module';
     UsersModule,
     AuthModule,
     SeedModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
