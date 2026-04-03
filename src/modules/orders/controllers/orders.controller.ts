@@ -29,8 +29,8 @@ import {
   
     @Post()
     create(@Req() req: Request, @Body() dto: CreateOrderDto) {
-      const user = req.user as UserEntity;
-      return this.ordersService.create(user, dto);
+      const payload = req.user as { sub: number };
+      return this.ordersService.create(payload.sub, dto);
     }
   
     // ==========================
