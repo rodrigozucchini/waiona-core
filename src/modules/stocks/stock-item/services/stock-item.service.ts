@@ -43,7 +43,7 @@ export class StockItemsService {
 
   async findAll(): Promise<StockItemResponseDto[]> {
     const stockItems = await this.stockItemRepository.find({
-      where: { isDeleted: false }, // 🔥 filtrar eliminados
+      where: { isDeleted: false },
       relations: ['location', 'product'],
       order: { id: 'ASC' },
     });
@@ -110,7 +110,7 @@ export class StockItemsService {
     }
 
     const stockItem = await this.stockItemRepository.findOne({
-      where: { productId, locationId, isDeleted: false }, // 🔥 isDeleted
+      where: { productId, locationId, isDeleted: false },
     });
 
     if (!stockItem) {
@@ -124,7 +124,7 @@ export class StockItemsService {
 
     const movement = this.stockMovementRepository.create({
       stockItemId: stockItem.id,
-      operationType: StockOperationType.ENTRY, // 🔥 ENTRY en lugar de INITIAL
+      operationType: StockOperationType.ENTRY,
       stockFlow: StockFlow.INBOUND,
       quantity,
       referenceType: StockReferenceType.MANUAL,
@@ -148,7 +148,7 @@ export class StockItemsService {
     }
 
     const stockItem = await this.stockItemRepository.findOne({
-      where: { id: stockItemId, isDeleted: false }, // 🔥 isDeleted
+      where: { id: stockItemId, isDeleted: false },
     });
 
     if (!stockItem) {
@@ -187,7 +187,7 @@ export class StockItemsService {
     }
 
     const stockItem = await this.stockItemRepository.findOne({
-      where: { id: dto.stockItemId, isDeleted: false }, // 🔥 isDeleted
+      where: { id: dto.stockItemId, isDeleted: false },
     });
 
     if (!stockItem) {
@@ -235,7 +235,7 @@ export class StockItemsService {
     dto: UpdateStockThresholdsDto,
   ): Promise<StockItemResponseDto> {
     const stockItem = await this.stockItemRepository.findOne({
-      where: { id, isDeleted: false }, // 🔥 isDeleted
+      where: { id, isDeleted: false },
       relations: ['location', 'product'],
     });
 
@@ -243,7 +243,6 @@ export class StockItemsService {
       throw new NotFoundException(`StockItem with id ${id} not found`);
     }
 
-    // 🔥 respetar opcionales — no pisar con undefined
     const stockMin = dto.stockMin ?? stockItem.stockMin;
     const stockCritical = dto.stockCritical ?? stockItem.stockCritical;
     const stockMax = dto.stockMax !== undefined ? dto.stockMax : stockItem.stockMax;
@@ -260,12 +259,98 @@ export class StockItemsService {
   }
 
   // ==========================
+  // RESERVE STOCK (al crear orden)
+  // ==========================
+
+  async reserveStock(
+    productId: number,
+    locationId: number,
+    quantity: number,
+  ): Promise<void> {
+    const stockItem = await this.stockItemRepository.findOne({
+      where: { productId, locationId, isDeleted: false },
+    });
+
+    if (!stockItem) throw new NotFoundException(`StockItem not found for product ${productId}`);
+
+    if (stockItem.quantityCurrent - stockItem.quantityReserved < quantity) {
+      throw new BadRequestException(`Insufficient available stock for product ${productId}`);
+    }
+
+    stockItem.quantityReserved += quantity;
+    await this.stockItemRepository.save(stockItem);
+  }
+
+  // ==========================
+  // DISPATCH STOCK (admin despacha)
+  // ==========================
+
+  async dispatchStock(
+    productId: number,
+    locationId: number,
+    quantity: number,
+    orderId: number,
+  ): Promise<void> {
+    const stockItem = await this.stockItemRepository.findOne({
+      where: { productId, locationId, isDeleted: false },
+    });
+
+    if (!stockItem) throw new NotFoundException(`StockItem not found for product ${productId}`);
+
+    stockItem.quantityCurrent -= quantity;
+    stockItem.quantityReserved -= quantity;
+    await this.stockItemRepository.save(stockItem);
+
+    const movement = this.stockMovementRepository.create({
+      stockItemId: stockItem.id,
+      operationType: StockOperationType.EXIT,
+      stockFlow: StockFlow.OUTBOUND,
+      quantity,
+      referenceType: StockReferenceType.ORDER,
+      referenceId: orderId,
+    });
+
+    await this.stockMovementRepository.save(movement);
+  }
+
+  // ==========================
+  // RELEASE RESERVATION (admin cancela)
+  // ==========================
+
+  async releaseReservation(
+    productId: number,
+    locationId: number,
+    quantity: number,
+    orderId: number,
+  ): Promise<void> {
+    const stockItem = await this.stockItemRepository.findOne({
+      where: { productId, locationId, isDeleted: false },
+    });
+
+    if (!stockItem) throw new NotFoundException(`StockItem not found for product ${productId}`);
+
+    stockItem.quantityReserved -= quantity;
+    await this.stockItemRepository.save(stockItem);
+
+    const movement = this.stockMovementRepository.create({
+      stockItemId: stockItem.id,
+      operationType: StockOperationType.RETURN,
+      stockFlow: StockFlow.INBOUND,
+      quantity,
+      referenceType: StockReferenceType.ORDER,
+      referenceId: orderId,
+    });
+
+    await this.stockMovementRepository.save(movement);
+  }
+
+  // ==========================
   // PRIVATE HELPERS
   // ==========================
 
   private async findEntity(id: number): Promise<StockItemEntity> {
     const stockItem = await this.stockItemRepository.findOne({
-      where: { id, isDeleted: false }, // 🔥 isDeleted
+      where: { id, isDeleted: false },
       relations: ['location', 'product', 'movements'],
       order: {
         movements: { createdAt: 'DESC' },
