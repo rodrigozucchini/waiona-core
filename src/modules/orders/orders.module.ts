@@ -14,6 +14,7 @@ import { OrdersController } from './controllers/orders.controller';
 
 import { StocksModule } from '../stocks/stocks.module';
 import { CalculationModule } from 'src/modules/pricing/calculation/calculation.module';
+import { UserEntity } from '../users/entities/user.entity';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { CalculationModule } from 'src/modules/pricing/calculation/calculation.m
       CouponEntity,
       CouponUsageEntity,
       StockItemEntity,
+      UserEntity
     ]),
     StocksModule,
     CalculationModule,
