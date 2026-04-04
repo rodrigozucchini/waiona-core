@@ -10,4 +10,8 @@ export interface Env {
 
     SUPERADMIN_EMAIL: string;
     SUPERADMIN_PASSWORD: string;
+
+    MP_ACCESS_TOKEN: string;
+    MP_PUBLIC_KEY: string;
+    MP_WEBHOOK_SECRET: string;
   }
