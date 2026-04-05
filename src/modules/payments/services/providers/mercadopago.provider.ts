@@ -18,6 +18,11 @@ export class MercadoPagoProvider {
     this.preference = new Preference(this.client);
   }
 
+  // 🔥 exponemos el cliente para usarlo en el webhook handler
+  getClient(): MercadoPagoConfig {
+    return this.client;
+  }
+
   async createPreference(order: OrderEntity): Promise<{ id: string; checkoutUrl: string }> {
 
     const response = await this.preference.create({
