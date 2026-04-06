@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { ComboTaxEntity } from '../entities/combo.-taxes.entity';
+import { ComboTaxEntity } from '../entities/combo-taxes.entity';
 import { TaxEntity } from 'src/modules/taxation/taxes/entities/tax.entity';
 
 import { CreateComboTaxDto } from '../dto/create-combo-taxes.dto';

@@ -70,6 +70,7 @@ export class TaxesService {
       value: dto.value,
       isPercentage: dto.isPercentage,
       currency: dto.currency,
+      isGlobal: dto.isGlobal,
     });
 
     const saved = await this.taxRepository.save(newEntity);

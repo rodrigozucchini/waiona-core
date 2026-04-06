@@ -1,4 +1,4 @@
-import { ComboTaxEntity } from "../entities/combo.-taxes.entity";
+import { ComboTaxEntity } from "../entities/combo-taxes.entity";
 
 export class ComboTaxResponseDto {
 
