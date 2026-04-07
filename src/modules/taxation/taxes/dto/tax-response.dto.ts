@@ -9,10 +9,8 @@ export class TaxResponseDto {
   isPercentage: boolean;
   currency?: CurrencyCode;
   isGlobal: boolean;
-
   createdAt: Date;
   updatedAt: Date;
-
   taxType?: TaxTypeResponseDto;
 
   constructor(entity: TaxEntity) {
@@ -22,8 +20,11 @@ export class TaxResponseDto {
     this.isPercentage = entity.isPercentage;
     this.currency = entity.currency;
     this.isGlobal = entity.isGlobal;
-
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
+
+    if (entity.taxType) {
+      this.taxType = TaxTypeResponseDto.fromEntity(entity.taxType);
+    }
   }
 }

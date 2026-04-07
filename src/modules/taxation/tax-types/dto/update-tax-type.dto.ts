@@ -1,13 +1,4 @@
-import { IsString, IsNotEmpty, Length } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateTaxTypeDto } from './create-tax-type.dto';
 
-export class UpdateTaxTypeDto {
-  @IsString()
-  @IsNotEmpty()
-  @Length(2, 20)
-  code: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @Length(3, 150)
-  name: string;
-}
+export class UpdateTaxTypeDto extends PartialType(CreateTaxTypeDto) {}

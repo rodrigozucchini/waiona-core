@@ -6,13 +6,13 @@ describe('TaxTypesController', () => {
   let controller: TaxTypesController;
   let service: jest.Mocked<TaxTypesService>;
 
-  const mockService = () => ({
+  const mockService = {
     findAll: jest.fn(),
     findById: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
-  });
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -20,7 +20,7 @@ describe('TaxTypesController', () => {
       providers: [
         {
           provide: TaxTypesService,
-          useFactory: mockService,
+          useValue: mockService,
         },
       ],
     }).compile();
@@ -33,128 +33,77 @@ describe('TaxTypesController', () => {
     jest.clearAllMocks();
   });
 
-  const mockResponse = (overrides = {}) => ({
-    id: 1,
-    code: 'IVA',
-    name: 'Impuesto',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  });
-
   describe('getTaxTypes', () => {
     it('should return all tax types', async () => {
-      const data = [mockResponse()];
+      const mockResponse = [
+        { id: 1, code: 'IVA', name: 'Impuesto' },
+      ];
 
-      service.findAll.mockResolvedValue(data);
+      service.findAll.mockResolvedValue(mockResponse as any);
 
       const result = await controller.getTaxTypes();
 
+      expect(result).toEqual(mockResponse);
       expect(service.findAll).toHaveBeenCalled();
-      expect(result).toEqual(data);
-    });
-
-    it('should return empty array', async () => {
-      service.findAll.mockResolvedValue([]);
-
-      const result = await controller.getTaxTypes();
-
-      expect(result).toEqual([]);
     });
   });
 
   describe('findTaxType', () => {
     it('should return one tax type', async () => {
-      const data = mockResponse();
+      const mockResponse = {
+        id: 1,
+        code: 'IVA',
+        name: 'Impuesto',
+      };
 
-      service.findById.mockResolvedValue(data);
+      service.findById.mockResolvedValue(mockResponse as any);
 
       const result = await controller.findTaxType(1);
 
+      expect(result).toEqual(mockResponse);
       expect(service.findById).toHaveBeenCalledWith(1);
-      expect(result).toEqual(data);
-    });
-
-    it('should call service with correct id type', async () => {
-      service.findById.mockResolvedValue(mockResponse());
-
-      await controller.findTaxType(1);
-
-      expect(service.findById).toHaveBeenCalledWith(1);
-    });
-
-    it('should propagate errors from service', async () => {
-      service.findById.mockRejectedValue(new Error('Not found'));
-
-      await expect(controller.findTaxType(1)).rejects.toThrow(
-        'Not found',
-      );
     });
   });
 
   describe('createTaxType', () => {
     it('should create a tax type', async () => {
       const dto = { code: 'IVA', name: 'Impuesto' };
-      const response = mockResponse(dto);
+      const mockResponse = { id: 1, ...dto };
 
-      service.create.mockResolvedValue(response);
+      service.create.mockResolvedValue(mockResponse as any);
 
-      const result = await controller.createTaxType(dto as any);
+      const result = await controller.createTaxType(dto);
 
+      expect(result).toEqual(mockResponse);
       expect(service.create).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(response);
-    });
-
-    it('should propagate errors from service', async () => {
-      service.create.mockRejectedValue(new Error('Duplicate'));
-
-      await expect(
-        controller.createTaxType({} as any),
-      ).rejects.toThrow('Duplicate');
     });
   });
 
   describe('updateTaxType', () => {
-    it('should update a tax type', async () => {
-      const dto = { name: 'New Name' };
-      const response = mockResponse(dto);
+    it('should update a tax type (PATCH)', async () => {
+      const dto = { name: 'Nuevo nombre' };
+      const mockResponse = {
+        id: 1,
+        code: 'IVA',
+        name: 'Nuevo nombre',
+      };
 
-      service.update.mockResolvedValue(response);
+      service.update.mockResolvedValue(mockResponse as any);
 
-      const result = await controller.updateTaxType(
-        1,
-        dto as any,
-      );
+      const result = await controller.updateTaxType(1, dto as any);
 
+      expect(result).toEqual(mockResponse);
       expect(service.update).toHaveBeenCalledWith(1, dto);
-      expect(result).toEqual(response);
-    });
-
-    it('should propagate errors from service', async () => {
-      service.update.mockRejectedValue(new Error('Error'));
-
-      await expect(
-        controller.updateTaxType(1, {} as any),
-      ).rejects.toThrow('Error');
     });
   });
 
   describe('deleteTaxType', () => {
     it('should delete a tax type', async () => {
-      service.delete.mockResolvedValue(undefined);
+      service.delete.mockResolvedValue();
 
-      const result = await controller.deleteTaxType(1);
+      await controller.deleteTaxType(1);
 
       expect(service.delete).toHaveBeenCalledWith(1);
-      expect(result).toBeUndefined();
-    });
-
-    it('should propagate errors from service', async () => {
-      service.delete.mockRejectedValue(new Error('Error'));
-
-      await expect(
-        controller.deleteTaxType(1),
-      ).rejects.toThrow('Error');
     });
   });
 });

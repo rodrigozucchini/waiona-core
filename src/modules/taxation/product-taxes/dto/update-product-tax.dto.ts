@@ -1,13 +1,9 @@
-import { IsInt, IsOptional } from 'class-validator';
+import { IsInt, IsOptional, Min } from 'class-validator';
 
 export class UpdateProductTaxDto {
 
   @IsOptional()
   @IsInt()
-  productId?: number;
-
-  @IsOptional()
-  @IsInt()
+  @Min(1)
   taxId?: number;
-
 }

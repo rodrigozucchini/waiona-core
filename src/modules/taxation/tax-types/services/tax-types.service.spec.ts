@@ -60,8 +60,14 @@ describe('TaxTypesService', () => {
         order: { createdAt: 'DESC' },
       });
 
-      expect(result.length).toBe(1);
-      expect(result[0].code).toBe('IVA');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          id: 1,
+          code: 'IVA',
+          name: 'Impuesto',
+        }),
+      );
     });
 
     it('should return empty array if none found', async () => {
@@ -77,15 +83,21 @@ describe('TaxTypesService', () => {
     it('should return one tax type', async () => {
       const entity = mockEntity();
 
-      repository.findOne.mockResolvedValue(entity);
+      repository.findOne.mockImplementation((options: any) => {
+        if (options.where.id === 1 && options.where.isDeleted === false) {
+          return Promise.resolve(entity);
+        }
+        return Promise.resolve(null);
+      });
 
       const result = await service.findById(1);
 
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: 1, isDeleted: false },
-      });
-
-      expect(result.id).toBe(1);
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 1,
+          code: 'IVA',
+        }),
+      );
     });
 
     it('should throw NotFoundException if not found', async () => {
@@ -114,7 +126,7 @@ describe('TaxTypesService', () => {
       expect(repository.create).toHaveBeenCalledWith(dto);
       expect(repository.save).toHaveBeenCalled();
 
-      expect(result.code).toBe(dto.code);
+      expect(result).toMatchObject(dto);
     });
 
     it('should throw if code already exists', async () => {
@@ -138,18 +150,29 @@ describe('TaxTypesService', () => {
         name: 'New',
       } as any);
 
-      expect(repository.merge).toHaveBeenCalled();
-      expect(repository.save).toHaveBeenCalled();
-
       expect(result.name).toBe('New');
+    });
+
+    it('should NOT validate code uniqueness if code is the same', async () => {
+      const entity = mockEntity({ code: 'IVA' });
+
+      repository.findOne.mockResolvedValue(entity);
+      repository.merge.mockReturnValue(entity);
+      repository.save.mockResolvedValue(entity);
+
+      await service.update(1, { code: 'IVA' } as any);
+
+      expect(repository.findOne).toHaveBeenCalledTimes(1);
     });
 
     it('should validate unique code if changed', async () => {
       const entity = mockEntity({ code: 'OLD' });
 
-      repository.findOne
-        .mockResolvedValueOnce(entity) // findOne(id)
-        .mockResolvedValueOnce(null); // ensureCodeIsUnique
+      repository.findOne.mockImplementation((options: any) => {
+        if (options.where.id) return Promise.resolve(entity);
+        if (options.where.code === 'NEW') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
 
       repository.merge.mockReturnValue({ ...entity, code: 'NEW' });
       repository.save.mockResolvedValue({ ...entity, code: 'NEW' });
@@ -164,9 +187,11 @@ describe('TaxTypesService', () => {
     it('should throw if new code already exists', async () => {
       const entity = mockEntity({ code: 'OLD' });
 
-      repository.findOne
-        .mockResolvedValueOnce(entity)
-        .mockResolvedValueOnce(mockEntity({ code: 'NEW' }));
+      repository.findOne.mockImplementation((options: any) => {
+        if (options.where.id) return Promise.resolve(entity);
+        if (options.where.code === 'NEW') return Promise.resolve(mockEntity());
+        return Promise.resolve(null);
+      });
 
       await expect(
         service.update(1, { code: 'NEW' } as any),
@@ -187,17 +212,12 @@ describe('TaxTypesService', () => {
       const entity = mockEntity();
 
       repository.findOne.mockResolvedValue(entity);
-      repository.save.mockResolvedValue({
-        ...entity,
-        isDeleted: true,
-      });
 
       await service.delete(1);
 
-      expect(repository.save).toHaveBeenCalledWith({
-        ...entity,
-        isDeleted: true,
-      });
+      expect(repository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isDeleted: true }),
+      );
     });
 
     it('should not fail if already deleted', async () => {

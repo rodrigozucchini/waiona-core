@@ -4,11 +4,11 @@ import {
   Post,
   Body,
   Param,
-  Put,
   Delete,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  Patch,
 } from '@nestjs/common';
 
 import { TaxTypesService } from '../services/tax-types.service';
@@ -39,7 +39,7 @@ export class TaxTypesController {
     return this.taxTypesService.create(body);
   }
 
-  @Put(':id')
+  @Patch(':id')
   updateTaxType(
     @Param('id', ParseIntPipe) id: number,
     @Body() changes: UpdateTaxTypeDto,
