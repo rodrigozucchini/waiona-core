@@ -24,7 +24,7 @@ export class ProductTaxesService {
   // CREATE
   // ==========================
 
-  async create(dto: CreateProductTaxDto): Promise<ProductTaxResponseDto> {
+  async create(dto: CreateProductTaxDto & { productId: number }): Promise<ProductTaxResponseDto> {
 
     const tax = await this.taxRepository.findOne({
       where: { id: dto.taxId, isDeleted: false },
@@ -38,25 +38,26 @@ export class ProductTaxesService {
       throw new BadRequestException('A global tax cannot be assigned to a specific product');
     }
 
-    const productTax = this.productTaxRepository.create(dto);
+    const productTax = this.productTaxRepository.create({
+      productId: dto.productId,
+      taxId: dto.taxId,
+    });
+
     const saved = await this.productTaxRepository.save(productTax);
     return new ProductTaxResponseDto(saved);
   }
 
   // ==========================
-  // GET ALL
+  // GET ALL BY PRODUCT
   // ==========================
 
-  async findAll(): Promise<ProductTaxResponseDto[]> {
-
+  async findAll(productId: number): Promise<ProductTaxResponseDto[]> {
     const productTaxes = await this.productTaxRepository.find({
-      where: { isDeleted: false },
+      where: { productId, isDeleted: false },
       order: { createdAt: 'DESC' },
     });
 
-    return productTaxes.map(
-      (productTax) => new ProductTaxResponseDto(productTax),
-    );
+    return productTaxes.map(pt => new ProductTaxResponseDto(pt));
   }
 
   // ==========================
@@ -64,7 +65,6 @@ export class ProductTaxesService {
   // ==========================
 
   async findOne(id: number): Promise<ProductTaxResponseDto> {
-
     const productTax = await this.productTaxRepository.findOne({
       where: { id, isDeleted: false },
     });
@@ -81,7 +81,6 @@ export class ProductTaxesService {
   // ==========================
 
   async update(id: number, dto: UpdateProductTaxDto): Promise<ProductTaxResponseDto> {
-
     const productTax = await this.productTaxRepository.findOne({
       where: { id, isDeleted: false },
     });
@@ -100,7 +99,6 @@ export class ProductTaxesService {
   // ==========================
 
   async remove(id: number): Promise<void> {
-
     const productTax = await this.productTaxRepository.findOne({
       where: { id, isDeleted: false },
     });

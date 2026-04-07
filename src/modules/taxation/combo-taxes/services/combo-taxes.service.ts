@@ -24,7 +24,7 @@ export class ComboTaxesService {
   // CREATE
   // ==========================
 
-  async create(dto: CreateComboTaxDto): Promise<ComboTaxResponseDto> {
+  async create(dto: CreateComboTaxDto & { comboId: number }): Promise<ComboTaxResponseDto> {
 
     const tax = await this.taxRepository.findOne({
       where: { id: dto.taxId, isDeleted: false },
@@ -38,25 +38,26 @@ export class ComboTaxesService {
       throw new BadRequestException('A global tax cannot be assigned to a specific combo');
     }
 
-    const comboTax = this.comboTaxRepository.create(dto);
+    const comboTax = this.comboTaxRepository.create({
+      comboId: dto.comboId,
+      taxId: dto.taxId,
+    });
+
     const saved = await this.comboTaxRepository.save(comboTax);
     return new ComboTaxResponseDto(saved);
   }
 
   // ==========================
-  // GET ALL
+  // GET ALL BY COMBO
   // ==========================
 
-  async findAll(): Promise<ComboTaxResponseDto[]> {
-
+  async findAll(comboId: number): Promise<ComboTaxResponseDto[]> {
     const comboTaxes = await this.comboTaxRepository.find({
-      where: { isDeleted: false },
+      where: { comboId, isDeleted: false },
       order: { createdAt: 'DESC' },
     });
 
-    return comboTaxes.map(
-      (comboTax) => new ComboTaxResponseDto(comboTax),
-    );
+    return comboTaxes.map(ct => new ComboTaxResponseDto(ct));
   }
 
   // ==========================
@@ -64,7 +65,6 @@ export class ComboTaxesService {
   // ==========================
 
   async findOne(id: number): Promise<ComboTaxResponseDto> {
-
     const comboTax = await this.comboTaxRepository.findOne({
       where: { id, isDeleted: false },
     });
@@ -81,7 +81,6 @@ export class ComboTaxesService {
   // ==========================
 
   async update(id: number, dto: UpdateComboTaxDto): Promise<ComboTaxResponseDto> {
-
     const comboTax = await this.comboTaxRepository.findOne({
       where: { id, isDeleted: false },
     });
@@ -100,7 +99,6 @@ export class ComboTaxesService {
   // ==========================
 
   async remove(id: number): Promise<void> {
-
     const comboTax = await this.comboTaxRepository.findOne({
       where: { id, isDeleted: false },
     });

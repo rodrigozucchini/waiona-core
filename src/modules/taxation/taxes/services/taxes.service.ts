@@ -24,9 +24,13 @@ export class TaxesService {
     private taxTypeRepository: Repository<TaxTypeEntity>,
   ) {}
 
-  async findAll(): Promise<TaxResponseDto[]> {
+  // ==========================
+  // FIND ALL BY TAX TYPE
+  // ==========================
+
+  async findAll(taxTypeId: number): Promise<TaxResponseDto[]> {
     const entities = await this.taxRepository.find({
-      where: { isDeleted: false },
+      where: { taxTypeId, isDeleted: false },
       relations: ['taxType'],
       order: { createdAt: 'DESC' },
     });
@@ -34,123 +38,94 @@ export class TaxesService {
     return entities.map(entity => new TaxResponseDto(entity));
   }
 
+  // ==========================
+  // FIND BY ID
+  // ==========================
+
   async findById(id: number): Promise<TaxResponseDto> {
     const entity = await this.findOne(id);
     return new TaxResponseDto(entity);
   }
 
-  async create(dto: CreateTaxDto): Promise<TaxResponseDto> {
+  // ==========================
+  // CREATE
+  // ==========================
 
-    // 🔎 validar taxType
+  async create(taxTypeId: number, dto: CreateTaxDto): Promise<TaxResponseDto> {
+
     const taxType = await this.taxTypeRepository.findOne({
-      where: { id: dto.taxTypeId, isDeleted: false },
+      where: { id: taxTypeId, isDeleted: false },
     });
 
     if (!taxType) {
-      throw new BadRequestException(
-        `TaxType with id ${dto.taxTypeId} not found`,
-      );
+      throw new BadRequestException(`TaxType with id ${taxTypeId} not found`);
     }
 
-    // 🔥 VALIDACIÓN CLAVE
     if (!dto.isPercentage && !dto.currency) {
-      throw new BadRequestException(
-        'Currency is required for fixed taxes',
-      );
+      throw new BadRequestException('Currency is required for fixed taxes');
     }
 
     if (dto.isPercentage && dto.currency) {
-      throw new BadRequestException(
-        'Percentage taxes should not have currency',
-      );
+      throw new BadRequestException('Percentage taxes should not have currency');
     }
 
     const newEntity = this.taxRepository.create({
-      taxTypeId: dto.taxTypeId,
+      taxTypeId,
       value: dto.value,
       isPercentage: dto.isPercentage,
       currency: dto.currency,
-      isGlobal: dto.isGlobal,
+      isGlobal: dto.isGlobal ?? false,
     });
 
     const saved = await this.taxRepository.save(newEntity);
-
-    const entityWithRelation = await this.findOne(saved.id);
-
-    return new TaxResponseDto(entityWithRelation);
+    return new TaxResponseDto(await this.findOne(saved.id));
   }
 
-  async update(
-    id: number,
-    changes: UpdateTaxDto,
-  ): Promise<TaxResponseDto> {
+  // ==========================
+  // UPDATE
+  // ==========================
+
+  async update(id: number, changes: UpdateTaxDto): Promise<TaxResponseDto> {
 
     const entity = await this.findOne(id);
 
-    // 🔎 validar taxType si viene
-    if (changes.taxTypeId) {
-      const taxType = await this.taxTypeRepository.findOne({
-        where: { id: changes.taxTypeId, isDeleted: false },
-      });
-
-      if (!taxType) {
-        throw new BadRequestException(
-          `TaxType with id ${changes.taxTypeId} not found`,
-        );
-      }
-    }
-
-    // 🔥 VALIDACIÓN INTELIGENTE (merge previo)
-    const isPercentage =
-      changes.isPercentage ?? entity.isPercentage;
-
-    const currency =
-      changes.currency !== undefined
-        ? changes.currency
-        : entity.currency;
+    const isPercentage = changes.isPercentage ?? entity.isPercentage;
+    const currency = changes.currency !== undefined ? changes.currency : entity.currency;
 
     if (!isPercentage && !currency) {
-      throw new BadRequestException(
-        'Currency is required for fixed taxes',
-      );
+      throw new BadRequestException('Currency is required for fixed taxes');
     }
 
     if (isPercentage && currency) {
-      throw new BadRequestException(
-        'Percentage taxes should not have currency',
-      );
+      throw new BadRequestException('Percentage taxes should not have currency');
     }
 
     const merged = this.taxRepository.merge(entity, changes);
-
     const saved = await this.taxRepository.save(merged);
-
-    const entityWithRelation = await this.findOne(saved.id);
-
-    return new TaxResponseDto(entityWithRelation);
+    return new TaxResponseDto(await this.findOne(saved.id));
   }
+
+  // ==========================
+  // DELETE
+  // ==========================
 
   async delete(id: number): Promise<void> {
     const entity = await this.findOne(id);
-
     entity.isDeleted = true;
-
     await this.taxRepository.save(entity);
   }
 
+  // ==========================
+  // PRIVATE
+  // ==========================
+
   private async findOne(id: number): Promise<TaxEntity> {
     const entity = await this.taxRepository.findOne({
-      where: {
-        id,
-        isDeleted: false,
-      },
+      where: { id, isDeleted: false },
       relations: ['taxType'],
     });
 
-    if (!entity) {
-      throw new NotFoundException(`Tax with id ${id} not found`);
-    }
-
+    if (!entity) throw new NotFoundException(`Tax with id ${id} not found`);
     return entity;
   }
 }
