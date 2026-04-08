@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -18,14 +19,15 @@ import { SeedModule } from './modules/seed/seed.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 
+import { UserEntity } from './modules/users/entities/user.entity';
+import { RolesGuard } from './common/guards/roles.guard';
+
 @Module({
   imports: [
-    // 🔥 Config global
     ConfigModule.forRoot({
       isGlobal: true,
     }),
 
-    // 🔥 TypeORM (como tu proyecto que funcionaba)
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -35,12 +37,13 @@ import { PaymentsModule } from './modules/payments/payments.module';
         username: config.get<string>('POSTGRES_USER'),
         password: config.get<string>('POSTGRES_PASSWORD'),
         database: config.get<string>('POSTGRES_DB'),
-
         autoLoadEntities: true,
         synchronize: true,
-        //dropSchema: true,
       }),
     }),
+
+    // 🔥 para el RolesGuard
+    TypeOrmModule.forFeature([UserEntity]),
 
     TaxationModule,
     MarginsModule,
@@ -56,6 +59,8 @@ import { PaymentsModule } from './modules/payments/payments.module';
     PaymentsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+  ],
 })
 export class AppModule {}
