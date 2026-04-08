@@ -9,13 +9,20 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 
 import { ProductTaxesService } from '../services/product-taxes.service';
 import { CreateProductTaxDto } from '../dto/create-product-tax.dto';
 import { UpdateProductTaxDto } from '../dto/update-product-tax.dto';
 import { ProductTaxResponseDto } from '../dto/product-tax-response.dto';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleType } from 'src/common/enums/role-type.enum';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('products/:productId/taxes')
 export class ProductTaxesController {
 
