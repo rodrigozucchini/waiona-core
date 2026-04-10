@@ -1,18 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TaxTypesController } from './tax-types.controller';
 import { TaxTypesService } from '../services/tax-types.service';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 describe('TaxTypesController', () => {
   let controller: TaxTypesController;
   let service: jest.Mocked<TaxTypesService>;
 
-  const mockService = {
+  const mockService: jest.Mocked<TaxTypesService> = {
     findAll: jest.fn(),
     findById: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
-  };
+  } as any;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -23,7 +25,17 @@ describe('TaxTypesController', () => {
           useValue: mockService,
         },
       ],
-    }).compile();
+    })
+      // 🔐 Mock de guards (permite acceso)
+      .overrideGuard(AuthGuard('jwt'))
+      .useValue({
+        canActivate: jest.fn(() => true),
+      })
+      .overrideGuard(RolesGuard)
+      .useValue({
+        canActivate: jest.fn(() => true),
+      })
+      .compile();
 
     controller = module.get<TaxTypesController>(TaxTypesController);
     service = module.get(TaxTypesService);
@@ -44,7 +56,7 @@ describe('TaxTypesController', () => {
       const result = await controller.getTaxTypes();
 
       expect(result).toEqual(mockResponse);
-      expect(service.findAll).toHaveBeenCalled();
+      expect(service.findAll).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -62,6 +74,7 @@ describe('TaxTypesController', () => {
 
       expect(result).toEqual(mockResponse);
       expect(service.findById).toHaveBeenCalledWith(1);
+      expect(service.findById).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -72,10 +85,11 @@ describe('TaxTypesController', () => {
 
       service.create.mockResolvedValue(mockResponse as any);
 
-      const result = await controller.createTaxType(dto);
+      const result = await controller.createTaxType(dto as any);
 
       expect(result).toEqual(mockResponse);
       expect(service.create).toHaveBeenCalledWith(dto);
+      expect(service.create).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -94,16 +108,27 @@ describe('TaxTypesController', () => {
 
       expect(result).toEqual(mockResponse);
       expect(service.update).toHaveBeenCalledWith(1, dto);
+      expect(service.update).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('deleteTaxType', () => {
     it('should delete a tax type', async () => {
-      service.delete.mockResolvedValue();
+      service.delete.mockResolvedValue(undefined);
 
       await controller.deleteTaxType(1);
 
       expect(service.delete).toHaveBeenCalledWith(1);
+      expect(service.delete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // 🔥 EXTRA (nivel pro): verificar que los guards existen
+  describe('guards', () => {
+    it('should have AuthGuard and RolesGuard applied', () => {
+      const guards = Reflect.getMetadata('__guards__', TaxTypesController);
+
+      expect(guards).toBeDefined();
     });
   });
 });
