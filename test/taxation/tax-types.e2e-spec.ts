@@ -8,6 +8,9 @@ import { TaxTypesController } from '../../src/modules/taxation/tax-types/control
 import { TaxTypesService } from '../../src/modules/taxation/tax-types/services/tax-types.service';
 import { TaxTypeEntity } from '../../src/modules/taxation/tax-types/entities/tax-types.entity';
 
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+
 describe('TaxTypes (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -26,11 +29,19 @@ describe('TaxTypes (e2e)', () => {
       ],
       controllers: [TaxTypesController],
       providers: [TaxTypesService],
-    }).compile();
+    })
+      .overrideGuard(AuthGuard('jwt'))
+      .useValue({
+        canActivate: () => true,
+      })
+      .overrideGuard(RolesGuard)
+      .useValue({
+        canActivate: () => true,
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
 
-    // IMPORTANTE: validar DTOs (como en producción)
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
