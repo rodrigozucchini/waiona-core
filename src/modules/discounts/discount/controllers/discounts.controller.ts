@@ -7,13 +7,20 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 
 import { DiscountsService } from '../services/discounts.service';
 import { CreateDiscountDto } from '../dto/create-discount.dto';
 import { UpdateDiscountDto } from '../dto/update-discount.dto';
 import { DiscountResponseDto } from '../dto/response-discount.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleType } from 'src/common/enums/role-type.enum';
 
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('discounts')
 export class DiscountsController {
   constructor(
