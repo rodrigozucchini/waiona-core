@@ -1,18 +1,19 @@
-import { IsString, IsNotEmpty, MaxLength, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, MinLength, IsNumber, IsBoolean, Min, Max, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMarginDto {
-  
+
   @IsString()
   @IsNotEmpty()
+  @MinLength(3)
   @MaxLength(100)
   name: string;
 
   @Type(() => Number)
-  @IsNumber(
-    { maxDecimalPlaces: 2 },
-    { message: 'value must be a number with max 2 decimal places' },
-  )
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @ValidateIf(o => o.isPercentage === true)
+  @Max(100)
   value: number;
 
   @IsBoolean()
