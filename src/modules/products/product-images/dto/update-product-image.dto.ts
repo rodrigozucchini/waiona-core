@@ -1,18 +1,4 @@
-import { IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateProductImageDto } from './create-product-image.dto';
 
-export class UpdateProductImageDto {
-
-  @IsOptional()
-  @IsNumber()
-  productId?: number;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  url?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  position?: number;
-}
+export class UpdateProductImageDto extends PartialType(CreateProductImageDto) {}

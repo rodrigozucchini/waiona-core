@@ -8,12 +8,19 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 
 import { DiscountProductTargetService } from '../services/discount-product-target.service';
 import { CreateDiscountProductTargetDto } from '../dto/create-discount-product-target.dto';
 import { DiscountProductTargetResponseDto } from '../dto/discount-target-response.dto';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleType } from 'src/common/enums/role-type.enum';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('discounts/:discountId/targets/products')
 export class DiscountProductTargetController {
 

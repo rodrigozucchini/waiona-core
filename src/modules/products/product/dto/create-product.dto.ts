@@ -1,50 +1,62 @@
 import {
-    IsString,
-    IsBoolean,
-    IsOptional,
-    IsEnum,
-    IsNumber,
-    Min,
-    MaxLength,
-  } from 'class-validator';
-  
-  import { ProductMeasurementUnit } from '../enums/product-measurement-unit.enum';
-  
-  export class CreateProductDto {
-  
-    // ==========================
-    // Identificación
-    // ==========================
-  
-    @IsString()
-    @MaxLength(50)
-    sku: string;
-  
-    // ==========================
-    // Información básica
-    // ==========================
-  
-    @IsString()
-    @MaxLength(150)
-    name: string;
-  
-    @IsString()
-    @MaxLength(255)
-    description: string;
-  
-    @IsOptional()
-    @IsBoolean()
-    isActive?: boolean;
-  
-    // ==========================
-    // Unidad de medida
-    // ==========================
-  
-    @IsEnum(ProductMeasurementUnit)
-    measurementUnit: ProductMeasurementUnit;
-  
-    @IsOptional()
-    @IsNumber()
-    @Min(0)
-    measurementValue?: number;
-  }
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  Min,
+  MaxLength,
+  MinLength,
+  IsNotEmpty,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
+
+import { ProductMeasurementUnit } from '../enums/product-measurement-unit.enum';
+
+export class CreateProductDto {
+
+  // ==========================
+  // Identificación
+  // ==========================
+
+  @Transform(({ value }) => value.trim())
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(50)
+  sku: string;
+
+  // ==========================
+  // Información básica
+  // ==========================
+
+  @Transform(({ value }) => value.trim())
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(150)
+  name: string;
+
+  @Transform(({ value }) => value.trim())
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(5)
+  @MaxLength(255)
+  description: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  // ==========================
+  // Unidad de medida
+  // ==========================
+
+  @IsEnum(ProductMeasurementUnit)
+  measurementUnit: ProductMeasurementUnit;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  measurementValue?: number;
+}

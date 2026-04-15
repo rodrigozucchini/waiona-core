@@ -1,44 +1,34 @@
 import {
-    IsString,
-    MaxLength,
-    IsBoolean,
-    IsOptional,
-    ValidateNested,
-    IsInt,
-    Min,
-  } from 'class-validator';
-  
-  import { Type } from 'class-transformer';
-  
-  class UpdateComboItemDto {
-  
-    @IsInt()
-    @Min(1)
-    productId: number;
-  
-    @IsInt()
-    @Min(1)
-    quantity: number;
-  }
-  
-  export class UpdateComboDto {
-  
-    @IsOptional()
-    @IsString()
-    @MaxLength(150)
-    name?: string;
-  
-    @IsOptional()
-    @IsString()
-    @MaxLength(255)
-    description?: string;
-  
-    @IsOptional()
-    @IsBoolean()
-    isActive?: boolean;
-  
-    @IsOptional()
-    @ValidateNested({ each: true })
-    @Type(() => UpdateComboItemDto)
-    items?: UpdateComboItemDto[];
-  }
+  IsInt,
+  ValidateNested,
+  IsOptional,
+} from 'class-validator';
+
+import { Type } from 'class-transformer';
+import { OmitType, PartialType } from '@nestjs/mapped-types';
+
+import { CreateComboDto, CreateComboItemDto } from './create-combo.dto';
+
+// ==========================
+// UPDATE ITEM
+// ==========================
+
+export class UpdateComboItemDto extends PartialType(CreateComboItemDto) {
+
+  @IsInt()
+  id: number; // 🔥 necesario para identificar el item
+}
+
+// ==========================
+// UPDATE COMBO
+// ==========================
+
+export class UpdateComboDto extends PartialType(
+  OmitType(CreateComboDto, ['items'] as const),
+) {
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateComboItemDto)
+  items?: UpdateComboItemDto[];
+}
