@@ -4,10 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarginsController } from './controllers/margins.controller';
 import { MarginsService } from './services/margins.service';
 import { MarginEntity } from './entities/margin.entity';
+import { GuardsModule } from 'src/common/guards/guards.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([MarginEntity]),
+    GuardsModule,
   ],
   controllers: [MarginsController],
   providers: [MarginsService],

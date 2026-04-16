@@ -2,6 +2,7 @@ import {
   IsInt,
   ValidateNested,
   IsOptional,
+  Min,
 } from 'class-validator';
 
 import { Type } from 'class-transformer';
@@ -16,7 +17,16 @@ import { CreateComboDto, CreateComboItemDto } from './create-combo.dto';
 export class UpdateComboItemDto extends PartialType(CreateComboItemDto) {
 
   @IsInt()
+  @Min(1)
   id: number; // 🔥 necesario para identificar el item
+
+  @IsInt()
+  @Min(1)
+  productId: number; // 🔥 FIX: obligatorio nuevamente
+
+  @IsInt()
+  @Min(1)
+  quantity: number; // 🔥 recomendado obligatorio
 }
 
 // ==========================
