@@ -19,6 +19,8 @@ import { ProductImageController } from './product-images/controllers/product-ima
 import { ComboImageEntity } from './combo-images/entities/combo-image.entity';
 import { ComboImageService } from './combo-images/services/combo-image.service';
 import { ComboImageController } from './combo-images/controllers/combo-image.controller';
+import { ShopModule } from './shop/shop.module';
+import { GuardsModule } from 'src/common/guards/guards.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { ComboImageController } from './combo-images/controllers/combo-image.con
       ProductImageEntity,
       ComboImageEntity,
     ]),
+    GuardsModule,
+    ShopModule,
   ],
   providers: [
     CategoryService,

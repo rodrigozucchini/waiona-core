@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -21,6 +20,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 
 import { UserEntity } from './modules/users/entities/user.entity';
 import { RolesGuard } from './common/guards/roles.guard';
+import { ShopModule } from './modules/products/shop/shop.module';
 
 @Module({
   imports: [
@@ -57,6 +57,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     SeedModule,
     OrdersModule,
     PaymentsModule,
+    ShopModule,
   ],
   controllers: [AppController],
   providers: [

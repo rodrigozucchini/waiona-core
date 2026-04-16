@@ -7,6 +7,7 @@ import {
     Patch,
     Delete,
     ParseIntPipe,
+    UseGuards,
   } from '@nestjs/common';
   
   import { ComboImageService } from '../services/combo-image.service';
@@ -14,7 +15,13 @@ import {
   import { CreateComboImageDto } from '../dto/create-combo-image.dto';
   import { UpdateComboImageDto } from '../dto/update-combo-image.dto';
   import { ComboImageResponseDto } from '../dto/combo-image-response.dto';
+  import { Roles } from 'src/common/decorators/roles.decorator';
+  import { RoleType } from 'src/common/enums/role-type.enum';
+  import { AuthGuard } from '@nestjs/passport';
+  import { RolesGuard } from 'src/common/guards/roles.guard';
   
+  @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Controller('combo-images')
   export class ComboImageController {
     constructor(

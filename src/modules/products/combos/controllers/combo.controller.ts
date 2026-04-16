@@ -7,6 +7,7 @@ import {
     Body,
     Param,
     ParseIntPipe,
+    UseGuards,
   } from '@nestjs/common';
   
   import { ComboService } from '../services/combo.service';
@@ -14,7 +15,14 @@ import {
   import { CreateComboDto } from '../dto/create-combo.dto';
   import { UpdateComboDto } from '../dto/update-combo.dto';
   import { ComboResponseDto } from '../dto/combo-response.dto';
+  import { Roles } from 'src/common/decorators/roles.decorator';
+  import { RoleType } from 'src/common/enums/role-type.enum';
+  import { AuthGuard } from '@nestjs/passport';
+  import { RolesGuard } from 'src/common/guards/roles.guard';
   
+  
+  @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Controller('combos')
   export class ComboController {
   
