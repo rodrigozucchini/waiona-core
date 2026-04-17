@@ -5,12 +5,20 @@ import {
     Param,
     Body,
     ParseIntPipe,
+    UseGuards,
   } from '@nestjs/common';
   
   import { StockWriteOffService } from '../services/stock-writeoff.service';
   import { UpdateStockWriteOffDto } from '../dto/update-stock-writeoff.dto';
   import { StockWriteOffResponseDto } from '../dto/stock-writeoff-response.dto';
   
+  import { AuthGuard } from '@nestjs/passport';
+  import { RolesGuard } from 'src/common/guards/roles.guard';
+  import { Roles } from 'src/common/decorators/roles.decorator';
+  import { RoleType } from 'src/common/enums/role-type.enum';
+  
+  @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Controller('stock-write-offs')
   export class StockWriteOffController {
   

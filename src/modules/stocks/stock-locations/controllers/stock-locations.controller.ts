@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 
 import { StockLocationsService } from '../services/stock-locations.service';
@@ -16,6 +17,13 @@ import { CreateStockLocationDto } from '../dto/create-stock-location.dto';
 import { UpdateStockLocationDto } from '../dto/update-stock-location.dto';
 import { StockLocationResponseDto } from '../dto/stock-location-response.dto';
 
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleType } from 'src/common/enums/role-type.enum';
+
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('stock-locations')
 export class StockLocationsController {
   constructor(

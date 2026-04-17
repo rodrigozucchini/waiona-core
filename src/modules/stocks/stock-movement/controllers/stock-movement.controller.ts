@@ -1,8 +1,15 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 
 import { StockMovementService } from '../services/stock-movement.service';
 import { StockMovementResponseDto } from '../dto/stock-movement-respose.dto';
 
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleType } from 'src/common/enums/role-type.enum';
+
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('stock-movements')
 export class StockMovementController {
 

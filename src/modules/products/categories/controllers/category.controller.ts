@@ -7,6 +7,7 @@ import {
     Body,
     Param,
     ParseIntPipe,
+    UseGuards,
   } from '@nestjs/common';
   
   import { CategoryService } from '../services/category.service';
@@ -16,6 +17,13 @@ import {
   import { CategoryResponseDto } from '../dto/category-response.dto';
   import { CategoryTreeResponseDto } from '../dto/category-tree-response.dto';
   
+  import { AuthGuard } from '@nestjs/passport';
+  import { RolesGuard } from 'src/common/guards/roles.guard';
+  import { Roles } from 'src/common/decorators/roles.decorator';
+  import { RoleType } from 'src/common/enums/role-type.enum';
+  
+  @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Controller('categories')
   export class CategoryController {
   
