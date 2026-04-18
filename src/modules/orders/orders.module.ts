@@ -1,0 +1,38 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { OrderEntity } from './entities/order.entity';
+import { OrderItemEntity } from './entities/order-item.entity';
+import { ProductEntity } from 'src/modules/products/product/entities/product.entity';
+import { ComboEntity } from 'src/modules/products/combos/entities/combo.entity';
+import { CouponEntity } from 'src/modules/coupons/coupon/entities/coupon.entity';
+import { CouponUsageEntity } from 'src/modules/coupons/usage/entities/coupon-usage.entity';
+import { StockItemEntity } from 'src/modules/stocks/stock-item/entities/stock-item.entity';
+
+import { OrdersService } from './services/orders.service';
+import { OrdersController } from './controllers/orders.controller';
+
+import { StocksModule } from '../stocks/stocks.module';
+import { CalculationModule } from 'src/modules/pricing/calculation/calculation.module';
+import { UserEntity } from '../users/entities/user.entity';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      OrderEntity,
+      OrderItemEntity,
+      ProductEntity,
+      ComboEntity,
+      CouponEntity,
+      CouponUsageEntity,
+      StockItemEntity,
+      UserEntity
+    ]),
+    StocksModule,
+    CalculationModule,
+  ],
+  controllers: [OrdersController],
+  providers: [OrdersService],
+  exports: [OrdersService],
+})
+export class OrdersModule {}

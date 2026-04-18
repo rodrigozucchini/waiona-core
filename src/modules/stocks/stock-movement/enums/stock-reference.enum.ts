@@ -1,0 +1,8 @@
+export enum StockReferenceType {
+    ORDER = 'ORDER',
+    PURCHASE_ORDER = 'PURCHASE_ORDER',
+    ADJUSTMENT = 'ADJUSTMENT',
+    DAMAGE_REPORT = 'DAMAGE_REPORT',
+    MANUAL = 'MANUAL',
+  }
+  

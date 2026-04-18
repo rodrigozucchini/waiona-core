@@ -1,0 +1,165 @@
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { ComboPricingEntity } from '../entities/combo-pricing.entity';
+import { MarginEntity } from 'src/modules/margins/entities/margin.entity';
+import { CreateComboPricingDto } from '../dto/create-combo-pricing.dto';
+import { UpdateComboPricingDto } from '../dto/update-combo-pricing.dto';
+import { ComboPricingResponseDto } from '../dto/combo-pricing-response.dto';
+
+@Injectable()
+export class ComboPricingService {
+
+  constructor(
+    @InjectRepository(ComboPricingEntity)
+    private repo: Repository<ComboPricingEntity>,
+
+    @InjectRepository(MarginEntity)
+    private marginRepo: Repository<MarginEntity>,
+  ) {}
+
+  // ==========================
+  // CREATE
+  // ==========================
+
+  async create(dto: CreateComboPricingDto): Promise<ComboPricingResponseDto> {
+
+    const existing = await this.repo.findOne({
+      where: { comboId: dto.comboId, isDeleted: false },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Combo already has pricing');
+    }
+
+    const margin = dto.marginId
+      ? await this.resolveMargin(dto.marginId)
+      : null;
+
+    const entity = this.repo.create({
+      comboId: dto.comboId,
+      currency: dto.currency,
+      unitPrice: dto.unitPrice,
+      margin,
+    });
+
+    const saved = await this.repo.save(entity);
+    return new ComboPricingResponseDto(saved);
+  }
+
+  // ==========================
+  // UPDATE
+  // ==========================
+
+  async update(id: number, dto: UpdateComboPricingDto): Promise<ComboPricingResponseDto> {
+
+    const entity = await this.findOneEntity(id);
+
+    if (dto.comboId && dto.comboId !== entity.comboId) {
+      const existing = await this.repo.findOne({
+        where: { comboId: dto.comboId, isDeleted: false },
+      });
+      if (existing) {
+        throw new BadRequestException('Combo already has pricing');
+      }
+    }
+
+    if (dto.marginId !== undefined) {
+      entity.margin = dto.marginId
+        ? await this.resolveMargin(dto.marginId)
+        : null;
+    }
+
+    Object.assign(entity, {
+      comboId: dto.comboId ?? entity.comboId,
+      currency: dto.currency ?? entity.currency,
+      unitPrice: dto.unitPrice ?? entity.unitPrice,
+    });
+
+    const saved = await this.repo.save(entity);
+    return new ComboPricingResponseDto(saved);
+  }
+
+  // ==========================
+  // FIND ALL
+  // ==========================
+
+  async findAll(): Promise<ComboPricingResponseDto[]> {
+    const entities = await this.repo.find({
+      where: { isDeleted: false },
+      relations: ['margin'],
+    });
+    return entities.map((e) => new ComboPricingResponseDto(e));
+  }
+
+  // ==========================
+  // FIND ONE
+  // ==========================
+
+  async findOne(id: number): Promise<ComboPricingResponseDto> {
+    const entity = await this.findOneEntity(id);
+    return new ComboPricingResponseDto(entity);
+  }
+
+  // ==========================
+  // FIND BY COMBO
+  // ==========================
+
+  async findByCombo(comboId: number): Promise<ComboPricingResponseDto> {
+    const entity = await this.repo.findOne({
+      where: { comboId, isDeleted: false },
+      relations: ['margin'],
+    });
+
+    if (!entity) {
+      throw new NotFoundException('Combo pricing not found');
+    }
+
+    return new ComboPricingResponseDto(entity);
+  }
+
+  // ==========================
+  // REMOVE
+  // ==========================
+
+  async remove(id: number): Promise<void> {
+    const entity = await this.findOneEntity(id);
+    entity.isDeleted = true;
+    await this.repo.save(entity);
+  }
+
+  // ==========================
+  // HELPERS
+  // ==========================
+
+  private async findOneEntity(id: number): Promise<ComboPricingEntity> {
+    const entity = await this.repo.findOne({
+      where: { id, isDeleted: false },
+      relations: ['margin'],
+    });
+
+    if (!entity) {
+      throw new NotFoundException('Combo pricing not found');
+    }
+
+    return entity;
+  }
+
+  private async resolveMargin(marginId: number): Promise<MarginEntity> {
+    const margin = await this.marginRepo.findOne({
+      where: { id: marginId, isDeleted: false },
+    });
+
+    if (!margin) {
+      throw new NotFoundException(`Margin with id ${marginId} not found`);
+    }
+
+    return margin;
+  }
+}

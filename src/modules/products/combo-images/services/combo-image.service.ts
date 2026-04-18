@@ -1,0 +1,106 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { ComboImageEntity } from '../entities/combo-image.entity';
+import { ComboEntity } from '../../combos/entities/combo.entity';
+
+import { CreateComboImageDto } from '../dto/create-combo-image.dto';
+import { UpdateComboImageDto } from '../dto/update-combo-image.dto';
+import { ComboImageResponseDto } from '../dto/combo-image-response.dto';
+
+@Injectable()
+export class ComboImageService {
+  constructor(
+    @InjectRepository(ComboImageEntity)
+    private readonly comboImageRepository: Repository<ComboImageEntity>,
+
+    @InjectRepository(ComboEntity)
+    private readonly comboRepository: Repository<ComboEntity>,
+  ) {}
+
+  // CREATE
+  async create(dto: CreateComboImageDto): Promise<ComboImageResponseDto> {
+    const combo = await this.comboRepository.findOne({
+      where: { id: dto.comboId, isDeleted: false },
+    });
+
+    if (!combo) {
+      throw new NotFoundException(
+        `Combo with id ${dto.comboId} not found`,
+      );
+    }
+
+    const image = this.comboImageRepository.create(dto);
+
+    const saved = await this.comboImageRepository.save(image);
+
+    return new ComboImageResponseDto(saved);
+  }
+
+  // GET ALL BY COMBO (no eliminadas)
+  async findByCombo(comboId: number): Promise<ComboImageResponseDto[]> {
+    const images = await this.comboImageRepository.find({
+      where: { comboId, isDeleted: false },
+      order: { position: 'ASC' },
+    });
+
+    return images.map(
+      (image) => new ComboImageResponseDto(image),
+    );
+  }
+
+  // GET BY ID
+  async findOne(id: number): Promise<ComboImageResponseDto> {
+    const image = await this.comboImageRepository.findOne({
+      where: { id, isDeleted: false },
+    });
+
+    if (!image) {
+      throw new NotFoundException(
+        `ComboImage with id ${id} not found`,
+      );
+    }
+
+    return new ComboImageResponseDto(image);
+  }
+
+  // UPDATE
+  async update(
+    id: number,
+    dto: UpdateComboImageDto,
+  ): Promise<ComboImageResponseDto> {
+    const image = await this.comboImageRepository.findOne({
+      where: { id, isDeleted: false },
+    });
+
+    if (!image) {
+      throw new NotFoundException(
+        `ComboImage with id ${id} not found`,
+      );
+    }
+
+    const merged = this.comboImageRepository.merge(image, dto);
+
+    const updated = await this.comboImageRepository.save(merged);
+
+    return new ComboImageResponseDto(updated);
+  }
+
+  // SOFT DELETE
+  async remove(id: number): Promise<void> {
+    const image = await this.comboImageRepository.findOne({
+      where: { id, isDeleted: false },
+    });
+
+    if (!image) {
+      throw new NotFoundException(
+        `ComboImage with id ${id} not found`,
+      );
+    }
+
+    image.isDeleted = true;
+
+    await this.comboImageRepository.save(image);
+  }
+}

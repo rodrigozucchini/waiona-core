@@ -1,0 +1,40 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { CouponEntity } from './coupon/entities/coupon.entity';
+import { CouponProductTargetEntity } from './coupon-product-target/entities/coupon-product-target.entity';
+import { CouponComboTargetEntity } from './coupon-combo-target/entities/coupon-combo-target.entity';
+import { CouponUsageEntity } from './usage/entities/coupon-usage.entity';
+
+import { CouponService } from './coupon/services/coupon.service';
+import { CouponProductTargetService } from './coupon-product-target/services/coupon-product-target.service';
+import { CouponComboTargetService } from './coupon-combo-target/services/coupon-combo-target.service';
+import { CouponUsageService } from './usage/services/coupon-usage.service';
+
+import { CouponController } from './coupon/controllers/coupon.controller';
+import { CouponProductTargetController } from './coupon-product-target/controllers/coupon-product-target.controller';
+import { CouponComboTargetController } from './coupon-combo-target/controllers/coupon-combo-target.controller';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      CouponEntity,
+      CouponProductTargetEntity,
+      CouponComboTargetEntity,
+      CouponUsageEntity,
+    ]),
+  ],
+  controllers: [
+    CouponController,
+    CouponProductTargetController,
+    CouponComboTargetController,
+  ],
+  providers: [
+    CouponService,
+    CouponProductTargetService,
+    CouponComboTargetService,
+    CouponUsageService,
+  ],
+  exports: [CouponService],
+})
+export class CouponsModule {}
