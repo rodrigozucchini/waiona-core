@@ -7,8 +7,13 @@ export class ProductResponseDto {
   name: string;
   description: string;
   isActive: boolean;
+
+  categoryId: number;
+  categoryName: string;        // 🔥 útil para el front sin join extra
+
   measurementUnit: string;
   measurementValue?: number;
+
   createdAt: Date;
   updatedAt: Date;
 
@@ -18,10 +23,15 @@ export class ProductResponseDto {
     this.name = entity.name;
     this.description = entity.description;
     this.isActive = entity.isActive;
+
+    this.categoryId = entity.categoryId;
+    this.categoryName = entity.category?.name ?? ''; // ok si se carga la relación
+
     this.measurementUnit = entity.measurementUnit;
     this.measurementValue = entity.measurementValue
       ? Number(entity.measurementValue)
       : undefined;
+
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
   }

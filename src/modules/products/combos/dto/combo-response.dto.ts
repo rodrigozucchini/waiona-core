@@ -20,6 +20,10 @@ export class ComboResponseDto {
   name: string;
   description: string;
   isActive: boolean;
+
+  categoryId: number;
+  categoryName: string;        // útil para el front sin join extra
+
   items: ComboItemResponseDto[];
   createdAt: Date;
   updatedAt: Date;
@@ -29,13 +33,15 @@ export class ComboResponseDto {
     this.name = entity.name;
     this.description = entity.description;
     this.isActive = entity.isActive;
+
+    this.categoryId = entity.categoryId;
+    this.categoryName = entity.category?.name ?? '';
+
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
 
     this.items = entity.items
-      ? entity.items.map(
-          item => new ComboItemResponseDto(item),
-        )
+      ? entity.items.map(item => new ComboItemResponseDto(item))
       : [];
   }
 }

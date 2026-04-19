@@ -53,6 +53,18 @@ export class CreateComboDto {
   @IsBoolean()
   isActive?: boolean;
 
+  // ==========================
+  // Categoría
+  // ==========================
+
+  @IsInt()
+  @Min(1)
+  categoryId: number;
+
+  // ==========================
+  // Items
+  // ==========================
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

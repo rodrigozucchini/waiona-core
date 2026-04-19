@@ -20,6 +20,8 @@ import { StockItemResponseDto } from '../dto/stock-item-response.dto';
 import { StockItemWithMovementsResponseDto } from '../dto/stock-item-with-movements-response.dto';
 
 import { CreateStockWriteOffDto } from '../../stock-writeoff/dto/create-stock-writeoff.dto';
+import { StockDispatchDto } from '../dto/stock-item-dispatch.dto';
+import { StockReleaseDto } from '../dto/stock-item-release.dto';
 
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -80,6 +82,30 @@ export class StockItemsController {
     @Body() dto: CreateStockWriteOffDto,
   ): Promise<StockItemWithMovementsResponseDto> {
     return this.stockItemsService.writeOffDamage(dto);
+  }
+
+  @Post('dispatch')
+  async dispatchStock(
+    @Body() dto: StockDispatchDto,
+  ): Promise<void> {
+    return this.stockItemsService.dispatchStock(
+      dto.productId,
+      dto.locationId,
+      dto.quantity,
+      dto.orderId,
+    );
+  }
+
+  @Post('release')
+  async releaseReservation(
+    @Body() dto: StockReleaseDto,
+  ): Promise<void> {
+    return this.stockItemsService.releaseReservation(
+      dto.productId,
+      dto.locationId,
+      dto.quantity,
+      dto.orderId,
+    );
   }
 
   @Patch(':id/thresholds')

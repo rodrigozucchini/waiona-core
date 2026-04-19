@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException  } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
@@ -182,7 +186,7 @@ export class ShopService {
     if (minPrice !== undefined && priceData.finalPrice < minPrice) return null;
     if (maxPrice !== undefined && priceData.finalPrice > maxPrice) return null;
 
-    // combos no tienen stock propio — se podría calcular en base a items, por ahora true si tiene pricing
+    const comboStock = await this.safeGetStockByCombo(combo.id);
     const image = combo.images
       ?.sort((a, b) => a.position - b.position)[0]?.url;
 
@@ -194,8 +198,8 @@ export class ShopService {
       finalPrice:        priceData.finalPrice,
       discountAmount:    priceData.discount,
       hasDiscount:       priceData.discount > 0,
-      inStock:           true,   // TODO: calcular en base al stock de cada item del combo
-      quantityAvailable: 0,
+      inStock:           comboStock?.inStock ?? false,
+      quantityAvailable: comboStock?.quantityAvailable ?? 0,
       image,
     };
   }
@@ -256,6 +260,7 @@ export class ShopService {
     const priceData = await this.safeCalculateCombo(id);
     if (!priceData) throw new NotFoundException('Combo has no pricing configured');
 
+    const comboStock = await this.safeGetStockByCombo(id);
     const images = combo.images
       ?.sort((a, b) => a.position - b.position)
       .map(img => img.url) ?? [];
@@ -277,9 +282,9 @@ export class ShopService {
       priceAfterDiscount:  priceData.priceAfterDiscount,
       taxes:               priceData.taxes,
       hasDiscount:         priceData.discount > 0,
-      inStock:             true,   // TODO: calcular en base al stock de cada item del combo
-      quantityAvailable:   0,
-      stockStatus:         'available',
+      inStock:             comboStock?.inStock ?? false,
+      quantityAvailable:   comboStock?.quantityAvailable ?? 0,
+      stockStatus:         comboStock?.inStock ? 'available' : 'out_of_stock',
       images,
       items,
     };
@@ -314,6 +319,16 @@ export class ShopService {
     }
   }
 
+  private async safeGetStockByCombo(
+    comboId: number,
+  ): Promise<{ quantityAvailable: number; inStock: boolean } | null> {
+    try {
+      return await this.stockItemsService.findByCombo(comboId);
+    } catch {
+      return null;
+    }
+  }
+
   // ==========================
   // PRIVATE — STOCK STATUS
   // ==========================
@@ -328,4 +343,3 @@ export class ShopService {
     return 'available';
   }
 }
-

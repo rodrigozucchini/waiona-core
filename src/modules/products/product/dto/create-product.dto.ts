@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEnum,
   IsNumber,
+  IsInt,
   Min,
   MaxLength,
   MinLength,
@@ -44,6 +45,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // ==========================
+  // Categoría
+  // ==========================
+
+  @IsInt()
+  @Min(1)
+  categoryId: number;
 
   // ==========================
   // Unidad de medida
