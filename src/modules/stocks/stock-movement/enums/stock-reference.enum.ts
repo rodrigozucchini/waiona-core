@@ -5,4 +5,3 @@ export enum StockReferenceType {
     DAMAGE_REPORT = 'DAMAGE_REPORT',
     MANUAL = 'MANUAL',
   }
-  
