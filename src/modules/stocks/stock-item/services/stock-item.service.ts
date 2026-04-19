@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { StockItemEntity } from '../entities/stock-item.entity';
 import { StockMovementEntity } from '../../stock-movement/entities/stock-movement.entity';
 import { StockWriteOffEntity } from '../../stock-writeoff/entities/stock-writeoff.entity';
+import { ComboItemEntity } from 'src/modules/products/combos/entities/combo-item.entity';
 
 import { CreateStockItemDto } from '../dto/create-stock-item.dto';
 import { UpdateStockThresholdsDto } from '../dto/update-stock-thresholds.dto';
@@ -35,6 +36,9 @@ export class StockItemsService {
 
     @InjectRepository(StockWriteOffEntity)
     private readonly stockWriteOffRepository: Repository<StockWriteOffEntity>,
+
+    @InjectRepository(ComboItemEntity)
+    private readonly comboItemRepository: Repository<ComboItemEntity>,
   ) {}
 
   // ==========================
@@ -80,6 +84,53 @@ export class StockItemsService {
     return items.reduce((best, current) =>
       current.quantityAvailable > best.quantityAvailable ? current : best,
     );
+  }
+
+  // ==========================
+  // GET STOCK BY COMBO
+  // Calcula cuántos combos se pueden armar en base al stock
+  // de cada producto que lo compone.
+  // Fórmula: min(floor(quantityAvailable / quantity)) para cada item.
+  // ==========================
+
+  async findByCombo(comboId: number): Promise<{ quantityAvailable: number; inStock: boolean }> {
+
+    const items = await this.comboItemRepository.find({
+      where: { comboId, isDeleted: false },
+    });
+
+    if (!items.length) {
+      return { quantityAvailable: 0, inStock: false };
+    }
+
+    let minAvailable = Infinity;
+
+    for (const item of items) {
+
+      const stockItems = await this.stockItemRepository.find({
+        where: { productId: item.productId, isDeleted: false },
+      });
+
+      // suma el quantityAvailable de todas las ubicaciones del producto
+      const totalAvailable = stockItems.reduce(
+        (sum, s) => sum + s.quantityAvailable,
+        0,
+      );
+
+      // cuántos combos puedo armar con este producto
+      const possible = Math.floor(totalAvailable / item.quantity);
+
+      if (possible < minAvailable) {
+        minAvailable = possible;
+      }
+    }
+
+    const quantityAvailable = minAvailable === Infinity ? 0 : minAvailable;
+
+    return {
+      quantityAvailable,
+      inStock: quantityAvailable > 0,
+    };
   }
 
   // ==========================
@@ -319,6 +370,20 @@ export class StockItemsService {
 
     if (!stockItem) throw new NotFoundException(`StockItem not found for product ${productId}`);
 
+    // 🔥 validar que hay suficiente reservado para despachar
+    if (stockItem.quantityReserved < quantity) {
+      throw new BadRequestException(
+        `Cannot dispatch ${quantity} units — only ${stockItem.quantityReserved} reserved for product ${productId}`,
+      );
+    }
+
+    // 🔥 validar que no queda stock negativo
+    if (stockItem.quantityCurrent < quantity) {
+      throw new BadRequestException(
+        `Cannot dispatch ${quantity} units — only ${stockItem.quantityCurrent} in stock for product ${productId}`,
+      );
+    }
+
     stockItem.quantityCurrent -= quantity;
     stockItem.quantityReserved -= quantity;
     await this.stockItemRepository.save(stockItem);
@@ -350,6 +415,13 @@ export class StockItemsService {
     });
 
     if (!stockItem) throw new NotFoundException(`StockItem not found for product ${productId}`);
+
+    // 🔥 validar que no queda quantityReserved negativo
+    if (stockItem.quantityReserved < quantity) {
+      throw new BadRequestException(
+        `Cannot release ${quantity} units — only ${stockItem.quantityReserved} reserved for product ${productId}`,
+      );
+    }
 
     stockItem.quantityReserved -= quantity;
     await this.stockItemRepository.save(stockItem);

@@ -18,8 +18,8 @@ import { StockMovementEntity } from './stock-movement/entities/stock-movement.en
 import { StockItemEntity } from './stock-item/entities/stock-item.entity';
 import { StockWriteOffEntity } from './stock-writeoff/entities/stock-writeoff.entity';
 
-// 🔥 AGREGAR ESTO
 import { GuardsModule } from 'src/common/guards/guards.module';
+import { ComboItemEntity } from 'src/modules/products/combos/entities/combo-item.entity';
 
 @Module({
   imports: [
@@ -27,7 +27,8 @@ import { GuardsModule } from 'src/common/guards/guards.module';
       StockLocationEntity,
       StockMovementEntity,
       StockItemEntity,
-      StockWriteOffEntity
+      StockWriteOffEntity,
+      ComboItemEntity,   // 🔥 necesario para findByCombo en StockItemsService
     ]),
     GuardsModule, // 👈 🔥 CLAVE
   ],
