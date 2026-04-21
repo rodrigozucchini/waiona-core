@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 
 import { ProductEntity } from '../../product/entities/product.entity';
 import { ComboEntity } from '../../combos/entities/combo.entity';
@@ -53,8 +53,6 @@ export class ShopService {
       const where: any = { isDeleted: false, isActive: true };
 
       if (search) where.name = ILike(`%${search}%`);
-
-      // 🔥 categoryId ahora se aplica (requiere FK en ProductEntity)
       if (categoryId) where.categoryId = categoryId;
 
       const [products, count] = await this.productRepository.findAndCount({
@@ -71,7 +69,6 @@ export class ShopService {
         products.map(p => this.buildProductListItem(p, minPrice, maxPrice)),
       );
 
-      // filtra nulls (sin pricing o fuera de rango de precio)
       data.push(...productItems.filter((i): i is ShopItemResponseDto => i !== null));
     }
 
@@ -83,6 +80,7 @@ export class ShopService {
       const where: any = { isDeleted: false, isActive: true };
 
       if (search) where.name = ILike(`%${search}%`);
+      if (categoryId) where.categoryId = categoryId; // 🔥 fix — antes no filtraba por categoría
 
       const [combos, count] = await this.comboRepository.findAndCount({
         where,
@@ -142,17 +140,14 @@ export class ShopService {
     maxPrice?: number,
   ): Promise<ShopItemResponseDto | null> {
 
-    // 🔥 si no tiene pricing lo skipeamos en vez de explotar
     const priceData = await this.safeCalculateProduct(product.id);
     if (!priceData) return null;
 
-    // 🔥 filtro de precio aplicado acá (no en SQL, porque el precio viene de pricing)
     if (minPrice !== undefined && priceData.finalPrice < minPrice) return null;
     if (maxPrice !== undefined && priceData.finalPrice > maxPrice) return null;
 
     const stock = await this.safeGetStockByProduct(product.id);
 
-    // imagen ordenada por position
     const image = product.images
       ?.sort((a, b) => a.position - b.position)[0]?.url;
 
@@ -163,7 +158,7 @@ export class ShopService {
       originalPrice:     priceData.fullPrice,
       finalPrice:        priceData.finalPrice,
       discountAmount:    priceData.discount,
-      hasDiscount:       priceData.discount > 0,       // 🔥 corrección clave
+      hasDiscount:       priceData.discount > 0,
       inStock:           stock ? stock.quantityAvailable > 0 : false,
       quantityAvailable: stock?.quantityAvailable ?? 0,
       image,
@@ -229,14 +224,14 @@ export class ShopService {
     return {
       id:                  product.id,
       name:                product.name,
-      description:         product.description,      // 🔥 antes nunca se asignaba
+      description:         product.description,
       type:                'product',
       originalPrice:       priceData.fullPrice,
       finalPrice:          priceData.finalPrice,
       discountAmount:      priceData.discount,
       priceAfterDiscount:  priceData.priceAfterDiscount,
       taxes:               priceData.taxes,
-      hasDiscount:         priceData.discount > 0,   // 🔥 corrección clave
+      hasDiscount:         priceData.discount > 0,
       inStock:             stock ? stock.quantityAvailable > 0 : false,
       quantityAvailable:   stock?.quantityAvailable ?? 0,
       stockStatus:         this.resolveStockStatus(stock),
@@ -252,7 +247,7 @@ export class ShopService {
 
     const combo = await this.comboRepository.findOne({
       where: { id, isDeleted: false, isActive: true },
-      relations: ['images', 'items', 'items.product'],  // 🔥 antes no cargaba items ni imágenes
+      relations: ['images', 'items', 'items.product'],
     });
 
     if (!combo) throw new NotFoundException('Combo not found');
@@ -292,7 +287,6 @@ export class ShopService {
 
   // ==========================
   // PRIVATE — SAFE WRAPPERS
-  // 🔥 evitan que un producto sin pricing explote todo el listado
   // ==========================
 
   private async safeCalculateProduct(productId: number): Promise<PriceBreakdownDto | null> {
@@ -338,8 +332,8 @@ export class ShopService {
   ): 'available' | 'low' | 'critical' | 'out_of_stock' {
 
     if (!stock || stock.quantityAvailable <= 0) return 'out_of_stock';
-    if (stock.quantityAvailable <= stock.stockCritical)  return 'critical';
-    if (stock.quantityAvailable <= stock.stockMin)       return 'low';
+    if (stock.quantityAvailable <= stock.stockCritical) return 'critical';
+    if (stock.quantityAvailable <= stock.stockMin)      return 'low';
     return 'available';
   }
 }
