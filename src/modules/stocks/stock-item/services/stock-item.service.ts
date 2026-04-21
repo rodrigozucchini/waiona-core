@@ -228,8 +228,12 @@ export class StockItemsService {
       throw new NotFoundException(`StockItem with id ${stockItemId} not found`);
     }
 
-    if (stockItem.quantityCurrent < quantity) {
-      throw new BadRequestException('Insufficient stock');
+    // 🔥 validar contra quantityAvailable, no quantityCurrent
+    // para no tocar stock que está reservado
+    if (stockItem.quantityAvailable < quantity) {
+      throw new BadRequestException(
+        `Insufficient available stock — only ${stockItem.quantityAvailable} available (${stockItem.quantityCurrent} current, ${stockItem.quantityReserved} reserved)`,
+      );
     }
 
     stockItem.quantityCurrent -= quantity;
@@ -267,8 +271,12 @@ export class StockItemsService {
       throw new NotFoundException(`StockItem with id ${dto.stockItemId} not found`);
     }
 
-    if (stockItem.quantityCurrent < dto.quantity) {
-      throw new BadRequestException('Insufficient stock');
+    // 🔥 validar contra quantityAvailable, no quantityCurrent
+    // para no tocar stock que está reservado
+    if (stockItem.quantityAvailable < dto.quantity) {
+      throw new BadRequestException(
+        `Insufficient available stock — only ${stockItem.quantityAvailable} available (${stockItem.quantityCurrent} current, ${stockItem.quantityReserved} reserved)`,
+      );
     }
 
     stockItem.quantityCurrent -= dto.quantity;
