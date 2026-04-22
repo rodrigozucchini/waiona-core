@@ -10,6 +10,7 @@ import { CouponService } from './coupon/services/coupon.service';
 import { CouponProductTargetService } from './coupon-product-target/services/coupon-product-target.service';
 import { CouponComboTargetService } from './coupon-combo-target/services/coupon-combo-target.service';
 import { CouponUsageService } from './usage/services/coupon-usage.service';
+import { CouponUsageController } from './usage/controllers/coupon-usage.controller';
 
 import { CouponController } from './coupon/controllers/coupon.controller';
 import { CouponProductTargetController } from './coupon-product-target/controllers/coupon-product-target.controller';
@@ -28,6 +29,7 @@ import { CouponComboTargetController } from './coupon-combo-target/controllers/c
     CouponController,
     CouponProductTargetController,
     CouponComboTargetController,
+    CouponUsageController,  // 🔥 faltaba registrar
   ],
   providers: [
     CouponService,
@@ -35,6 +37,9 @@ import { CouponComboTargetController } from './coupon-combo-target/controllers/c
     CouponComboTargetService,
     CouponUsageService,
   ],
-  exports: [CouponService],
+  exports: [
+    CouponService,
+    CouponUsageService,  // 🔥 exportado para que órdenes lo consuma
+  ],
 })
 export class CouponsModule {}
