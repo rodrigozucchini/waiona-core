@@ -88,6 +88,7 @@ export class OrdersService {
     const orderItems: OrderItemEntity[] = [];
     const stockReservations: { productId: number; locationId: number; quantity: number }[] = [];
     let subtotal = 0;
+    let couponDiscount = 0; // 🔥 acumulado desde CalculationService
 
     for (const item of dto.items) {
 
@@ -101,13 +102,14 @@ export class OrdersService {
 
         const breakdown = await this.calculationService.calculateProduct({
           productId: item.productId,
+          couponCode: dto.couponCode, // 🔥 pasar couponCode para cálculo unificado
         });
 
         const orderItem = this.orderItemRepo.create({
           product,
           quantity: item.quantity,
           unitPrice: breakdown.unitPrice,
-          finalPrice: breakdown.finalPrice * item.quantity,
+          finalPrice: breakdown.orderTotal * item.quantity, // 🔥 usar orderTotal (con cupón)
         });
 
         orderItems.push(orderItem);
@@ -116,7 +118,8 @@ export class OrdersService {
           locationId: stockItem.locationId,
           quantity: item.quantity,
         });
-        subtotal += breakdown.finalPrice * item.quantity;
+        subtotal += breakdown.finalPrice * item.quantity;       // subtotal sin cupón
+        couponDiscount += breakdown.coupon * item.quantity;     // 🔥 acumular descuento real
 
       } else if (item.comboId) {
         const combo = await this.comboRepo.findOne({
@@ -139,23 +142,24 @@ export class OrdersService {
 
         const breakdown = await this.calculationService.calculateCombo({
           comboId: item.comboId,
+          couponCode: dto.couponCode, // 🔥 pasar couponCode para cálculo unificado
         });
 
         const orderItem = this.orderItemRepo.create({
           combo,
           quantity: item.quantity,
           unitPrice: breakdown.unitPrice,
-          finalPrice: breakdown.finalPrice * item.quantity,
+          finalPrice: breakdown.orderTotal * item.quantity, // 🔥 usar orderTotal (con cupón)
         });
 
         orderItems.push(orderItem);
-        subtotal += breakdown.finalPrice * item.quantity;
+        subtotal += breakdown.finalPrice * item.quantity;       // subtotal sin cupón
+        couponDiscount += breakdown.coupon * item.quantity;     // 🔥 acumular descuento real
       }
     }
 
-    // 4. Aplicar cupón si viene
+    // 4. Validar cupón si viene — el cálculo ya se hizo en el paso 3
     let coupon: CouponEntity | null = null;
-    let couponDiscount = 0;
 
     if (dto.couponCode) {
       coupon = await this.couponRepo.findOne({
@@ -178,12 +182,9 @@ export class OrdersService {
         where: { couponId: coupon.id, userId: user.id },
       });
       if (alreadyUsed) throw new ConflictException('Coupon already used by this user');
-
-      couponDiscount = coupon.isPercentage
-        ? subtotal * (coupon.value / 100)
-        : coupon.value;
     }
 
+    // 🔥 total calculado con el descuento acumulado del CalculationService
     const total = subtotal - couponDiscount;
 
     // 5. Guardar orden
