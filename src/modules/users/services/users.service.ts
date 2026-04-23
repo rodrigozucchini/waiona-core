@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 
 import { UserEntity } from '../entities/user.entity';
 import { ProfileEntity } from '../entities/profile.entity';
+import { RoleEntity } from '../entities/role.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
+import { SearchUsersDto } from '../dto/search-users.dto';
+import { RoleType } from 'src/common/enums/role-type.enum';
 
 @Injectable()
 export class UsersService {
@@ -15,6 +18,9 @@ export class UsersService {
 
     @InjectRepository(ProfileEntity)
     private readonly profileRepo: Repository<ProfileEntity>,
+
+    @InjectRepository(RoleEntity)
+    private readonly roleRepo: Repository<RoleEntity>,
   ) {}
 
   /* =======================
@@ -32,10 +38,16 @@ export class UsersService {
       avatar: dto.avatar ?? null,
     });
 
+    // 🔥 asignar rol CLIENT automáticamente al registrarse
+    const clientRole = await this.roleRepo.findOne({
+      where: { type: RoleType.CLIENT },
+    });
+
     const user = this.userRepo.create({
       email: dto.email,
       password: dto.password,
       profile,
+      role: clientRole ?? undefined,
     });
 
     return this.userRepo.save(user);
@@ -44,10 +56,25 @@ export class UsersService {
   /* =======================
       FIND
   ======================= */
-  findAll() {
-    return this.userRepo.find({
-      where: { isDeleted: false },
-    });
+  async findAll(dto?: SearchUsersDto) {
+
+    const where: any = { isDeleted: false };
+
+    if (dto?.email) {
+      where.email = ILike(`%${dto.email}%`);
+    }
+
+    // buscar por nombre en el profile
+    if (dto?.name) {
+      return this.userRepo.find({
+        where: [
+          { isDeleted: false, profile: { name: ILike(`%${dto.name}%`) } },
+          { isDeleted: false, profile: { lastName: ILike(`%${dto.name}%`) } },
+        ],
+      });
+    }
+
+    return this.userRepo.find({ where });
   }
 
   async findOne(id: number) {
