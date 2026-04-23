@@ -2,7 +2,6 @@ import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
 
 import { UserEntity } from 'src/modules/users/entities/user.entity';
 import { ProfileEntity } from 'src/modules/users/entities/profile.entity';
@@ -26,32 +25,43 @@ export class SeedService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
+    await this.seedRoles();
     await this.seedSuperAdmin();
   }
 
+  // ==========================
+  // SEED ROLES
+  // Crea los tres roles base si no existen
+  // ==========================
+
+  private async seedRoles() {
+    for (const type of Object.values(RoleType)) {
+      const existing = await this.roleRepo.findOne({ where: { type } });
+      if (!existing) {
+        await this.roleRepo.save(this.roleRepo.create({ type }));
+      }
+    }
+  }
+
+  // ==========================
+  // SEED SUPERADMIN
+  // ==========================
+
   private async seedSuperAdmin() {
-    // Verificar si ya existe el superadmin
     const existing = await this.userRepo.findOne({
       where: { role: { type: RoleType.SUPER_ADMIN } },
     });
     if (existing) return;
 
-    // Crear o buscar el rol superadmin
-    let role = await this.roleRepo.findOne({
+    const role = await this.roleRepo.findOne({
       where: { type: RoleType.SUPER_ADMIN },
     });
-    if (!role) {
-      role = this.roleRepo.create({ type: RoleType.SUPER_ADMIN });
-      role = await this.roleRepo.save(role);
-    }
 
-    // Crear profile
     const profile = this.profileRepo.create({
       name: 'Super',
       lastName: 'Admin',
     });
 
-    // Crear usuario
     const email = this.configService.get('SUPERADMIN_EMAIL', { infer: true })!;
     const password = this.configService.get('SUPERADMIN_PASSWORD', { infer: true })!;
 
@@ -59,10 +69,9 @@ export class SeedService implements OnApplicationBootstrap {
       email,
       password,
       profile,
-      role,
+      role: role!,
     });
 
     await this.userRepo.save(user);
-    console.log('✅ Superadmin created');
   }
 }

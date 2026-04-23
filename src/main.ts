@@ -1,5 +1,5 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -7,11 +7,14 @@ async function bootstrap() {
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,    // elimina campos no declarados en el DTO
-      forbidNonWhitelisted: true, // rechaza con 400 si vienen campos extra
-      transform: true,    // transforma los tipos (@Type(() => Date), etc.)
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
+
+  // 🔥 activa @Exclude() y otros decorators de class-transformer en todas las respuestas
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   await app.listen(process.env.PORT ?? 3000);
 }
