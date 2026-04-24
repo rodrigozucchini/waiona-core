@@ -18,6 +18,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   validate(payload: Payload) {
-    return payload; // queda disponible como req.user = { sub: userId }
+    return payload; // queda disponible como req.user = { sub, role }
   }
 }

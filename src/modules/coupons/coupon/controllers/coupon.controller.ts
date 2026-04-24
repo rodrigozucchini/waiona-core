@@ -9,22 +9,25 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 import { CouponService } from '../services/coupon.service';
 import { CreateCouponDto } from '../dto/create-coupon.dto';
 import { UpdateCouponDto } from '../dto/update-coupon.dto';
 import { CouponResponseDto } from '../dto/coupon-response.dto';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleType } from 'src/common/enums/role-type.enum';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('coupons')
 export class CouponController {
   constructor(
     private readonly couponService: CouponService,
   ) {}
-
-  // ==========================
-  // CREATE
-  // ==========================
 
   @Post()
   async create(
@@ -33,18 +36,10 @@ export class CouponController {
     return this.couponService.create(dto);
   }
 
-  // ==========================
-  // GET ALL
-  // ==========================
-
   @Get()
   async findAll(): Promise<CouponResponseDto[]> {
     return this.couponService.findAll();
   }
-
-  // ==========================
-  // GET ONE
-  // ==========================
 
   @Get(':id')
   async findOne(
@@ -53,10 +48,6 @@ export class CouponController {
     return this.couponService.findOne(id);
   }
 
-  // ==========================
-  // UPDATE (parcial)
-  // ==========================
-
   @Patch(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
@@ -64,10 +55,6 @@ export class CouponController {
   ): Promise<CouponResponseDto> {
     return this.couponService.update(id, dto);
   }
-
-  // ==========================
-  // SOFT DELETE
-  // ==========================
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
