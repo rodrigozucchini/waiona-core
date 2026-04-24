@@ -83,17 +83,14 @@ export class PaymentsService {
   // ==========================
 
   async handleMercadoPagoWebhook(body: any, query: any): Promise<void> {
-    console.log('webhook body:', JSON.stringify(body));
-    console.log('webhook query:', JSON.stringify(query));
 
     const topic = query.topic ?? body.type;
-    const id = query.id ?? body.data?.id;
+    const id    = query.id ?? body.data?.id;
 
     if (!id) return;
     if (topic !== 'payment' && topic !== 'merchant_order') return;
 
     try {
-      // Consultar MP para obtener el external_reference (nuestro orderId)
       const merchantOrder = new MerchantOrder(this.mercadoPagoProvider.getClient());
       const mpOrder = await merchantOrder.get({ merchantOrderId: Number(id) });
 
@@ -105,22 +102,33 @@ export class PaymentsService {
         relations: ['order'],
       });
 
-      if (!payment) {
-        console.log('Payment not found for orderId:', externalReference);
-        return;
+      if (!payment) return;
+
+      // 🔥 manejar todos los status posibles de MP
+      const mpStatus = mpOrder.order_status;
+
+      if (mpStatus === 'paid') {
+        payment.status         = PaymentStatus.APPROVED;
+        payment.order.status   = OrderStatus.CONFIRMED;
+      } else if (mpStatus === 'reverted' || mpStatus === 'charged_back') {
+        payment.status         = PaymentStatus.CANCELLED;
+        payment.order.status   = OrderStatus.CANCELLED;
+      } else if (mpStatus === 'payment_required' || mpStatus === 'payment_in_process') {
+        payment.status = PaymentStatus.PENDING;
+        // orden se mantiene en PENDING
+      } else {
+        // expired u otros → rechazado
+        payment.status       = PaymentStatus.REJECTED;
+        payment.order.status = OrderStatus.CANCELLED;
       }
 
-      payment.status = PaymentStatus.APPROVED;
-      payment.order.status = OrderStatus.CONFIRMED;
       payment.metadata = { body, query };
 
       await this.orderRepo.save(payment.order);
       await this.paymentRepo.save(payment);
 
-      console.log('Payment approved, order confirmed:', payment.order.id);
-
-    } catch (err) {
-      console.error('Error processing webhook:', err);
+    } catch {
+      // swallow — MP requiere siempre 200
     }
   }
 

@@ -14,4 +14,6 @@ export interface Env {
     MP_ACCESS_TOKEN: string;
     MP_PUBLIC_KEY: string;
     MP_WEBHOOK_SECRET: string;
+    FRONTEND_URL: string;
+    MP_NOTIFICATION_URL: string;
   }

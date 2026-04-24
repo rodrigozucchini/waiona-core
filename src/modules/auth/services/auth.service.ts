@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from '../../users/services/users.service';
 import { UserEntity } from '../../users/entities/user.entity';
 import { Payload } from '../models/payload.model';
+import { RoleType } from 'src/common/enums/role-type.enum';
 
 @Injectable()
 export class AuthService {
@@ -21,7 +22,10 @@ export class AuthService {
   }
 
   generateToken(user: UserEntity) {
-    const payload: Payload = { sub: user.id };
+    const payload: Payload = {
+      sub: user.id,
+      role: (user.role?.type as RoleType) ?? null, // 🔥 incluir rol en el token
+    };
     return this.jwtService.sign(payload);
   }
 }

@@ -25,6 +25,10 @@ export class MercadoPagoProvider {
 
   async createPreference(order: OrderEntity): Promise<{ id: string; checkoutUrl: string }> {
 
+    // 🔥 URLs desde variables de entorno — nunca hardcodeadas
+    const frontendUrl     = this.configService.get('FRONTEND_URL', { infer: true })!;
+    const notificationUrl = this.configService.get('MP_NOTIFICATION_URL', { infer: true })!;
+
     const response = await this.preference.create({
       body: {
         items: [
@@ -38,12 +42,12 @@ export class MercadoPagoProvider {
         ],
         external_reference: String(order.id),
         back_urls: {
-          success: 'https://erinn-fiercer-caleb.ngrok-free.dev/payment/success',
-          failure: 'https://erinn-fiercer-caleb.ngrok-free.dev/payment/failure',
-          pending: 'https://erinn-fiercer-caleb.ngrok-free.dev/payment/pending',
+          success: `${frontendUrl}/payment/success`,
+          failure: `${frontendUrl}/payment/failure`,
+          pending: `${frontendUrl}/payment/pending`,
         },
         auto_return: 'approved',
-        notification_url: 'https://erinn-fiercer-caleb.ngrok-free.dev/payments/webhook/mercadopago',
+        notification_url: notificationUrl,
       },
     });
 
