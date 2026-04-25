@@ -273,9 +273,8 @@ export class OrdersService {
   async updateStatus(id: number, dto: UpdateOrderStatusDto): Promise<OrderEntity> {
     const order = await this.findOne(id);
 
-    if (order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Cannot update a cancelled order');
-    }
+    // 🔥 validar transiciones permitidas
+    this.validateStatusTransition(order.status, dto.status);
 
     if (dto.status === OrderStatus.DISPATCHED) {
       await this.handleDispatch(order);
@@ -287,6 +286,30 @@ export class OrdersService {
 
     order.status = dto.status;
     return this.orderRepo.save(order);
+  }
+
+  // ==========================
+  // VALIDAR TRANSICIÓN DE STATUS
+  // ==========================
+
+  private validateStatusTransition(
+    current: OrderStatus,
+    next: OrderStatus,
+  ): void {
+
+    const allowed: Record<OrderStatus, OrderStatus[]> = {
+      [OrderStatus.PENDING]:    [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+      [OrderStatus.CONFIRMED]:  [OrderStatus.DISPATCHED, OrderStatus.CANCELLED],
+      [OrderStatus.DISPATCHED]: [OrderStatus.DELIVERED],
+      [OrderStatus.DELIVERED]:  [],
+      [OrderStatus.CANCELLED]:  [],
+    };
+
+    if (!allowed[current].includes(next)) {
+      throw new BadRequestException(
+        `Cannot transition order from "${current}" to "${next}"`,
+      );
+    }
   }
 
   // ==========================
