@@ -15,7 +15,9 @@ import type { Request } from 'express';
 import { OrdersService } from '../services/orders.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
-import { UserEntity } from 'src/modules/users/entities/user.entity';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleType } from 'src/common/enums/role-type.enum';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('orders')
@@ -62,9 +64,11 @@ export class OrdersController {
   }
 
   // ==========================
-  // UPDATE STATUS (admin)
+  // UPDATE STATUS (solo admin)
   // ==========================
 
+  @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+  @UseGuards(RolesGuard)
   @Patch(':id/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
