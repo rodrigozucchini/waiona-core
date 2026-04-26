@@ -15,6 +15,9 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   password: string;
 
+  @Column({ type: 'boolean', default: false })
+  isActive: boolean;
+
   // ==========================
   // Relaciones
   // ==========================

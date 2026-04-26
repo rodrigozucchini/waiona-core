@@ -21,6 +21,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { UserEntity } from './modules/users/entities/user.entity';
 import { RolesGuard } from './common/guards/roles.guard';
 import { ShopModule } from './modules/products/shop/shop.module';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { ShopModule } from './modules/products/shop/shop.module';
     OrdersModule,
     PaymentsModule,
     ShopModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [

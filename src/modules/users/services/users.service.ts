@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 
@@ -56,6 +57,13 @@ export class UsersService {
   /* =======================
       FIND
   ======================= */
+
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    return this.userRepo.findOne({
+      where: { email, isDeleted: false },
+    });
+  }
+
   async findAll(dto?: SearchUsersDto) {
 
     const where: any = { isDeleted: false };
@@ -85,12 +93,6 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string) {
-    return this.userRepo.findOne({
-      where: { email, isDeleted: false },
-    });
-  }
-
   /* =======================
       UPDATE
   ======================= */
@@ -114,5 +116,20 @@ export class UsersService {
     user.isDeleted = true;
     user.profile.isDeleted = true;
     return this.userRepo.save(user);
+  }
+
+  /* =======================
+      ACTIVATE
+  ======================= */
+  async activate(id: number): Promise<void> {
+    await this.userRepo.update(id, { isActive: true });
+  }
+
+  /* =======================
+      UPDATE PASSWORD
+  ======================= */
+  async updatePassword(id: number, newPassword: string): Promise<void> {
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await this.userRepo.update(id, { password: hashed });
   }
 }
