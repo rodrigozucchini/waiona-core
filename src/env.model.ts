@@ -16,4 +16,5 @@ export interface Env {
     MP_WEBHOOK_SECRET: string;
     FRONTEND_URL: string;
     MP_NOTIFICATION_URL: string;
+    RESEND_API_KEY: string;
   }
