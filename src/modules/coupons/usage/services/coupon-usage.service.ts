@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { CouponUsageEntity } from '../entities/coupon-usage.entity';
 import { CouponEntity } from '../../coupon/entities/coupon.entity';
 import { CouponUsageResponseDto } from '../dto/coupon-usage-response.dto';
@@ -15,6 +15,8 @@ export class CouponUsageService {
 
     @InjectRepository(CouponEntity)
     private readonly couponRepository: Repository<CouponEntity>,
+
+    private readonly dataSource: DataSource,
   ) {}
 
   // ==========================
@@ -57,19 +59,24 @@ export class CouponUsageService {
       throw new ConflictException('User has already used this coupon');
     }
 
-    // 5. Registrar el uso
-    const usage = this.repo.create({
-      couponId: coupon.id,
-      orderId:  dto.orderId,
-      userId:   dto.userId,
-      appliedAt: now,
+    // 5 & 6. Registrar el uso e incrementar usageCount en transacción
+    // si falla cualquiera de los dos, se revierte todo
+    const usage = await this.dataSource.transaction(async manager => {
+
+      const newUsage = manager.create(CouponUsageEntity, {
+        couponId:  coupon.id,
+        orderId:   dto.orderId,
+        userId:    dto.userId,
+        appliedAt: now,
+      });
+
+      await manager.save(newUsage);
+
+      coupon.usageCount += 1;
+      await manager.save(coupon);
+
+      return newUsage;
     });
-
-    await this.repo.save(usage);
-
-    // 6. Incrementar usageCount en el cupón
-    coupon.usageCount += 1;
-    await this.couponRepository.save(coupon);
 
     return new CouponUsageResponseDto(usage);
   }
