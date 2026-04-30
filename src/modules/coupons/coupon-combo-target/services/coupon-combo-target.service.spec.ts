@@ -1,18 +1,94 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CouponComboTargetService } from './coupon-combo-target.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { NotFoundException, ConflictException } from '@nestjs/common';
+import { CouponComboTargetService } from '../../../coupons/coupon-combo-target/services/coupon-combo-target.service';
+import { CouponComboTargetEntity } from '../../../coupons/coupon-combo-target/entities/coupon-combo-target.entity';
+import { CouponEntity } from '../../../coupons/coupon/entities/coupon.entity';
 
 describe('CouponComboTargetService', () => {
   let service: CouponComboTargetService;
 
+  const mockTargetRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn() });
+  const mockCouponRepo = () => ({ findOne: jest.fn() });
+
+  const mockCoupon = (overrides = {}) => ({ id: 1, code: 'FIJO500', isGlobal: false, isDeleted: false, ...overrides });
+  const mockTarget = (overrides = {}) => ({ id: 1, couponId: 1, comboId: 1, isDeleted: false, createdAt: new Date(), updatedAt: new Date(), ...overrides });
+
+  let targetRepo: any;
+  let couponRepo: any;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [CouponComboTargetService],
+      providers: [
+        CouponComboTargetService,
+        { provide: getRepositoryToken(CouponComboTargetEntity), useFactory: mockTargetRepo },
+        { provide: getRepositoryToken(CouponEntity),            useFactory: mockCouponRepo },
+      ],
     }).compile();
 
-    service = module.get<CouponComboTargetService>(CouponComboTargetService);
+    service    = module.get<CouponComboTargetService>(CouponComboTargetService);
+    targetRepo = module.get(getRepositoryToken(CouponComboTargetEntity));
+    couponRepo = module.get(getRepositoryToken(CouponEntity));
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  afterEach(() => jest.clearAllMocks());
+
+  describe('create', () => {
+    it('should create a combo target', async () => {
+      const target = mockTarget();
+      couponRepo.findOne.mockResolvedValue(mockCoupon());
+      targetRepo.findOne.mockResolvedValue(null);
+      targetRepo.create.mockReturnValue(target);
+      targetRepo.save.mockResolvedValue(target);
+
+      const result = await service.create(1, { comboId: 1 } as any);
+      expect(result.comboId).toBe(1);
+    });
+
+    it('should throw NotFoundException if coupon not found', async () => {
+      couponRepo.findOne.mockResolvedValue(null);
+      await expect(service.create(999, { comboId: 1 } as any)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException if coupon is global', async () => {
+      couponRepo.findOne.mockResolvedValue(mockCoupon({ isGlobal: true }));
+      await expect(service.create(1, { comboId: 1 } as any)).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw ConflictException if target already exists', async () => {
+      couponRepo.findOne.mockResolvedValue(mockCoupon());
+      targetRepo.findOne.mockResolvedValue(mockTarget());
+      await expect(service.create(1, { comboId: 1 } as any)).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('findAll', () => {
+    it('should return all targets for a coupon', async () => {
+      couponRepo.findOne.mockResolvedValue(mockCoupon());
+      targetRepo.find.mockResolvedValue([mockTarget()]);
+      expect(await service.findAll(1)).toHaveLength(1);
+    });
+
+    it('should throw NotFoundException if coupon not found', async () => {
+      couponRepo.findOne.mockResolvedValue(null);
+      await expect(service.findAll(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('remove', () => {
+    it('should soft delete a target', async () => {
+      const target = mockTarget();
+      couponRepo.findOne.mockResolvedValue(mockCoupon());
+      targetRepo.findOne.mockResolvedValue(target);
+      targetRepo.save.mockResolvedValue({ ...target, isDeleted: true });
+      await service.remove(1, 1);
+      expect(targetRepo.save).toHaveBeenCalledWith({ ...target, isDeleted: true });
+    });
+
+    it('should throw NotFoundException if target not found', async () => {
+      couponRepo.findOne.mockResolvedValue(mockCoupon());
+      targetRepo.findOne.mockResolvedValue(null);
+      await expect(service.remove(1, 999)).rejects.toThrow(NotFoundException);
+    });
   });
 });
