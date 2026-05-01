@@ -1,18 +1,154 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ProductPricingService } from './product-pricing.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { ProductPricingService } from './../services/product-pricing.service';
+import { ProductPricingEntity } from './../entities/product-pricing.entity';
+import { MarginEntity } from 'src/modules/margins/entities/margin.entity';
+import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 describe('ProductPricingService', () => {
   let service: ProductPricingService;
 
+  const mockRepo       = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn() });
+  const mockMarginRepo = () => ({ findOne: jest.fn() });
+
+  const mockMargin  = { id: 1, value: 20, isPercentage: true };
+  const mockPricing = (overrides = {}): ProductPricingEntity =>
+    ({ id: 1, productId: 1, currency: CurrencyCode.ARS, unitPrice: 500,
+       margin: mockMargin, isDeleted: false, createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as ProductPricingEntity;
+
+  let repo: any;
+  let marginRepo: any;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ProductPricingService],
+      providers: [
+        ProductPricingService,
+        { provide: getRepositoryToken(ProductPricingEntity), useFactory: mockRepo       },
+        { provide: getRepositoryToken(MarginEntity),         useFactory: mockMarginRepo },
+      ],
     }).compile();
 
-    service = module.get<ProductPricingService>(ProductPricingService);
+    service    = module.get<ProductPricingService>(ProductPricingService);
+    repo       = module.get(getRepositoryToken(ProductPricingEntity));
+    marginRepo = module.get(getRepositoryToken(MarginEntity));
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  afterEach(() => jest.clearAllMocks());
+
+  describe('create', () => {
+    const dto = { productId: 1, currency: CurrencyCode.ARS, unitPrice: 500, marginId: 1 };
+
+    it('should create pricing with margin', async () => {
+      const pricing = mockPricing();
+      repo.findOne.mockResolvedValueOnce(null); // no existe
+      marginRepo.findOne.mockResolvedValue(mockMargin);
+      repo.create.mockReturnValue(pricing);
+      repo.save.mockResolvedValue(pricing);
+
+      const result = await service.create(dto as any);
+      expect(result.unitPrice).toBe(500);
+      expect(result.marginId).toBe(1);
+    });
+
+    it('should create pricing without margin', async () => {
+      const pricing = mockPricing({ margin: null });
+      repo.findOne.mockResolvedValueOnce(null);
+      repo.create.mockReturnValue(pricing);
+      repo.save.mockResolvedValue(pricing);
+
+      const result = await service.create({ ...dto, marginId: undefined } as any);
+      expect(result.marginId).toBeNull();
+    });
+
+    it('should throw BadRequestException if product already has pricing', async () => {
+      repo.findOne.mockResolvedValue(mockPricing());
+      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException if margin not found', async () => {
+      repo.findOne.mockResolvedValue(null);
+      marginRepo.findOne.mockResolvedValue(null);
+      await expect(service.create(dto as any)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findAll', () => {
+    it('should return all pricings', async () => {
+      repo.find.mockResolvedValue([mockPricing()]);
+      const result = await service.findAll();
+      expect(result).toHaveLength(1);
+      expect(result[0].productId).toBe(1);
+    });
+
+    it('should return empty array', async () => {
+      repo.find.mockResolvedValue([]);
+      expect(await service.findAll()).toEqual([]);
+    });
+  });
+
+  describe('findOne', () => {
+    it('should return pricing by id', async () => {
+      repo.findOne.mockResolvedValue(mockPricing());
+      const result = await service.findOne(1);
+      expect(result.id).toBe(1);
+    });
+
+    it('should throw NotFoundException', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findByProduct', () => {
+    it('should return pricing by productId', async () => {
+      repo.findOne.mockResolvedValue(mockPricing());
+      const result = await service.findByProduct(1);
+      expect(result.productId).toBe(1);
+    });
+
+    it('should throw NotFoundException', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.findByProduct(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('update', () => {
+    it('should update pricing', async () => {
+      const updated = mockPricing({ unitPrice: 600 });
+      repo.findOne.mockResolvedValueOnce(mockPricing()); // findOneEntity
+      marginRepo.findOne.mockResolvedValue(mockMargin);
+      repo.save.mockResolvedValue(updated);
+
+      const result = await service.update(1, { unitPrice: 600 } as any);
+      expect(result.unitPrice).toBe(600);
+    });
+
+    it('should throw BadRequestException if new productId already has pricing', async () => {
+      repo.findOne
+        .mockResolvedValueOnce(mockPricing({ productId: 1 })) // findOneEntity
+        .mockResolvedValueOnce(mockPricing({ productId: 2 })); // validación duplicado
+      await expect(service.update(1, { productId: 2 } as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.update(999, {} as any)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('remove', () => {
+    it('should soft delete pricing', async () => {
+      const pricing = mockPricing();
+      repo.findOne.mockResolvedValue(pricing);
+      repo.save.mockResolvedValue({ ...pricing, isDeleted: true });
+      await service.remove(1);
+      expect(repo.save).toHaveBeenCalledWith({ ...pricing, isDeleted: true });
+    });
+
+    it('should throw NotFoundException', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.remove(999)).rejects.toThrow(NotFoundException);
+    });
   });
 });

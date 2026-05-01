@@ -1,18 +1,72 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CalculationController } from './calculation.controller';
+import { AuthGuard } from '@nestjs/passport';
+import { Reflector } from '@nestjs/core';
+import { CalculationController } from '../../calculation/controllers/calculation.controller';
+import { CalculationService } from '../../calculation/services/calculation.service';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 describe('CalculationController', () => {
   let controller: CalculationController;
+  let service: jest.Mocked<CalculationService>;
+
+  const mockService    = () => ({ preview: jest.fn(), calculateProduct: jest.fn(), calculateCombo: jest.fn() });
+  const mockAuthGuard  = { canActivate: jest.fn(() => true) };
+  const mockRolesGuard = { canActivate: jest.fn(() => true) };
+
+  const mockBreakdown = (overrides = {}) => ({
+    unitPrice: 500, discount: 50, priceAfterDiscount: 450,
+    margin: 90, priceAfterMargin: 540, taxes: 113.4,
+    finalPrice: 653.4, fullPrice: 726, coupon: 0, orderTotal: 653.4, ...overrides,
+  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CalculationController],
-    }).compile();
+      providers: [
+        { provide: CalculationService, useFactory: mockService },
+        { provide: Reflector, useValue: { get: jest.fn() } },
+      ],
+    })
+      .overrideGuard(AuthGuard('jwt')).useValue(mockAuthGuard)
+      .overrideGuard(RolesGuard).useValue(mockRolesGuard)
+      .compile();
 
     controller = module.get<CalculationController>(CalculationController);
+    service    = module.get(CalculationService);
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+  afterEach(() => jest.clearAllMocks());
+
+  it('should be defined', () => expect(controller).toBeDefined());
+
+  it('preview should delegate to service', () => {
+    service.preview.mockReturnValue(mockBreakdown() as any);
+    const dto    = { unitPrice: 500, marginValue: 20 };
+    const result = controller.preview(dto as any);
+    expect(service.preview).toHaveBeenCalledWith(dto);
+    expect(result.unitPrice).toBe(500);
+  });
+
+  it('calculateProduct should delegate to service', async () => {
+    service.calculateProduct.mockResolvedValue(mockBreakdown() as any);
+    const dto    = { productId: 1 };
+    const result = await controller.calculateProduct(dto as any);
+    expect(service.calculateProduct).toHaveBeenCalledWith(dto);
+    expect(result.finalPrice).toBe(653.4);
+  });
+
+  it('calculateProduct with coupon should return discount', async () => {
+    service.calculateProduct.mockResolvedValue(mockBreakdown({ coupon: 65.34, orderTotal: 588.06 }) as any);
+    const result = await controller.calculateProduct({ productId: 1, couponCode: 'DESCUENTO10' } as any);
+    expect(result.coupon).toBe(65.34);
+    expect(result.orderTotal).toBe(588.06);
+  });
+
+  it('calculateCombo should delegate to service', async () => {
+    service.calculateCombo.mockResolvedValue(mockBreakdown({ unitPrice: 1200, finalPrice: 1742.4 }) as any);
+    const dto    = { comboId: 1 };
+    const result = await controller.calculateCombo(dto as any);
+    expect(service.calculateCombo).toHaveBeenCalledWith(dto);
+    expect(result.unitPrice).toBe(1200);
   });
 });
