@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository, ILike, DataSource } from 'typeorm';
 
 import { UserEntity } from '../entities/user.entity';
 import { ProfileEntity } from '../entities/profile.entity';
@@ -22,6 +22,8 @@ export class UsersService {
 
     @InjectRepository(RoleEntity)
     private readonly roleRepo: Repository<RoleEntity>,
+
+    private readonly dataSource: DataSource,
   ) {}
 
   /* =======================
@@ -33,25 +35,28 @@ export class UsersService {
     });
     if (existing) throw new ConflictException('Email already in use');
 
-    const profile = this.profileRepo.create({
-      name: dto.name,
-      lastName: dto.lastName,
-      avatar: dto.avatar ?? null,
-    });
-
-    // 🔥 asignar rol CLIENT automáticamente al registrarse
     const clientRole = await this.roleRepo.findOne({
       where: { type: RoleType.CLIENT },
     });
 
-    const user = this.userRepo.create({
-      email: dto.email,
-      password: dto.password,
-      profile,
-      role: clientRole ?? undefined,
-    });
+    // 🔥 transacción — si falla el save del user el profile no queda huérfano
+    return this.dataSource.transaction(async manager => {
 
-    return this.userRepo.save(user);
+      const profile = manager.create(ProfileEntity, {
+        name:     dto.name,
+        lastName: dto.lastName,
+        avatar:   dto.avatar ?? null,
+      });
+
+      const user = manager.create(UserEntity, {
+        email:    dto.email,
+        password: dto.password,
+        profile,
+        role:     clientRole ?? undefined,
+      });
+
+      return manager.save(UserEntity, user);
+    });
   }
 
   /* =======================
@@ -72,7 +77,6 @@ export class UsersService {
       where.email = ILike(`%${dto.email}%`);
     }
 
-    // buscar por nombre en el profile
     if (dto?.name) {
       return this.userRepo.find({
         where: [
@@ -100,9 +104,9 @@ export class UsersService {
     const user = await this.findOne(id);
 
     Object.assign(user.profile, {
-      name: dto.name ?? user.profile.name,
+      name:     dto.name     ?? user.profile.name,
       lastName: dto.lastName ?? user.profile.lastName,
-      avatar: dto.avatar ?? user.profile.avatar,
+      avatar:   dto.avatar   ?? user.profile.avatar,
     });
 
     return this.userRepo.save(user);
@@ -113,7 +117,7 @@ export class UsersService {
   ======================= */
   async remove(id: number) {
     const user = await this.findOne(id);
-    user.isDeleted = true;
+    user.isDeleted         = true;
     user.profile.isDeleted = true;
     return this.userRepo.save(user);
   }
