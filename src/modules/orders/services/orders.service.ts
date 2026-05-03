@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 
 import { OrderEntity } from '../entities/order.entity';
 import { OrderItemEntity } from '../entities/order-item.entity';
@@ -54,6 +54,7 @@ export class OrdersService {
 
     private readonly stockItemsService: StockItemsService,
     private readonly calculationService: CalculationService,
+    private readonly dataSource: DataSource,
   ) {}
 
   // ==========================
@@ -63,7 +64,6 @@ export class OrdersService {
   async create(userId: number, dto: CreateOrderDto): Promise<OrderEntity> {
     const now = new Date();
 
-    // Buscar usuario
     const user = await this.userRepo.findOne({
       where: { id: userId, isDeleted: false },
     });
@@ -84,11 +84,11 @@ export class OrdersService {
       throw new BadRequestException('Address is required for delivery orders');
     }
 
-    // 3. Calcular precio de cada item y validar stock
+    // 3. Calcular precios, validar stock y cupón ANTES de la transacción
     const orderItems: OrderItemEntity[] = [];
     const stockReservations: { productId: number; locationId: number; quantity: number }[] = [];
-    let subtotal = 0;
-    let couponDiscount = 0; // 🔥 acumulado desde CalculationService
+    let subtotal       = 0;
+    let couponDiscount = 0;
 
     for (const item of dto.items) {
 
@@ -102,24 +102,24 @@ export class OrdersService {
 
         const breakdown = await this.calculationService.calculateProduct({
           productId: item.productId,
-          couponCode: dto.couponCode, // 🔥 pasar couponCode para cálculo unificado
+          couponCode: dto.couponCode,
         });
 
         const orderItem = this.orderItemRepo.create({
           product,
-          quantity: item.quantity,
-          unitPrice: breakdown.unitPrice,
-          finalPrice: breakdown.orderTotal * item.quantity, // 🔥 usar orderTotal (con cupón)
+          quantity:   item.quantity,
+          unitPrice:  breakdown.unitPrice,
+          finalPrice: breakdown.orderTotal * item.quantity,
         });
 
         orderItems.push(orderItem);
         stockReservations.push({
-          productId: item.productId,
+          productId:  item.productId,
           locationId: stockItem.locationId,
-          quantity: item.quantity,
+          quantity:   item.quantity,
         });
-        subtotal += breakdown.finalPrice * item.quantity;       // subtotal sin cupón
-        couponDiscount += breakdown.coupon * item.quantity;     // 🔥 acumular descuento real
+        subtotal       += breakdown.finalPrice * item.quantity;
+        couponDiscount += breakdown.coupon * item.quantity;
 
       } else if (item.comboId) {
         const combo = await this.comboRepo.findOne({
@@ -134,31 +134,31 @@ export class OrdersService {
             item.quantity * comboItem.quantity,
           );
           stockReservations.push({
-            productId: comboItem.productId,
+            productId:  comboItem.productId,
             locationId: stockItem.locationId,
-            quantity: item.quantity * comboItem.quantity,
+            quantity:   item.quantity * comboItem.quantity,
           });
         }
 
         const breakdown = await this.calculationService.calculateCombo({
           comboId: item.comboId,
-          couponCode: dto.couponCode, // 🔥 pasar couponCode para cálculo unificado
+          couponCode: dto.couponCode,
         });
 
         const orderItem = this.orderItemRepo.create({
           combo,
-          quantity: item.quantity,
-          unitPrice: breakdown.unitPrice,
-          finalPrice: breakdown.orderTotal * item.quantity, // 🔥 usar orderTotal (con cupón)
+          quantity:   item.quantity,
+          unitPrice:  breakdown.unitPrice,
+          finalPrice: breakdown.orderTotal * item.quantity,
         });
 
         orderItems.push(orderItem);
-        subtotal += breakdown.finalPrice * item.quantity;       // subtotal sin cupón
-        couponDiscount += breakdown.coupon * item.quantity;     // 🔥 acumular descuento real
+        subtotal       += breakdown.finalPrice * item.quantity;
+        couponDiscount += breakdown.coupon * item.quantity;
       }
     }
 
-    // 4. Validar cupón si viene — el cálculo ya se hizo en el paso 3
+    // 4. Validar cupón
     let coupon: CouponEntity | null = null;
 
     if (dto.couponCode) {
@@ -184,47 +184,52 @@ export class OrdersService {
       if (alreadyUsed) throw new ConflictException('Coupon already used by this user');
     }
 
-    // 🔥 total calculado con el descuento acumulado del CalculationService
     const total = subtotal - couponDiscount;
 
-    // 5. Guardar orden
-    const order = this.orderRepo.create({
-      user,
-      items: orderItems,
-      status: OrderStatus.PENDING,
-      deliveryType: dto.deliveryType,
-      address: dto.address ?? null,
-      notes: dto.notes ?? null,
-      subtotal,
-      couponDiscount: couponDiscount || null,
-      coupon: coupon ?? null,
-      total,
-    });
+    // 5. 🔥 Transacción — guardar orden + reservar stock + registrar cupón de forma atómica
+    const saved = await this.dataSource.transaction(async manager => {
 
-    const saved = await this.orderRepo.save(order);
-
-    // 6. Reservar stock
-    for (const reservation of stockReservations) {
-      await this.stockItemsService.reserveStock(
-        reservation.productId,
-        reservation.locationId,
-        reservation.quantity,
-      );
-    }
-
-    // 7. Registrar uso del cupón
-    if (coupon) {
-      coupon.usageCount += 1;
-      await this.couponRepo.save(coupon);
-
-      const usage = this.couponUsageRepo.create({
-        couponId: coupon.id,
-        userId: user.id,
-        orderId: saved.id,
-        appliedAt: now,
+      // guardar orden
+      const order = manager.create(OrderEntity, {
+        user,
+        items:          orderItems,
+        status:         OrderStatus.PENDING,
+        deliveryType:   dto.deliveryType,
+        address:        dto.address ?? null,
+        notes:          dto.notes ?? null,
+        subtotal,
+        couponDiscount: couponDiscount > 0 ? couponDiscount : null,
+        coupon:         coupon ?? null,
+        total,
       });
-      await this.couponUsageRepo.save(usage);
-    }
+
+      const savedOrder = await manager.save(OrderEntity, order);
+
+      // reservar stock
+      for (const reservation of stockReservations) {
+        await this.stockItemsService.reserveStock(
+          reservation.productId,
+          reservation.locationId,
+          reservation.quantity,
+        );
+      }
+
+      // registrar uso del cupón
+      if (coupon) {
+        coupon.usageCount += 1;
+        await manager.save(CouponEntity, coupon);
+
+        const usage = manager.create(CouponUsageEntity, {
+          couponId:  coupon.id,
+          userId:    user.id,
+          orderId:   savedOrder.id,
+          appliedAt: now,
+        });
+        await manager.save(CouponUsageEntity, usage);
+      }
+
+      return savedOrder;
+    });
 
     return saved;
   }
@@ -267,13 +272,12 @@ export class OrdersService {
   }
 
   // ==========================
-  // UPDATE STATUS (admin)
+  // UPDATE STATUS
   // ==========================
 
   async updateStatus(id: number, dto: UpdateOrderStatusDto): Promise<OrderEntity> {
     const order = await this.findOne(id);
 
-    // 🔥 validar transiciones permitidas
     this.validateStatusTransition(order.status, dto.status);
 
     if (dto.status === OrderStatus.DISPATCHED) {
@@ -289,14 +293,10 @@ export class OrdersService {
   }
 
   // ==========================
-  // VALIDAR TRANSICIÓN DE STATUS
+  // PRIVATE — validar transición
   // ==========================
 
-  private validateStatusTransition(
-    current: OrderStatus,
-    next: OrderStatus,
-  ): void {
-
+  private validateStatusTransition(current: OrderStatus, next: OrderStatus): void {
     const allowed: Record<OrderStatus, OrderStatus[]> = {
       [OrderStatus.PENDING]:    [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
       [OrderStatus.CONFIRMED]:  [OrderStatus.DISPATCHED, OrderStatus.CANCELLED],
@@ -313,7 +313,7 @@ export class OrdersService {
   }
 
   // ==========================
-  // HELPERS PRIVADOS
+  // PRIVATE — stock disponible
   // ==========================
 
   private async findAvailableStockItem(
@@ -335,6 +335,10 @@ export class OrdersService {
 
     return stockItem;
   }
+
+  // ==========================
+  // PRIVATE — despachar
+  // ==========================
 
   private async handleDispatch(order: OrderEntity): Promise<void> {
     for (const item of order.items) {
@@ -370,6 +374,10 @@ export class OrdersService {
       }
     }
   }
+
+  // ==========================
+  // PRIVATE — cancelar
+  // ==========================
 
   private async handleCancellation(order: OrderEntity): Promise<void> {
     for (const item of order.items) {

@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
@@ -36,21 +37,33 @@ export class OrdersController {
   }
 
   // ==========================
-  // GET ALL (admin)
+  // GET ALL — solo admin
   // ==========================
 
+  @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+  @UseGuards(RolesGuard)
   @Get()
   findAll() {
     return this.ordersService.findAll();
   }
 
   // ==========================
-  // GET BY USER
-  // 🔥 antes de GET :id para evitar que 'user' sea tratado como id
+  // GET BY USER — 🔥 ownership check
+  // antes de GET :id para evitar conflicto de rutas
   // ==========================
 
   @Get('user/:userId')
-  findByUser(@Param('userId', ParseIntPipe) userId: number) {
+  findByUser(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Req() req: Request,
+  ) {
+    const payload = req.user as { sub: number; role: RoleType };
+
+    // cliente solo puede ver sus propias órdenes
+    if (payload.role === RoleType.CLIENT && payload.sub !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
     return this.ordersService.findByUser(userId);
   }
 
@@ -64,7 +77,7 @@ export class OrdersController {
   }
 
   // ==========================
-  // UPDATE STATUS (solo admin)
+  // UPDATE STATUS — solo admin
   // ==========================
 
   @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
