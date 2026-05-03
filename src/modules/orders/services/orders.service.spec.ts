@@ -262,4 +262,4 @@ describe('OrdersService', () => {
       await expect(service.updateStatus(999, { status: OrderStatus.CONFIRMED } as any)).rejects.toThrow(NotFoundException);
     });
   });
-});
+}); 
