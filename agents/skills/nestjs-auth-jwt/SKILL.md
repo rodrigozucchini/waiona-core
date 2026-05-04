@@ -1,11 +1,11 @@
 ---
 name: nestjs-auth-jwt
 description: >
-  JWT authentication patterns for this repo using Passport, LocalStrategy, JwtStrategy, and AuthGuard.
-  Load when implementing login, protecting routes, or working with the auth module.
+  JWT authentication patterns for this repo using Passport, LocalStrategy, JwtStrategy, RolesGuard and full auth flow (register, activate, forgot/reset password).
+  Load when implementing login, protecting routes, working with guards, roles, or the auth module.
 metadata:
   author: @rodrigozucchini
-  version: "2.0"
+  version: "3.0"
 ---
 
 # NestJS Auth JWT Skill
@@ -14,186 +14,197 @@ metadata:
 
 ## When to Use
 
-Load when implementing login, protecting routes with JWT, or modifying `AuthModule`, `AuthService`, or strategies.
-Skip for general module structure (nestjs-core) or user CRUD unrelated to auth.
+Load when implementing login, register, account activation, password reset, protecting routes with JWT, or modifying `AuthModule`, `AuthService`, guards or strategies.
+Skip for general module structure (use `nestjs-core`) or user CRUD unrelated to auth.
 
 ---
 
 ## Repo Rules
 
 1. Two strategies: `local` for login only, `jwt` for all protected routes.
-2. JWT payload is `{ sub: user.id }` only — no roles, email, or extra data.
-3. `JwtStrategy.validate()` returns `{ userId: payload.sub }` — downstream uses `req.user.userId`.
+2. JWT payload is `{ sub: userId, role: RoleType }` — always includes role.
+3. `JwtStrategy.validate()` returns the full payload — downstream uses `req.user as { sub: number; role: RoleType }`.
 4. `JWT_SECRET` always via `ConfigService<Env>` — never `process.env`.
 5. Password excluded via `@Exclude()` on entity + `ClassSerializerInterceptor` globally in `main.ts`.
-6. Credential validation lives in `AuthService.validateUser()` — never in the strategy directly.
+6. `RolesGuard` reads role from JWT payload — **never queries the DB**.
+7. `validateUser()` checks `isActive` — inactive accounts get `401`.
 
 ---
 
 ## Auth Flow
 
 ```
+POST /auth/register { email, password, name, lastName }
+  → UsersService.create() → user created with isActive: false
+  → TokenEntity created (type: ACCOUNT_ACTIVATION, expires 24h)
+  → MailService.sendActivationEmail()
+
+GET /auth/activate?token=xxx
+  → TokenEntity validated (not used, not expired)
+  → UsersService.activate(userId) → isActive: true
+  → Token marked as used
+
 POST /auth/login { email, password }
-  → AuthGuard('local') → LocalStrategy.validate(email, password)
-  → AuthService.validateUser() → bcrypt.compare()
-  → Controller receives req.user as UserEntity
-  → AuthService.generateToken(user) → { sub: user.id }
+  → AuthGuard('local') → LocalStrategy → AuthService.validateUser()
+  → bcrypt.compare() + check isActive
+  → generateToken() → { sub: user.id, role: user.role.type }
   → Response: { user, access_token }
+
+POST /auth/forgot-password { email }
+  → silently returns OK if user not found (no hints to attacker)
+  → TokenEntity created (type: PASSWORD_RESET, expires 1h)
+  → MailService.sendPasswordResetEmail()
+
+POST /auth/reset-password { token, password }
+  → TokenEntity validated
+  → UsersService.updatePassword() → bcrypt.hash(10)
+  → Token marked as used
 
 Protected route:
   Authorization: Bearer <token>
-  → AuthGuard('jwt') → JwtStrategy.validate({ sub })
-  → req.user = { userId: payload.sub }
+  → AuthGuard('jwt') → JwtStrategy.validate(payload)
+  → req.user = { sub: userId, role: RoleType }
 ```
 
 ---
 
-## AuthModule
+## JWT Payload
 
 ```typescript
-@Module({
-  imports: [
-    UsersModule,
-    PassportModule,
-    JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env>) => ({
-        secret: config.get('JWT_SECRET', { infer: true }),
-        signOptions: { expiresIn: '6d' },
-      }),
-    }),
-  ],
-  controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
-  exports: [AuthService],
-})
-export class AuthModule {}
-```
+// models/payload.model.ts
+import { RoleType } from 'src/common/enums/role-type.enum';
 
----
-
-## Strategies
-
-```typescript
-// local.strategy.ts
-@Injectable()
-export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
-  constructor(private readonly authService: AuthService) {
-    super({ usernameField: 'email', passwordField: 'password' });
-  }
-
-  async validate(email: string, password: string) {
-    return this.authService.validateUser(email, password);
-  }
-}
-
-// jwt.strategy.ts
-@Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(config: ConfigService<Env>) {
-    const secret = config.get('JWT_SECRET', { infer: true });
-    if (!secret) throw new Error('JWT_SECRET is not set');
-    super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false,
-      secretOrKey: secret,
-    });
-  }
-
-  validate(payload: { sub: string }) {
-    return { userId: payload.sub };
-  }
+export interface Payload {
+  sub: number;
+  role: RoleType | null;
 }
 ```
 
 ---
 
-## AuthService
+## RolesGuard — reads from token, no DB query
 
 ```typescript
 @Injectable()
-export class AuthService {
-  constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
-  ) {}
+export class RolesGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
 
-  async validateUser(email: string, password: string) {
-    const user = await this.usersService.getUserByEmail(email);
-    if (!user) throw new UnauthorizedException('Unauthorized');
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new UnauthorizedException('Unauthorized');
-    return user;
-  }
+  canActivate(context: ExecutionContext): boolean {
+    const requiredRoles =
+      this.reflector.get<RoleType[]>('roles', context.getHandler()) ??
+      this.reflector.get<RoleType[]>('roles', context.getClass());
 
-  generateToken(user: UserEntity) {
-    return this.jwtService.sign({ sub: user.id });
-  }
-}
-```
+    if (!requiredRoles || requiredRoles.length === 0) return true;
 
----
+    const request = context.switchToHttp().getRequest();
+    const payload = request.user as { sub: number; role: RoleType | null };
 
-## Controller
+    if (!payload?.role) throw new ForbiddenException('Access denied');
+    if (!requiredRoles.includes(payload.role)) throw new ForbiddenException('Access denied');
 
-```typescript
-@Controller('auth')
-export class AuthController {
-  constructor(private authService: AuthService) {}
-
-  @UseGuards(AuthGuard('local'))
-  @Post('login')
-  login(@Req() req: Request) {
-    const user = req.user as UserEntity;
-    return {
-      user,
-      access_token: this.authService.generateToken(user),
-    };
+    return true;
   }
 }
 ```
 
 ---
 
-## Protecting routes
+## Protecting Routes
 
 ```typescript
-// Whole controller
+// Endpoint público (shop, registro)
+@Post('register')
+register(@Body() dto: CreateUserDto) { ... }
+
+// Solo autenticado (cualquier rol)
 @UseGuards(AuthGuard('jwt'))
-@Controller('products')
-export class ProductsController { ... }
+@Get(':id')
+findOne(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+  const payload = req.user as { sub: number; role: RoleType };
+}
 
-// Single route with role
-@Roles(RoleType.ADMIN)
+// Solo admin — a nivel de clase
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Delete(':id')
-remove(@Param('id', ParseIntPipe) id: number) { ... }
+@Controller('products')
+export class ProductController { ... }
+
+// Solo admin — en método específico
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(RolesGuard)
+@Patch(':id/status')
+updateStatus() { ... }
 ```
 
 ---
 
-## Exclude password from responses
+## Ownership Check (cliente solo ve sus propios datos)
 
-On the entity:
 ```typescript
-@Exclude()
-@Column({ length: 255 })
-password: string;
+@UseGuards(AuthGuard('jwt'))
+@Get(':id')
+findOne(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+  const payload = req.user as { sub: number; role: RoleType };
+  if (payload.role === RoleType.CLIENT && payload.sub !== id) {
+    throw new ForbiddenException('Access denied');
+  }
+  return this.service.findOne(id);
+}
 ```
 
-In `main.ts` (already configured — do not remove):
+---
+
+## Token Entity
+
 ```typescript
-app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+export enum TokenType {
+  ACCOUNT_ACTIVATION = 'account_activation',
+  PASSWORD_RESET     = 'password_reset',
+}
+
+@Entity('tokens')
+export class TokenEntity extends BaseEntity {
+  @Column({ type: 'varchar', length: 255, nullable: false, unique: true })
+  token: string;
+
+  @Column({ type: 'enum', enum: TokenType, nullable: false })
+  type: TokenType;
+
+  @Column({ name: 'user_id', type: 'int', nullable: false })
+  userId: number;
+
+  @Column({ name: 'expires_at', type: 'timestamptz', nullable: false })
+  expiresAt: Date;
+
+  @Column({ name: 'used_at', type: 'timestamptz', nullable: true })
+  usedAt: Date | null;
+
+  get isExpired(): boolean { return new Date() > this.expiresAt; }
+  get isUsed(): boolean { return this.usedAt !== null; }
+}
+```
+
+---
+
+## Roles Enum
+
+```typescript
+// src/common/enums/role-type.enum.ts
+export enum RoleType {
+  SUPER_ADMIN = 'super_admin',
+  ADMIN       = 'admin',
+  CLIENT      = 'client',
+}
 ```
 
 ---
 
 ## Common Mistakes
 
-- Using `AuthGuard('local')` outside login — it expects `email` + `password` in body.
-- Putting roles/email in JWT payload — payload is `{ sub: user.id }` only.
+- Putting `AuthGuard('local')` outside login — it expects `email` + `password` in body.
+- **Putting only `{ sub }` in JWT payload** — always include `role` in this project.
+- **Querying DB in `RolesGuard`** — read role from `req.user` (JWT payload), never the DB.
 - Using `process.env.JWT_SECRET` directly — always use `ConfigService<Env>`.
 - Forgetting `ClassSerializerInterceptor` in `main.ts` — `@Exclude()` won't work without it.
-- Not casting `req.user` — always `req.user as UserEntity` in login, `req.user as { userId }` in protected routes.
-
----
+- Not checking `isActive` in `validateUser` — inactive users must get `401`.
+- Forgetting ownership check for client role — clients should only access their own resources.

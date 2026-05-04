@@ -1,16 +1,16 @@
 ---
 name: nestjs-core
 description: >
-  NestJS core conventions for this repo: module structure, controllers, services, global config, and entity patterns.
-  Load when creating modules, controllers, services, or configuring the app bootstrap.
+  NestJS core conventions for this repo: module structure, controllers, services, global config, entity patterns, and unit testing.
+  Load when creating modules, controllers, services, configuring the app bootstrap, or writing unit tests.
 metadata:
   author: @rodrigozucchini
-  version: "1.0"
+  version: "2.0"
 ---
 
 # NestJS Core Skill
 
-Defines the structural conventions, patterns, and rules for all NestJS modules in this project. Based on the actual codebase. Works alongside `nestjs-auth-jwt` (auth/guards) and `typeorm-standard` (entities/DTOs).
+Defines the structural conventions, patterns, and rules for all NestJS modules in this project. Based on the actual codebase. Works alongside `nestjs-auth-jwt` (auth/guards) and `typeorm-standard` (entities/DTOs/transactions).
 
 ---
 
@@ -19,24 +19,26 @@ Defines the structural conventions, patterns, and rules for all NestJS modules i
 Load when the user:
 - Creates a new module, controller, or service
 - Configures `main.ts` or `app.module.ts`
-- Defines a new entity or relationship
+- Writes or fixes unit tests (service spec or controller spec)
 - Implements soft delete, findAll, findOne, or update patterns
 
 Do NOT load when:
 - Setting up Docker or database connection (use `nestjs-docker-postgres`)
 - Implementing auth, guards, or JWT (use `nestjs-auth-jwt`)
 - Writing migrations (use `postgres-standard`)
+- Creating entities or DTOs in detail (use `typeorm-standard`)
 
 ---
 
 ## Core Rules
 
-1. **Modules split by context**: Admin and client logic live in separate controllers and services (`{module}/admin/` and `{module}/client/`).
-2. **All entities extend `BaseEntity`**: Every entity gets `id`, `createdAt`, `updatedAt`, `isDeleted` for free.
-3. **Soft delete only**: Never use hard delete. Always set `isDeleted = true` and save.
-4. **All queries filter `isDeleted: false`**: Every `find` and `findOne` must include this condition.
-5. **Relations resolved in service via helper methods**: Never inline relation lookups in `create` or `update` — use private `resolve{Relation}()` methods.
-6. **`ParseIntPipe` on all ID params**: Every `:id` route param uses `@Param('id', ParseIntPipe)`.
+1. **All entities extend `BaseEntity`**: Every entity gets `id`, `createdAt`, `updatedAt`, `isDeleted`.
+2. **Soft delete only**: Never hard delete. Set `isDeleted = true` and save.
+3. **Always filter `isDeleted: false`**: Every query includes this condition.
+4. **Services return DTOs**: Never return raw entities from a service.
+5. **`ParseIntPipe` on all ID params**: Every `:id` route param uses it.
+6. **Specific routes before generic ones**: `GET /user/:userId` must come before `GET /:id`.
+7. **Transactions for multi-table writes**: Use `dataSource.transaction()`.
 
 ---
 
@@ -44,247 +46,222 @@ Do NOT load when:
 
 ```
 src/
-├── main.ts                        # Bootstrap: GlobalPipe, GlobalInterceptor, PORT
-├── app.module.ts                  # Root module: ConfigModule, TypeOrmModule, all modules
-├── env.model.ts                   # Env interface (typed ConfigService)
+├── main.ts                          # Bootstrap: GlobalPipe, GlobalInterceptor, PORT
+├── app.module.ts                    # Root module: ConfigModule, TypeOrmModule, all modules
+├── env.model.ts                     # Env interface (typed ConfigService)
 ├── common/
-│   ├── entities/
-│   │   ├── base.entity.ts         # id, createdAt, updatedAt, isDeleted
-│   │   └── person.entity.ts       # Shared person data
-│   └── enums/                     # All enums live here
-└── {module}/
-    ├── {module}.module.ts         # Module declaration
-    ├── entities/
-    │   └── {module}.entity.ts
-    ├── admin/
-    │   ├── {module}.admin.controller.ts
-    │   ├── {module}.admin.service.ts
-    │   ├── {module}.admin.module.ts
-    │   └── dto/
-    │       ├── create-{module}.admin.dto.ts
-    │       ├── update-{module}.admin.dto.ts
-    │       └── {module}-response.admin.dto.ts
-    └── client/
-        ├── {module}.client.controller.ts
-        ├── {module}.client.service.ts
-        └── dto/
+│   ├── decorators/roles.decorator.ts
+│   ├── entities/base.entity.ts      # id, createdAt, updatedAt, isDeleted
+│   ├── enums/
+│   │   ├── role-type.enum.ts        # SUPER_ADMIN | ADMIN | CLIENT
+│   │   └── currency-code.enum.ts
+│   ├── guards/
+│   │   ├── roles.guard.ts           # reads role from JWT — no DB query
+│   │   └── guards.module.ts
+│   └── theme/email-theme.ts         # colors + logo for email templates
+└── modules/
+    └── {module}/
+        ├── {module}.module.ts
+        ├── entities/{module}.entity.ts
+        ├── dto/
+        │   ├── create-{module}.dto.ts
+        │   ├── update-{module}.dto.ts    → PartialType(CreateDto)
+        │   └── {module}-response.dto.ts  → constructor(entity)
+        ├── services/
+        │   ├── {module}.service.ts
+        │   └── {module}.service.spec.ts
+        └── controllers/
+            ├── {module}.controller.ts
+            └── {module}.controller.spec.ts
 ```
 
 ---
 
-## Patterns: Do This, Not That
+## main.ts Bootstrap
 
-### Pattern 1: main.ts bootstrap
-
-**Do this:**
 ```typescript
+import { NestFactory, Reflector } from '@nestjs/core';
+import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
+import { AppModule } from './app.module';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }));
+
+  // activa @Exclude() en todas las respuestas
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+
   await app.listen(process.env.PORT ?? 3000);
 }
+bootstrap();
 ```
-> Always include `whitelist`, `forbidNonWhitelisted`, `transform`, and `ClassSerializerInterceptor`. Never remove these — they enforce DTO validation and `@Exclude()` on sensitive fields.
 
 ---
 
-### Pattern 2: Controller structure
+## Controller Pattern
 
-**Do this:**
 ```typescript
-@UseGuards(AuthGuard('jwt'))
-@Controller('admin/products')
-export class ProductsAdminController {
-  constructor(private readonly productsService: ProductsAdminService) {}
+@Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Controller('nombres')
+export class NombreController {
+  constructor(private readonly service: NombreService) {}
 
   @Post()
-  create(@Body() dto: CreateProductAdminDto) {
-    return this.productsService.create(dto);
+  create(@Body() dto: CreateNombreDto) { return this.service.create(dto); }
+
+  @Get()
+  findAll() { return this.service.findAll(); }
+
+  // ⚠️ Specific routes BEFORE generic /:id
+  @Get('by-product/:productId')
+  findByProduct(@Param('productId', ParseIntPipe) productId: number) {
+    return this.service.findByProduct(productId);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.findOne(id);
-  }
+  findById(@Param('id', ParseIntPipe) id: number) { return this.service.findById(id); }
 
-  @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateProductAdminDto) {
-    return this.productsService.update(id, dto);
-  }
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateNombreDto,
+  ) { return this.service.update(id, dto); }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.remove(id);
-  }
-}
-```
-**Not this:** missing `ParseIntPipe`, missing `@UseGuards`, or mixing admin/client routes in the same controller.
-
----
-
-### Pattern 3: Soft delete
-
-**Do this:**
-```typescript
-async remove(id: number) {
-  const entity = await this.findOne(id);
-  entity.isDeleted = true;
-  return this.repository.save(entity);
-}
-```
-**Not this:**
-```typescript
-await this.repository.delete(id);
-```
-> Hard deletes are never used. All removals set `isDeleted = true`.
-
----
-
-### Pattern 4: findAll and findOne always filter isDeleted
-
-**Do this:**
-```typescript
-findAll() {
-  return this.repository.find({ where: { isDeleted: false } });
-}
-
-async findOne(id: number) {
-  const entity = await this.repository.findOne({ where: { id, isDeleted: false } });
-  if (!entity) throw new NotFoundException('Entity not found');
-  return entity;
-}
-```
-**Not this:**
-```typescript
-return this.repository.find();
-return this.repository.findOneBy({ id });
-```
-
----
-
-### Pattern 5: Resolve relations with private helpers
-
-**Do this:**
-```typescript
-async create(dto: CreateProductAdminDto) {
-  const product = this.productRepository.create({
-    ...dto,
-    margin: dto.marginId ? await this.resolveMargin(dto.marginId) : null,
-    taxes: dto.taxIds?.length ? await this.resolveTaxes(dto.taxIds) : [],
-  });
-  return this.productRepository.save(product);
-}
-
-private async resolveMargin(marginId: number): Promise<MarginEntity> {
-  const margin = await this.marginRepository.findOneBy({ id: marginId, isDeleted: false });
-  if (!margin) throw new NotFoundException(`Margin ${marginId} not found`);
-  return margin;
-}
-
-private async resolveTaxes(taxIds: number[]): Promise<TaxEntity[]> {
-  const taxes = await this.taxRepository.find({ where: { id: In(taxIds), isDeleted: false } });
-  if (taxes.length !== taxIds.length) throw new NotFoundException('One or more taxes not found');
-  return taxes;
-}
-```
-**Not this:** inlining repository calls directly inside `create()` or `update()`.
-
----
-
-### Pattern 6: Update with partial DTO
-
-**Do this:**
-```typescript
-async update(id: number, dto: UpdateProductAdminDto) {
-  const entity = await this.findOne(id);
-  Object.assign(entity, {
-    name: dto.name ?? entity.name,
-    description: dto.description ?? entity.description,
-  });
-  return this.repository.save(entity);
-}
-```
-> Always use `?? entity.field` to preserve existing values when a field is not sent.
-
----
-
-### Pattern 7: Entity sections
-
-Entities use section comments matching DTO sections:
-```typescript
-@Entity('products')
-export class ProductEntity extends BaseEntity {
-  // ==========================
-  // Datos básicos
-  // ==========================
-
-  // ==========================
-  // Relaciones
-  // ==========================
+  @HttpCode(HttpStatus.NO_CONTENT)
+  delete(@Param('id', ParseIntPipe) id: number) { return this.service.delete(id); }
 }
 ```
 
 ---
 
-## BaseEntity Reference
-
-All entities must extend this:
-```typescript
-export abstract class BaseEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @Column({ default: false })
-  isDeleted: boolean;
-}
-```
-
----
-
-## app.module.ts Pattern
+## Module Pattern
 
 ```typescript
 @Module({
-  imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env>) => ({
-        type: 'postgres',
-        host: config.get('POSTGRES_HOST', { infer: true }),
-        port: config.get('POSTGRES_PORT', { infer: true }),
-        username: config.get('POSTGRES_USER', { infer: true }),
-        password: config.get('POSTGRES_PASSWORD', { infer: true }),
-        database: config.get('POSTGRES_DB', { infer: true }),
-        autoLoadEntities: true,
-        synchronize: false,
-      }),
-    }),
-    // modules...
-  ],
+  imports: [TypeOrmModule.forFeature([NombreEntity])],
+  controllers: [NombreController],
+  providers: [NombreService],
+  exports: [NombreService], // only if other modules need it
 })
-export class AppModule {}
+export class NombreModule {}
+```
+
+**Rules:**
+- Do NOT import `GuardsModule` — `RolesGuard` no longer needs `UserEntity`
+- Import external modules instead of re-registering their entities
+- Export services only when consumed by other modules
+
+---
+
+## Unit Test — Service Spec
+
+```typescript
+describe('NombreService', () => {
+  let service: NombreService;
+  let repo: any;
+
+  const mockRepo = () => ({
+    find: jest.fn(), findOne: jest.fn(),
+    create: jest.fn(), save: jest.fn(), merge: jest.fn(),
+  });
+
+  // factory — always use overrides pattern
+  const mockEntity = (overrides = {}): NombreEntity =>
+    ({ id: 1, name: 'Test', isDeleted: false,
+       createdAt: new Date(), updatedAt: new Date(), ...overrides }) as NombreEntity;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        NombreService,
+        { provide: getRepositoryToken(NombreEntity), useFactory: mockRepo },
+      ],
+    }).compile();
+
+    service = module.get<NombreService>(NombreService);
+    repo    = module.get(getRepositoryToken(NombreEntity));
+  });
+
+  afterEach(() => jest.clearAllMocks()); // always clear between tests
+
+  describe('findAll', () => {
+    it('should return all items', async () => {
+      repo.find.mockResolvedValue([mockEntity()]);
+      const result = await service.findAll();
+      expect(result).toHaveLength(1);
+    });
+
+    it('should return empty array', async () => {
+      repo.find.mockResolvedValue([]);
+      expect(await service.findAll()).toEqual([]);
+    });
+  });
+
+  describe('findById', () => {
+    it('should return item', async () => {
+      repo.findOne.mockResolvedValue(mockEntity());
+      expect((await service.findById(1)).id).toBe(1);
+    });
+
+    it('should throw NotFoundException', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.findById(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+});
 ```
 
 ---
 
-## env.model.ts Pattern
+## Unit Test — Controller Spec
 
-Always type the env with an interface and use `ConfigService<Env>`:
+```typescript
+describe('NombreController', () => {
+  let controller: NombreController;
+  let service: jest.Mocked<NombreService>;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      controllers: [NombreController],
+      providers: [
+        {
+          provide: NombreService,
+          useFactory: () => ({ findAll: jest.fn(), findById: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() }),
+        },
+        { provide: Reflector, useValue: { get: jest.fn() } },
+      ],
+    })
+      .overrideGuard(AuthGuard('jwt')).useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard).useValue({ canActivate: () => true })
+      .compile();
+
+    controller = module.get<NombreController>(NombreController);
+    service    = module.get(NombreService);
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it('should be defined', () => expect(controller).toBeDefined());
+
+  it('findAll delegates to service', async () => {
+    service.findAll.mockResolvedValue([]);
+    await controller.findAll();
+    expect(service.findAll).toHaveBeenCalled();
+  });
+});
+```
+
+---
+
+## env.model.ts
+
 ```typescript
 export interface Env {
   POSTGRES_HOST: string;
@@ -293,6 +270,16 @@ export interface Env {
   POSTGRES_USER: string;
   POSTGRES_PASSWORD: string;
   JWT_SECRET: string;
+  SUPERADMIN_EMAIL: string;
+  SUPERADMIN_PASSWORD: string;
+  MP_ACCESS_TOKEN: string;
+  MP_PUBLIC_KEY: string;
+  MP_NOTIFICATION_URL: string;
+  MP_WEBHOOK_SECRET: string;
+  FRONTEND_URL: string;
+  RESEND_API_KEY: string;
+  MAIL_FROM: string;
+  API_URL: string;
 }
 ```
 
@@ -300,12 +287,13 @@ export interface Env {
 
 ## Common Mistakes
 
-- **Missing `isDeleted: false` in queries**: Soft-deleted records appear in results.
-- **Using `findOneBy` without `isDeleted`**: Always use `findOne({ where: { id, isDeleted: false } })`.
-- **Hard deleting**: Never call `.delete()` or `.remove()` directly on the repository.
-- **Missing `ParseIntPipe` on ID params**: Allows string IDs to reach the service.
-- **Mixing admin and client in the same controller**: Keep them separated — different guards, different response shapes.
-- **Inlining relation resolution**: Makes `create()` and `update()` hard to read and test.
+- **Missing `isDeleted: false`**: Soft-deleted records appear in results.
+- **Returning entities from services**: Always return DTOs.
+- **Missing `ParseIntPipe`**: Allows string IDs to reach the service.
+- **Specific route after `/:id`**: `GET /user/:userId` after `GET /:id` never matches — swap them.
+- **Importing `GuardsModule` in feature modules**: Not needed — `RolesGuard` reads from JWT.
+- **Multi-table writes without transaction**: Leaves DB in inconsistent state on failure.
+- **`module.get()` inside `it()`**: Always assign repos to variables in `beforeEach`.
 
 ---
 
@@ -313,10 +301,7 @@ export interface Env {
 
 | Situation | How to handle it |
 |-----------|-----------------|
-| Array relation partially not found | Count resolved vs requested IDs and throw `NotFoundException` if mismatch (see `resolveTaxes` pattern) |
-| Nullable relation in update | Check `dto.field !== undefined` before reassigning — `null` is a valid value to clear a relation |
-| `@Exclude()` not working on response | Confirm `ClassSerializerInterceptor` is registered globally in `main.ts` |
-| New env variable needed | Add to `Env` interface in `env.model.ts` first, then use via typed `ConfigService<Env>` |
-
----
-
+| Service depends on multiple repos | Add each with `getRepositoryToken(Entity)` in spec providers |
+| Service uses `DataSource` | Mock with `{ transaction: jest.fn(cb => cb(mockEntityManager)) }` |
+| Controller reads `req.user` | Pass mock request `{ user: { sub: 1, role: RoleType.CLIENT } }` |
+| `ConfigService` needed in spec | `{ provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('value') } }` |
