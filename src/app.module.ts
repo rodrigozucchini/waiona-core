@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
+import { AppController } from './app.controller';
+
 import { TaxationModule } from './modules/taxation/taxation.module';
 import { MarginsModule } from './modules/margins/margins.module';
 import { DiscountsModule } from './modules/discounts/discounts.module';
@@ -34,6 +36,7 @@ import { MailModule } from './modules/mail/mail.module';
         synchronize: process.env.NODE_ENV !== 'production',
       }),
     }),
+
     TaxationModule,
     MarginsModule,
     DiscountsModule,
@@ -49,5 +52,6 @@ import { MailModule } from './modules/mail/mail.module';
     ShopModule,
     MailModule,
   ],
+  controllers: [AppController], // health check: GET / → { status: 'ok' }
 })
 export class AppModule {}
