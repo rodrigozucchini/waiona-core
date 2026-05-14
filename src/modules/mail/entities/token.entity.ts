@@ -15,7 +15,7 @@ import {
   @Index(['userId', 'type'])
   export class TokenEntity extends BaseEntity {
   
-    @Column({ type: 'varchar', length: 255, nullable: false, unique: true })
+    @Column({ type: 'varchar', length: 255, nullable: false })
     token: string;
   
     @Column({ type: 'enum', enum: TokenType, nullable: false })

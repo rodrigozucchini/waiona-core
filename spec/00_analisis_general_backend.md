@@ -391,23 +391,23 @@ Si NestJS loguea las variables de entorno en algún modo verbose, `SUPERADMIN_PA
 
 ### Urgente (antes de ir a producción)
 
-- [ ] Arreglar atomicidad de `reserveStock` dentro de la transacción de la orden
-- [ ] Agregar `SELECT FOR UPDATE` (pessimistic lock) en validación de cupón
-- [ ] Agregar ownership check en `GET /orders/:id`, `GET /payments/:id`, `POST /payments`
+- [x] Arreglar atomicidad de `reserveStock` dentro de la transacción de la orden
+- [x] Agregar `SELECT FOR UPDATE` (pessimistic lock) en validación de cupón
+- [x] Agregar ownership check en `GET /orders/:id`, `GET /payments/:id`, `POST /payments`, `GET /payments/order/:orderId`
 - [ ] Crear migraciones TypeORM y eliminar el `synchronize` del Dockerfile
-- [ ] Configurar CORS en `main.ts` (`app.enableCors(...)`)
-- [ ] Agregar `@nestjs/throttler` en endpoints de auth
+- [x] Configurar CORS en `main.ts` (`app.enableCors(...)`)
+- [x] Agregar `@nestjs/throttler` en endpoints de auth (login 5/60s, register 5/60s, forgot-password 3/60s; global 30/60s)
 
 ### Importante (primera iteración post-lanzamiento)
 
-- [ ] Arreglar location tracking en dispatch/release de stock para combos
-- [ ] Agregar Helmet para security headers
+- [x] Arreglar location tracking en dispatch/release de stock para combos
+- [x] Agregar Helmet para security headers
 - [ ] Implementar paginación en `GET /orders` (admin)
 - [ ] Arreglar paginación del shop para listas mixtas producto+combo
 - [ ] Agregar emails de notificación en cambios de estado de orden
-- [ ] Arreglar el topic `payment` del webhook MP para usar Payment API, no MerchantOrder
-- [ ] Eliminar el índice único duplicado en `token.entity.ts`
-- [ ] Corregir mismatch de variables de entorno en `docker-compose.yaml` (DATABASE_HOST vs POSTGRES_HOST)
+- [x] Arreglar el topic `payment` del webhook MP para usar Payment API, no MerchantOrder
+- [x] Eliminar el índice único duplicado en `token.entity.ts`
+- [x] Corregir mismatch de variables de entorno en `docker-compose.yaml` (DATABASE_HOST vs POSTGRES_HOST)
 - [ ] Actualizar ESLint a v9+ o bajar `typescript-eslint` a versión compatible
 
 ### Roadmap / Mejoras
@@ -432,3 +432,9 @@ Si NestJS loguea las variables de entorno en algún modo verbose, `SUPERADMIN_PA
 | 1 | **3.1 — Stock reservation fuera de la transacción** | `stock-item.service.ts`, `orders.service.ts` | 2026-05-14 | `reserveStock` acepta `manager?: EntityManager` opcional. `orders.service` pasa el `manager` de la transacción. La reserva ahora es atómica con el save de la orden y el registro del cupón. |
 | 2 | **3.2 — Race condition en cupón (TOCTOU)** | `orders.service.ts`, `orders.module.ts` | 2026-05-14 | La validación del cupón se movió dentro de la transacción con `lock: { mode: 'pessimistic_write' }`. PostgreSQL bloquea la fila del cupón hasta que la transacción confirma, impidiendo que dos requests concurrentes superen el límite de uso. Se eliminaron `couponRepo` y `couponUsageRepo` del constructor (ahora se usa el `manager` directamente). |
 | 3 | **3.3 — Dispatch/release usa ubicación incorrecta + inconsistencia shop/orden** | `order-item.entity.ts`, `orders.service.ts` | 2026-05-14 | `findAvailableStockItem` cambió de `findOne` a `find` + mejor ubicación por `quantityAvailable` (igual que el shop). Para productos: columna `location_id` en `order_items` persiste la ubicación exacta; dispatch/release la usan directamente. Para combos: helper `findStockItemWithReservation` busca la ubicación con `quantityReserved >= requerido` — la que acumuló la reserva. |
+| 4 | **CORS + Helmet** | `main.ts` | 2026-05-14 | `app.use(helmet())` + `app.enableCors({ origin: FRONTEND_URL, credentials: true })` agregados al bootstrap. |
+| 5 | **Rate limiting** | `app.module.ts`, `auth.controller.ts`, `payments.controller.ts` | 2026-05-14 | `ThrottlerModule.forRoot([{ ttl: 60_000, limit: 30 }])` + `APP_GUARD → ThrottlerGuard` global. Auth endpoints: login/register `5/60s`, forgot-password `3/60s`. Webhook con `@SkipThrottle()`. |
+| 6 | **Ownership checks en orders y payments** | `orders.controller.ts`, `payments.service.ts`, `payments.controller.ts` | 2026-05-14 | `GET /orders/:id` verifica `order.user.id === req.user.sub` para clientes. `POST /payments`, `GET /payments/:id`, `GET /payments/order/:orderId` verifican ownership cargando el user de la orden. Admins pasan sin restricción. |
+| 7 | **Webhook MP: topic=payment usa Payment API** | `payments.service.ts` | 2026-05-14 | Cuando `topic === 'payment'` se usa el SDK `Payment` (con status `approved/in_process/refunded/etc.`). Cuando `topic === 'merchant_order'` sigue usando `MerchantOrder`. Evita buscar un pago como si fuera una merchant order, lo que rompía silenciosamente. |
+| 8 | **Índice único duplicado en token.entity.ts** | `token.entity.ts` | 2026-05-14 | Eliminado `unique: true` del `@Column` — el `@Index(['token'], { unique: true })` a nivel de clase es suficiente y evita que TypeORM genere dos constraints en la DB. |
+| 9 | **Env vars incorrectas en docker-compose.yaml** | `docker-compose.yaml` | 2026-05-14 | `DATABASE_HOST/PORT/USER/PASSWORD/NAME` renombrados a `POSTGRES_HOST/PORT/USER/PASSWORD/DB` — alineados con lo que espera `app.module.ts` vía `ConfigService`. |

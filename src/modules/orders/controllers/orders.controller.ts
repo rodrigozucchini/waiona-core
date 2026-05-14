@@ -68,12 +68,20 @@ export class OrdersController {
   }
 
   // ==========================
-  // GET ONE
+  // GET ONE — 🔥 ownership check
   // ==========================
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.findOne(id);
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    const payload = req.user as { sub: number; role: RoleType };
+    const order = await this.ordersService.findOne(id);
+    if (payload.role === RoleType.CLIENT && order.user.id !== payload.sub) {
+      throw new ForbiddenException('Access denied');
+    }
+    return order;
   }
 
   // ==========================

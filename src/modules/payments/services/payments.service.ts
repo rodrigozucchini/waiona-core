@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -9,7 +10,7 @@ import { Repository, DataSource } from 'typeorm';
 import { PaymentEntity } from '../entities/payment.entity';
 import { OrderEntity } from 'src/modules/orders/entities/order.entity';
 import { MercadoPagoProvider } from './providers/mercadopago.provider';
-import { MerchantOrder } from 'mercadopago';
+import { MerchantOrder, Payment } from 'mercadopago';
 
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { PaymentResponseDto } from '../dto/payment-response.dto';
@@ -17,6 +18,7 @@ import { PaymentResponseDto } from '../dto/payment-response.dto';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentProvider } from '../enums/payment-provider.enum';
 import { OrderStatus } from 'src/modules/orders/enums/order-status.enum';
+import { RoleType } from 'src/common/enums/role-type.enum';
 
 @Injectable()
 export class PaymentsService {
@@ -36,14 +38,18 @@ export class PaymentsService {
   // CREATE PAYMENT
   // ==========================
 
-  async create(dto: CreatePaymentDto): Promise<PaymentResponseDto> {
+  async create(userId: number, role: RoleType, dto: CreatePaymentDto): Promise<PaymentResponseDto> {
 
     const order = await this.orderRepo.findOne({
       where: { id: dto.orderId, isDeleted: false },
-      relations: ['items', 'items.product', 'items.combo'],
+      relations: ['items', 'items.product', 'items.combo', 'user'],
     });
 
     if (!order) throw new NotFoundException('Order not found');
+
+    if (role === RoleType.CLIENT && order.user.id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
 
     if (order.status !== OrderStatus.PENDING) {
       throw new BadRequestException('Order is not in a payable state');
@@ -92,10 +98,28 @@ export class PaymentsService {
     if (topic !== 'payment' && topic !== 'merchant_order') return;
 
     try {
-      const merchantOrder = new MerchantOrder(this.mercadoPagoProvider.getClient());
-      const mpOrder = await merchantOrder.get({ merchantOrderId: Number(id) });
+      let externalReference: string | null | undefined;
+      let mpStatus: string | null | undefined;
 
-      const externalReference = mpOrder.external_reference;
+      if (topic === 'payment') {
+        // topic=payment → usar Payment API para obtener la info del pago
+        const mpPayment = new Payment(this.mercadoPagoProvider.getClient());
+        const paymentData = await mpPayment.get({ id: String(id) });
+        externalReference = paymentData.external_reference;
+        // mapear status de Payment al mismo vocabulario que MerchantOrder
+        const s = paymentData.status;
+        if (s === 'approved') mpStatus = 'paid';
+        else if (s === 'refunded' || s === 'charged_back') mpStatus = 'reverted';
+        else if (s === 'in_process' || s === 'pending') mpStatus = 'payment_in_process';
+        else mpStatus = 'expired';
+      } else {
+        // topic=merchant_order → usar MerchantOrder API
+        const merchantOrder = new MerchantOrder(this.mercadoPagoProvider.getClient());
+        const mpOrder = await merchantOrder.get({ merchantOrderId: Number(id) });
+        externalReference = mpOrder.external_reference;
+        mpStatus = mpOrder.order_status;
+      }
+
       if (!externalReference) return;
 
       const payment = await this.paymentRepo.findOne({
@@ -106,8 +130,6 @@ export class PaymentsService {
       if (!payment) return;
 
       // 🔥 manejar todos los status posibles de MP
-      const mpStatus = mpOrder.order_status;
-
       if (mpStatus === 'paid') {
         payment.status         = PaymentStatus.APPROVED;
         payment.order.status   = OrderStatus.CONFIRMED;
@@ -140,7 +162,16 @@ export class PaymentsService {
   // FIND BY ORDER
   // ==========================
 
-  async findByOrder(orderId: number): Promise<PaymentResponseDto[]> {
+  async findByOrder(orderId: number, userId: number, role: RoleType): Promise<PaymentResponseDto[]> {
+    if (role === RoleType.CLIENT) {
+      const order = await this.orderRepo.findOne({
+        where: { id: orderId, isDeleted: false },
+        relations: ['user'],
+      });
+      if (!order) throw new NotFoundException('Order not found');
+      if (order.user.id !== userId) throw new ForbiddenException('Access denied');
+    }
+
     const payments = await this.paymentRepo.find({
       where: { orderId, isDeleted: false },
       order: { createdAt: 'DESC' },
@@ -152,11 +183,15 @@ export class PaymentsService {
   // FIND ONE
   // ==========================
 
-  async findOne(id: number): Promise<PaymentResponseDto> {
+  async findOne(id: number, userId: number, role: RoleType): Promise<PaymentResponseDto> {
     const payment = await this.paymentRepo.findOne({
       where: { id, isDeleted: false },
+      relations: role === RoleType.CLIENT ? ['order', 'order.user'] : [],
     });
     if (!payment) throw new NotFoundException('Payment not found');
+    if (role === RoleType.CLIENT && payment.order.user.id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
     return new PaymentResponseDto(payment);
   }
 }
