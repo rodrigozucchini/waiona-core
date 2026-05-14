@@ -11,15 +11,19 @@ import {
   Query,
   Headers,
   UnauthorizedException,
+  Req,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
+import { SkipThrottle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { Env } from 'src/env.model';
 
 import { PaymentsService } from '../services/payments.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { PaymentResponseDto } from '../dto/payment-response.dto';
+import { RoleType } from 'src/common/enums/role-type.enum';
 
 @Controller('payments')
 export class PaymentsController {
@@ -35,8 +39,9 @@ export class PaymentsController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
-  create(@Body() dto: CreatePaymentDto): Promise<PaymentResponseDto> {
-    return this.paymentsService.create(dto);
+  create(@Req() req: Request, @Body() dto: CreatePaymentDto): Promise<PaymentResponseDto> {
+    const payload = req.user as { sub: number; role: RoleType };
+    return this.paymentsService.create(payload.sub, payload.role, dto);
   }
 
   // ==========================
@@ -45,6 +50,7 @@ export class PaymentsController {
   // Siempre devuelve 200 — MP reintenta si no recibe 200
   // ==========================
 
+  @SkipThrottle()
   @Post('webhook/mercadopago')
   @HttpCode(HttpStatus.OK)
   async handleMercadoPagoWebhook(
@@ -68,8 +74,10 @@ export class PaymentsController {
   @Get('order/:orderId')
   findByOrder(
     @Param('orderId', ParseIntPipe) orderId: number,
+    @Req() req: Request,
   ): Promise<PaymentResponseDto[]> {
-    return this.paymentsService.findByOrder(orderId);
+    const payload = req.user as { sub: number; role: RoleType };
+    return this.paymentsService.findByOrder(orderId, payload.sub, payload.role);
   }
 
   // ==========================
@@ -80,8 +88,10 @@ export class PaymentsController {
   @Get(':id')
   findOne(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
   ): Promise<PaymentResponseDto> {
-    return this.paymentsService.findOne(id);
+    const payload = req.user as { sub: number; role: RoleType };
+    return this.paymentsService.findOne(id, payload.sub, payload.role);
   }
 
   // ==========================

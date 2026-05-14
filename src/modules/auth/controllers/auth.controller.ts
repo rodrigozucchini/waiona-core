@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from '../services/auth.service';
 import { UserEntity } from '../../users/entities/user.entity';
@@ -28,6 +29,7 @@ export class AuthController {
   // POST /auth/register
   // ==========================
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: CreateUserDto): Promise<{ message: string }> {
@@ -50,6 +52,7 @@ export class AuthController {
   // POST /auth/login
   // ==========================
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @UseInterceptors(ClassSerializerInterceptor)
   @UseGuards(AuthGuard('local'))
   @Post('login')
@@ -65,6 +68,7 @@ export class AuthController {
   // POST /auth/forgot-password
   // ==========================
 
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
