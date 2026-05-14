@@ -35,6 +35,14 @@ export class OrderItemEntity extends BaseEntity {
   quantity: number;
 
   // ==========================
+  // Ubicación de stock reservada (solo para items de producto)
+  // Permite que dispatch/release usen la ubicación exacta sin re-query
+  // ==========================
+
+  @Column({ name: 'location_id', type: 'int', nullable: true, default: null })
+  locationId?: number | null;
+
+  // ==========================
   // Precio snapshot al momento de la compra
   // ==========================
 
