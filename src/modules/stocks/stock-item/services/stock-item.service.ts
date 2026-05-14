@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 
 import { StockItemEntity } from '../entities/stock-item.entity';
 import { StockMovementEntity } from '../../stock-movement/entities/stock-movement.entity';
@@ -347,8 +347,11 @@ export class StockItemsService {
     productId: number,
     locationId: number,
     quantity: number,
+    manager?: EntityManager,
   ): Promise<void> {
-    const stockItem = await this.stockItemRepository.findOne({
+    const repo = manager?.getRepository(StockItemEntity) ?? this.stockItemRepository;
+
+    const stockItem = await repo.findOne({
       where: { productId, locationId, isDeleted: false },
     });
 
@@ -359,7 +362,7 @@ export class StockItemsService {
     }
 
     stockItem.quantityReserved += quantity;
-    await this.stockItemRepository.save(stockItem);
+    await repo.save(stockItem);
   }
 
   // ==========================

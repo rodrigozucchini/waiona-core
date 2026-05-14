@@ -40,12 +40,6 @@ export class OrdersService {
     @InjectRepository(ComboEntity)
     private readonly comboRepo: Repository<ComboEntity>,
 
-    @InjectRepository(CouponEntity)
-    private readonly couponRepo: Repository<CouponEntity>,
-
-    @InjectRepository(CouponUsageEntity)
-    private readonly couponUsageRepo: Repository<CouponUsageEntity>,
-
     @InjectRepository(StockItemEntity)
     private readonly stockItemRepo: Repository<StockItemEntity>,
 
@@ -110,6 +104,7 @@ export class OrdersService {
           quantity:   item.quantity,
           unitPrice:  breakdown.unitPrice,
           finalPrice: breakdown.orderTotal * item.quantity,
+          locationId: stockItem.locationId,
         });
 
         orderItems.push(orderItem);
@@ -158,36 +153,35 @@ export class OrdersService {
       }
     }
 
-    // 4. Validar cupón
-    let coupon: CouponEntity | null = null;
-
-    if (dto.couponCode) {
-      coupon = await this.couponRepo.findOne({
-        where: { code: dto.couponCode, isDeleted: false },
-      });
-
-      if (!coupon) throw new NotFoundException('Coupon not found');
-
-      if (coupon.startsAt && now < coupon.startsAt) {
-        throw new BadRequestException('Coupon is not active yet');
-      }
-      if (coupon.endsAt && now > coupon.endsAt) {
-        throw new BadRequestException('Coupon has expired');
-      }
-      if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
-        throw new BadRequestException('Coupon has reached its usage limit');
-      }
-
-      const alreadyUsed = await this.couponUsageRepo.findOne({
-        where: { couponId: coupon.id, userId: user.id },
-      });
-      if (alreadyUsed) throw new ConflictException('Coupon already used by this user');
-    }
-
     const total = subtotal - couponDiscount;
 
-    // 5. 🔥 Transacción — guardar orden + reservar stock + registrar cupón de forma atómica
+    // 4. 🔥 Transacción — guardar orden + reservar stock + registrar cupón de forma atómica
     const saved = await this.dataSource.transaction(async manager => {
+
+      // pessimistic lock sobre el cupón — previene race condition (TOCTOU):
+      // dos requests concurrentes con el mismo código esperan el lock en lugar de ambas pasar
+      let lockedCoupon: CouponEntity | null = null;
+
+      if (dto.couponCode) {
+        lockedCoupon = await manager.findOne(CouponEntity, {
+          where: { code: dto.couponCode, isDeleted: false },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!lockedCoupon) throw new NotFoundException('Coupon not found');
+
+        if (lockedCoupon.startsAt && now < lockedCoupon.startsAt)
+          throw new BadRequestException('Coupon is not active yet');
+        if (lockedCoupon.endsAt && now > lockedCoupon.endsAt)
+          throw new BadRequestException('Coupon has expired');
+        if (lockedCoupon.usageLimit && lockedCoupon.usageCount >= lockedCoupon.usageLimit)
+          throw new BadRequestException('Coupon has reached its usage limit');
+
+        const alreadyUsed = await manager.findOne(CouponUsageEntity, {
+          where: { couponId: lockedCoupon.id, userId: user.id },
+        });
+        if (alreadyUsed) throw new ConflictException('Coupon already used by this user');
+      }
 
       // guardar orden
       const order = manager.create(OrderEntity, {
@@ -199,28 +193,29 @@ export class OrdersService {
         notes:          dto.notes ?? null,
         subtotal,
         couponDiscount: couponDiscount > 0 ? couponDiscount : null,
-        coupon:         coupon ?? null,
+        coupon:         lockedCoupon ?? null,
         total,
       });
 
       const savedOrder = await manager.save(OrderEntity, order);
 
-      // reservar stock
+      // reservar stock — atómico con el save de la orden
       for (const reservation of stockReservations) {
         await this.stockItemsService.reserveStock(
           reservation.productId,
           reservation.locationId,
           reservation.quantity,
+          manager,
         );
       }
 
       // registrar uso del cupón
-      if (coupon) {
-        coupon.usageCount += 1;
-        await manager.save(CouponEntity, coupon);
+      if (lockedCoupon) {
+        lockedCoupon.usageCount += 1;
+        await manager.save(CouponEntity, lockedCoupon);
 
         const usage = manager.create(CouponUsageEntity, {
-          couponId:  coupon.id,
+          couponId:  lockedCoupon.id,
           userId:    user.id,
           orderId:   savedOrder.id,
           appliedAt: now,
@@ -320,20 +315,42 @@ export class OrdersService {
     productId: number,
     quantity: number,
   ): Promise<StockItemEntity> {
-    const stockItem = await this.stockItemRepo.findOne({
+    const items = await this.stockItemRepo.find({
       where: { productId, isDeleted: false },
     });
 
-    if (!stockItem) {
+    if (!items.length) {
       throw new NotFoundException(`No stock found for product ${productId}`);
     }
 
-    const available = stockItem.quantityCurrent - stockItem.quantityReserved;
-    if (available < quantity) {
+    // misma lógica que ShopService: la ubicación con más stock disponible
+    const best = items.reduce((prev, curr) =>
+      curr.quantityAvailable > prev.quantityAvailable ? curr : prev,
+    );
+
+    if (best.quantityAvailable < quantity) {
       throw new BadRequestException(`Insufficient stock for product ${productId}`);
     }
 
-    return stockItem;
+    return best;
+  }
+
+  // Busca la ubicación que tiene la reserva para esta cantidad.
+  // Para combos, donde no persiste el locationId en el order item,
+  // se elige la ubicación con quantityReserved >= quantity (la que acumuló la reserva).
+  private async findStockItemWithReservation(
+    productId: number,
+    quantity: number,
+  ): Promise<StockItemEntity | null> {
+    const items = await this.stockItemRepo.find({
+      where: { productId, isDeleted: false },
+    });
+
+    return (
+      items
+        .filter(s => s.quantityReserved >= quantity)
+        .sort((a, b) => b.quantityReserved - a.quantityReserved)[0] ?? null
+    );
   }
 
   // ==========================
@@ -343,13 +360,11 @@ export class OrdersService {
   private async handleDispatch(order: OrderEntity): Promise<void> {
     for (const item of order.items) {
       if (item.product) {
-        const stockItem = await this.stockItemRepo.findOne({
-          where: { productId: item.product.id, isDeleted: false },
-        });
-        if (!stockItem) continue;
+        // locationId guardado al crear la orden — apunta a la ubicación exacta reservada
+        if (!item.locationId) continue;
         await this.stockItemsService.dispatchStock(
           item.product.id,
-          stockItem.locationId,
+          item.locationId,
           item.quantity,
           order.id,
         );
@@ -360,14 +375,13 @@ export class OrdersService {
         });
         if (!combo) continue;
         for (const comboItem of combo.items) {
-          const stockItem = await this.stockItemRepo.findOne({
-            where: { productId: comboItem.productId, isDeleted: false },
-          });
+          const required = item.quantity * comboItem.quantity;
+          const stockItem = await this.findStockItemWithReservation(comboItem.productId, required);
           if (!stockItem) continue;
           await this.stockItemsService.dispatchStock(
             comboItem.productId,
             stockItem.locationId,
-            item.quantity * comboItem.quantity,
+            required,
             order.id,
           );
         }
@@ -382,13 +396,11 @@ export class OrdersService {
   private async handleCancellation(order: OrderEntity): Promise<void> {
     for (const item of order.items) {
       if (item.product) {
-        const stockItem = await this.stockItemRepo.findOne({
-          where: { productId: item.product.id, isDeleted: false },
-        });
-        if (!stockItem) continue;
+        // locationId guardado al crear la orden — apunta a la ubicación exacta reservada
+        if (!item.locationId) continue;
         await this.stockItemsService.releaseReservation(
           item.product.id,
-          stockItem.locationId,
+          item.locationId,
           item.quantity,
           order.id,
         );
@@ -399,14 +411,13 @@ export class OrdersService {
         });
         if (!combo) continue;
         for (const comboItem of combo.items) {
-          const stockItem = await this.stockItemRepo.findOne({
-            where: { productId: comboItem.productId, isDeleted: false },
-          });
+          const required = item.quantity * comboItem.quantity;
+          const stockItem = await this.findStockItemWithReservation(comboItem.productId, required);
           if (!stockItem) continue;
           await this.stockItemsService.releaseReservation(
             comboItem.productId,
             stockItem.locationId,
-            item.quantity * comboItem.quantity,
+            required,
             order.id,
           );
         }
