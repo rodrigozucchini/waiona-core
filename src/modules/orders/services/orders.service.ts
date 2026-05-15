@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 
 import { OrderEntity } from '../entities/order.entity';
 import { OrderItemEntity } from '../entities/order-item.entity';
@@ -123,16 +123,20 @@ export class OrdersService {
         });
         if (!combo) throw new NotFoundException(`Combo ${item.comboId} not found`);
 
+        const comboReservations: { productId: number; locationId: number; quantity: number }[] = [];
+
         for (const comboItem of combo.items) {
           const stockItem = await this.findAvailableStockItem(
             comboItem.productId,
             item.quantity * comboItem.quantity,
           );
-          stockReservations.push({
+          const reservation = {
             productId:  comboItem.productId,
             locationId: stockItem.locationId,
             quantity:   item.quantity * comboItem.quantity,
-          });
+          };
+          comboReservations.push(reservation);
+          stockReservations.push(reservation);
         }
 
         const breakdown = await this.calculationService.calculateCombo({
@@ -142,9 +146,10 @@ export class OrdersService {
 
         const orderItem = this.orderItemRepo.create({
           combo,
-          quantity:   item.quantity,
-          unitPrice:  breakdown.unitPrice,
-          finalPrice: breakdown.orderTotal * item.quantity,
+          quantity:          item.quantity,
+          unitPrice:         breakdown.unitPrice,
+          finalPrice:        breakdown.orderTotal * item.quantity,
+          comboReservations,
         });
 
         orderItems.push(orderItem);
@@ -271,20 +276,26 @@ export class OrdersService {
   // ==========================
 
   async updateStatus(id: number, dto: UpdateOrderStatusDto): Promise<OrderEntity> {
-    const order = await this.findOne(id);
+    return this.dataSource.transaction(async manager => {
+      const order = await manager.findOne(OrderEntity, {
+        where: { id, isDeleted: false },
+        relations: ['items', 'items.product', 'items.combo'],
+      });
+      if (!order) throw new NotFoundException('Order not found');
 
-    this.validateStatusTransition(order.status, dto.status);
+      this.validateStatusTransition(order.status, dto.status);
 
-    if (dto.status === OrderStatus.DISPATCHED) {
-      await this.handleDispatch(order);
-    }
+      if (dto.status === OrderStatus.DISPATCHED) {
+        await this.handleDispatch(order, manager);
+      }
 
-    if (dto.status === OrderStatus.CANCELLED) {
-      await this.handleCancellation(order);
-    }
+      if (dto.status === OrderStatus.CANCELLED) {
+        await this.handleCancellation(order, manager);
+      }
 
-    order.status = dto.status;
-    return this.orderRepo.save(order);
+      order.status = dto.status;
+      return manager.save(OrderEntity, order);
+    });
   }
 
   // ==========================
@@ -305,6 +316,21 @@ export class OrdersService {
         `Cannot transition order from "${current}" to "${next}"`,
       );
     }
+  }
+
+  // ==========================
+  // RELEASE STOCK (llamado desde pagos al cancelar por webhook)
+  // ==========================
+
+  async releaseStockForOrder(orderId: number, manager?: EntityManager): Promise<void> {
+    const repo  = manager?.getRepository(OrderEntity) ?? this.orderRepo;
+    const order = await repo.findOne({
+      where: { id: orderId, isDeleted: false },
+      relations: ['items', 'items.product', 'items.combo'],
+    });
+    if (!order) return;
+    if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.CONFIRMED) return;
+    await this.handleCancellation(order, manager);
   }
 
   // ==========================
@@ -335,54 +361,30 @@ export class OrdersService {
     return best;
   }
 
-  // Busca la ubicación que tiene la reserva para esta cantidad.
-  // Para combos, donde no persiste el locationId en el order item,
-  // se elige la ubicación con quantityReserved >= quantity (la que acumuló la reserva).
-  private async findStockItemWithReservation(
-    productId: number,
-    quantity: number,
-  ): Promise<StockItemEntity | null> {
-    const items = await this.stockItemRepo.find({
-      where: { productId, isDeleted: false },
-    });
-
-    return (
-      items
-        .filter(s => s.quantityReserved >= quantity)
-        .sort((a, b) => b.quantityReserved - a.quantityReserved)[0] ?? null
-    );
-  }
-
   // ==========================
   // PRIVATE — despachar
   // ==========================
 
-  private async handleDispatch(order: OrderEntity): Promise<void> {
+  private async handleDispatch(order: OrderEntity, manager?: EntityManager): Promise<void> {
     for (const item of order.items) {
       if (item.product) {
-        // locationId guardado al crear la orden — apunta a la ubicación exacta reservada
         if (!item.locationId) continue;
         await this.stockItemsService.dispatchStock(
           item.product.id,
           item.locationId,
           item.quantity,
           order.id,
+          manager,
         );
       } else if (item.combo) {
-        const combo = await this.comboRepo.findOne({
-          where: { id: item.combo.id },
-          relations: ['items'],
-        });
-        if (!combo) continue;
-        for (const comboItem of combo.items) {
-          const required = item.quantity * comboItem.quantity;
-          const stockItem = await this.findStockItemWithReservation(comboItem.productId, required);
-          if (!stockItem) continue;
+        if (!item.comboReservations?.length) continue;
+        for (const res of item.comboReservations) {
           await this.stockItemsService.dispatchStock(
-            comboItem.productId,
-            stockItem.locationId,
-            required,
+            res.productId,
+            res.locationId,
+            res.quantity,
             order.id,
+            manager,
           );
         }
       }
@@ -393,32 +395,26 @@ export class OrdersService {
   // PRIVATE — cancelar
   // ==========================
 
-  private async handleCancellation(order: OrderEntity): Promise<void> {
+  private async handleCancellation(order: OrderEntity, manager?: EntityManager): Promise<void> {
     for (const item of order.items) {
       if (item.product) {
-        // locationId guardado al crear la orden — apunta a la ubicación exacta reservada
         if (!item.locationId) continue;
         await this.stockItemsService.releaseReservation(
           item.product.id,
           item.locationId,
           item.quantity,
           order.id,
+          manager,
         );
       } else if (item.combo) {
-        const combo = await this.comboRepo.findOne({
-          where: { id: item.combo.id },
-          relations: ['items'],
-        });
-        if (!combo) continue;
-        for (const comboItem of combo.items) {
-          const required = item.quantity * comboItem.quantity;
-          const stockItem = await this.findStockItemWithReservation(comboItem.productId, required);
-          if (!stockItem) continue;
+        if (!item.comboReservations?.length) continue;
+        for (const res of item.comboReservations) {
           await this.stockItemsService.releaseReservation(
-            comboItem.productId,
-            stockItem.locationId,
-            required,
+            res.productId,
+            res.locationId,
+            res.quantity,
             order.id,
+            manager,
           );
         }
       }

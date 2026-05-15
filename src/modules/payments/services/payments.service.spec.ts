@@ -1,33 +1,37 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 import { PaymentsService } from './payments.service';
 import { PaymentEntity } from '../entities/payment.entity';
 import { OrderEntity } from 'src/modules/orders/entities/order.entity';
 import { MercadoPagoProvider } from './providers/mercadopago.provider';
+import { OrdersService } from 'src/modules/orders/services/orders.service';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentProvider } from '../enums/payment-provider.enum';
 import { OrderStatus } from 'src/modules/orders/enums/order-status.enum';
+import { RoleType } from 'src/common/enums/role-type.enum';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
 
-  const mockPaymentRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn() });
-  const mockOrderRepo   = () => ({ find: jest.fn(), findOne: jest.fn(), save: jest.fn() });
-  const mockMpProvider  = () => ({
-    createPreference: jest.fn(),
-    getClient:        jest.fn(),
-  });
+  const mockPaymentRepo   = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn() });
+  const mockOrderRepo     = () => ({ find: jest.fn(), findOne: jest.fn(), save: jest.fn() });
+  const mockMpProvider    = () => ({ createPreference: jest.fn(), getClient: jest.fn() });
+  const mockOrdersService = () => ({ releaseStockForOrder: jest.fn() });
 
-  const mockOrder = (overrides = {}): OrderEntity =>
+  const mockOrder = (overrides: any = {}): OrderEntity =>
     ({ id: 1, status: OrderStatus.PENDING, total: 653.4, isDeleted: false,
        items: [], createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as OrderEntity;
 
-  const mockPayment = (overrides = {}): PaymentEntity =>
+  const mockPayment = (overrides: any = {}): PaymentEntity =>
     ({ id: 1, orderId: 1, provider: PaymentProvider.MERCADOPAGO, status: PaymentStatus.PENDING,
        externalId: 'pref_123', checkoutUrl: 'https://mp.com/checkout', amount: 653.4,
        isDeleted: false, createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as PaymentEntity;
+
+  // manager usado dentro de dataSource.transaction en create()
+  const mockTxManager = { findOne: jest.fn(), create: jest.fn(), save: jest.fn() };
+  const mockDataSource = { transaction: jest.fn(cb => cb(mockTxManager)) };
 
   let paymentRepo: any;
   let orderRepo: any;
@@ -37,9 +41,11 @@ describe('PaymentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
-        { provide: getRepositoryToken(PaymentEntity), useFactory: mockPaymentRepo },
-        { provide: getRepositoryToken(OrderEntity),   useFactory: mockOrderRepo   },
-        { provide: MercadoPagoProvider,               useFactory: mockMpProvider  },
+        { provide: getRepositoryToken(PaymentEntity), useFactory: mockPaymentRepo   },
+        { provide: getRepositoryToken(OrderEntity),   useFactory: mockOrderRepo     },
+        { provide: MercadoPagoProvider,               useFactory: mockMpProvider    },
+        { provide: OrdersService,                     useFactory: mockOrdersService },
+        { provide: getDataSourceToken(),              useValue: mockDataSource      },
       ],
     }).compile();
 
@@ -49,24 +55,31 @@ describe('PaymentsService', () => {
     mpProvider  = module.get(MercadoPagoProvider);
   });
 
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+    Object.values(mockTxManager).forEach(fn => (fn as jest.Mock).mockReset?.());
+  });
 
   // ==========================
   // create
   // ==========================
 
   describe('create', () => {
-    const dto = { orderId: 1, provider: PaymentProvider.MERCADOPAGO };
+    const userId = 99;
+    const role   = RoleType.CLIENT;
+    const dto    = { orderId: 1, provider: PaymentProvider.MERCADOPAGO };
 
     it('should create a payment with MercadoPago preference', async () => {
       const payment = mockPayment();
-      orderRepo.findOne.mockResolvedValue(mockOrder());
-      paymentRepo.findOne.mockResolvedValue(null); // no hay pago pendiente
+      // create() usa manager.findOne: primera llamada → orden, segunda → null (no hay pago pendiente)
+      mockTxManager.findOne
+        .mockResolvedValueOnce(mockOrder({ user: { id: userId } }))
+        .mockResolvedValueOnce(null);
       mpProvider.createPreference.mockResolvedValue({ id: 'pref_123', checkoutUrl: 'https://mp.com/checkout' });
-      paymentRepo.create.mockReturnValue(payment);
-      paymentRepo.save.mockResolvedValue(payment);
+      mockTxManager.create.mockReturnValue(payment);
+      mockTxManager.save.mockResolvedValue(payment);
 
-      const result = await service.create(dto as any);
+      const result = await service.create(userId, role, dto as any);
 
       expect(mpProvider.createPreference).toHaveBeenCalled();
       expect(result.status).toBe(PaymentStatus.PENDING);
@@ -74,19 +87,20 @@ describe('PaymentsService', () => {
     });
 
     it('should throw NotFoundException if order not found', async () => {
-      orderRepo.findOne.mockResolvedValue(null);
-      await expect(service.create(dto as any)).rejects.toThrow(NotFoundException);
+      mockTxManager.findOne.mockResolvedValueOnce(null);
+      await expect(service.create(userId, role, dto as any)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException if order is not PENDING', async () => {
-      orderRepo.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.CONFIRMED }));
-      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
+      mockTxManager.findOne.mockResolvedValueOnce(mockOrder({ status: OrderStatus.CONFIRMED, user: { id: userId } }));
+      await expect(service.create(userId, role, dto as any)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if order already has a pending payment', async () => {
-      orderRepo.findOne.mockResolvedValue(mockOrder());
-      paymentRepo.findOne.mockResolvedValue(mockPayment());
-      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
+      mockTxManager.findOne
+        .mockResolvedValueOnce(mockOrder({ user: { id: userId } }))
+        .mockResolvedValueOnce(mockPayment());
+      await expect(service.create(userId, role, dto as any)).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -130,16 +144,16 @@ describe('PaymentsService', () => {
   // ==========================
 
   describe('findByOrder', () => {
-    it('should return payments by orderId', async () => {
+    it('should return payments by orderId for admin', async () => {
       paymentRepo.find.mockResolvedValue([mockPayment()]);
-      const result = await service.findByOrder(1);
+      const result = await service.findByOrder(1, 99, RoleType.ADMIN);
       expect(result).toHaveLength(1);
       expect(result[0].orderId).toBe(1);
     });
 
     it('should return empty array if no payments', async () => {
       paymentRepo.find.mockResolvedValue([]);
-      const result = await service.findByOrder(999);
+      const result = await service.findByOrder(999, 99, RoleType.ADMIN);
       expect(result).toEqual([]);
     });
   });
@@ -149,16 +163,16 @@ describe('PaymentsService', () => {
   // ==========================
 
   describe('findOne', () => {
-    it('should return a payment by id', async () => {
+    it('should return a payment by id for admin', async () => {
       paymentRepo.findOne.mockResolvedValue(mockPayment());
-      const result = await service.findOne(1);
+      const result = await service.findOne(1, 99, RoleType.ADMIN);
       expect(result.id).toBe(1);
       expect(result.status).toBe(PaymentStatus.PENDING);
     });
 
     it('should throw NotFoundException if not found', async () => {
       paymentRepo.findOne.mockResolvedValue(null);
-      await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(999, 99, RoleType.ADMIN)).rejects.toThrow(NotFoundException);
     });
   });
 });

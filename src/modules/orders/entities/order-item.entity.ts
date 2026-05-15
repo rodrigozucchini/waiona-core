@@ -43,6 +43,15 @@ export class OrderItemEntity extends BaseEntity {
   locationId?: number | null;
 
   // ==========================
+  // Reservas de stock por componente (solo para combos)
+  // Persiste { productId, locationId, quantity } de cada producto del combo
+  // para que dispatch/release usen la ubicación exacta donde se reservó
+  // ==========================
+
+  @Column({ name: 'combo_reservations', type: 'jsonb', nullable: true, default: null })
+  comboReservations?: { productId: number; locationId: number; quantity: number }[] | null;
+
+  // ==========================
   // Precio snapshot al momento de la compra
   // ==========================
 

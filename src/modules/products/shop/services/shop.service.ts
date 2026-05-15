@@ -40,66 +40,55 @@ export class ShopService {
 
   async search(dto: SearchShopDto): Promise<ShopPaginatedResponseDto> {
     const { search, type, page = 1, limit = 20, minPrice, maxPrice, categoryId } = dto;
-    const skip = (page - 1) * limit;
 
-    let data: ShopItemResponseDto[] = [];
-    let total = 0;
+    let allItems: ShopItemResponseDto[] = [];
 
     // ==========================
     // PRODUCTS
     // ==========================
     if (!type || type === 'product') {
-
       const where: any = { isDeleted: false, isActive: true };
-
-      if (search) where.name = ILike(`%${search}%`);
+      if (search)     where.name       = ILike(`%${search}%`);
       if (categoryId) where.categoryId = categoryId;
 
-      const [products, count] = await this.productRepository.findAndCount({
+      const products = await this.productRepository.find({
         where,
         relations: ['images'],
         order: { name: 'ASC' },
-        take: limit,
-        skip,
       });
-
-      total += count;
 
       const productItems = await Promise.all(
         products.map(p => this.buildProductListItem(p, minPrice, maxPrice)),
       );
-
-      data.push(...productItems.filter((i): i is ShopItemResponseDto => i !== null));
+      allItems.push(...productItems.filter((i): i is ShopItemResponseDto => i !== null));
     }
 
     // ==========================
     // COMBOS
     // ==========================
     if (!type || type === 'combo') {
-
       const where: any = { isDeleted: false, isActive: true };
+      if (search)     where.name       = ILike(`%${search}%`);
+      if (categoryId) where.categoryId = categoryId;
 
-      if (search) where.name = ILike(`%${search}%`);
-      if (categoryId) where.categoryId = categoryId; // 🔥 fix — antes no filtraba por categoría
-
-      const [combos, count] = await this.comboRepository.findAndCount({
+      const combos = await this.comboRepository.find({
         where,
         relations: ['images'],
         order: { name: 'ASC' },
-        take: limit,
-        skip,
       });
-
-      total += count;
 
       const comboItems = await Promise.all(
         combos.map(c => this.buildComboListItem(c, minPrice, maxPrice)),
       );
-
-      data.push(...comboItems.filter((i): i is ShopItemResponseDto => i !== null));
+      allItems.push(...comboItems.filter((i): i is ShopItemResponseDto => i !== null));
     }
 
+    // Orden alfabético consistente en la lista combinada
+    allItems.sort((a, b) => a.name.localeCompare(b.name));
+
+    const total      = allItems.length;
     const totalPages = Math.ceil(total / limit);
+    const skip       = (page - 1) * limit;
 
     return {
       total,
@@ -107,7 +96,7 @@ export class ShopService {
       limit,
       totalPages,
       hasNextPage: page < totalPages,
-      data,
+      data: allItems.slice(skip, skip + limit),
     };
   }
 
