@@ -26,25 +26,52 @@ describe('OrdersService', () => {
   const mockComboRepo       = () => ({ findOne: jest.fn() });
   const mockCouponRepo      = () => ({ findOne: jest.fn(), save: jest.fn() });
   const mockCouponUsageRepo = () => ({ findOne: jest.fn(), create: jest.fn(), save: jest.fn() });
-  const mockStockItemRepo   = () => ({ findOne: jest.fn() });
+  const mockStockItemRepo   = () => ({ findOne: jest.fn(), find: jest.fn(), save: jest.fn() });
   const mockUserRepo        = () => ({ findOne: jest.fn() });
   const mockStockService    = () => ({ reserveStock: jest.fn(), dispatchStock: jest.fn(), releaseReservation: jest.fn() });
   const mockCalcService     = () => ({ calculateProduct: jest.fn(), calculateCombo: jest.fn() });
 
-  const mockEntityManager = { create: jest.fn(), save: jest.fn() };
-  const mockDataSource    = { transaction: jest.fn(cb => cb(mockEntityManager)) };
+  // Repo devuelto por manager.getRepository() — para reserveStock dentro de la transacción
+  const mockManagerRepo   = { findOne: jest.fn(), find: jest.fn(), save: jest.fn(), create: jest.fn() };
+  const mockEntityManager = {
+    findOne:       jest.fn(),
+    create:        jest.fn(),
+    save:          jest.fn(),
+    getRepository: jest.fn(() => mockManagerRepo),
+  };
+  const mockDataSource = { transaction: jest.fn(cb => cb(mockEntityManager)) };
 
-  const mockUser    = (overrides = {}) => ({ id: 1, email: 'juan@test.com', isDeleted: false, ...overrides });
-  const mockProduct = (overrides = {}) => ({ id: 1, name: 'Coca Cola 500ml', isDeleted: false, ...overrides });
-  const mockStock   = (overrides = {}) => ({ id: 1, productId: 1, locationId: 1, quantityCurrent: 10, quantityReserved: 2, isDeleted: false, ...overrides });
-  const mockBreakdown = (overrides = {}) => ({ unitPrice: 500, discount: 0, finalPrice: 653.4, fullPrice: 726, coupon: 0, orderTotal: 653.4, ...overrides });
-  const mockOrder   = (overrides = {}): OrderEntity =>
+  const mockUser    = (overrides: any = {}) => ({ id: 1, email: 'juan@test.com', isDeleted: false, ...overrides });
+  const mockProduct = (overrides: any = {}) => ({ id: 1, name: 'Coca Cola 500ml', isDeleted: false, ...overrides });
+  const mockStock   = (overrides: any = {}) => {
+    const q = { quantityCurrent: 10, quantityReserved: 2, ...overrides };
+    return { id: 1, productId: 1, locationId: 1, isDeleted: false, ...q, quantityAvailable: q.quantityCurrent - q.quantityReserved };
+  };
+  const mockBreakdown = (overrides: any = {}) => ({ unitPrice: 500, discount: 0, finalPrice: 653.4, fullPrice: 726, coupon: 0, orderTotal: 653.4, ...overrides });
+  const mockCombo = (overrides: any = {}) => ({
+    id: 1, name: 'Combo Test', isDeleted: false,
+    items: [{ productId: 10, quantity: 2 }, { productId: 11, quantity: 1 }],
+    ...overrides,
+  });
+  const mockOrder = (overrides: any = {}): OrderEntity =>
     ({ id: 1, status: OrderStatus.PENDING, subtotal: 653.4, total: 653.4, isDeleted: false,
-       items: [{ id: 1, quantity: 1, product: mockProduct(), combo: null }],
+       items: [{ id: 1, quantity: 1, locationId: 1, product: mockProduct(), combo: null }],
+       createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as OrderEntity;
+  const mockComboOrder = (overrides: any = {}): OrderEntity =>
+    ({ id: 1, status: OrderStatus.CONFIRMED, subtotal: 653.4, total: 653.4, isDeleted: false,
+       items: [{
+         id: 2, quantity: 2, locationId: null, product: null,
+         combo: { id: 1 },
+         comboReservations: [
+           { productId: 10, locationId: 3, quantity: 4 },
+           { productId: 11, locationId: 3, quantity: 2 },
+         ],
+       }],
        createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as OrderEntity;
 
   let orderRepo: any;
   let productRepo: any;
+  let comboRepo: any;
   let stockItemRepo: any;
   let userRepo: any;
   let couponRepo: any;
@@ -74,6 +101,7 @@ describe('OrdersService', () => {
     service         = module.get<OrdersService>(OrdersService);
     orderRepo       = module.get(getRepositoryToken(OrderEntity));
     productRepo     = module.get(getRepositoryToken(ProductEntity));
+    comboRepo       = module.get(getRepositoryToken(ComboEntity));
     stockItemRepo   = module.get(getRepositoryToken(StockItemEntity));
     userRepo        = module.get(getRepositoryToken(UserEntity));
     couponRepo      = module.get(getRepositoryToken(CouponEntity));
@@ -83,7 +111,11 @@ describe('OrdersService', () => {
     orderItemRepo   = module.get(getRepositoryToken(OrderItemEntity));
   });
 
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+    // resetear el repo del manager explícitamente (es singleton fuera del TestingModule)
+    Object.values(mockManagerRepo).forEach(fn => (fn as jest.Mock).mockReset?.());
+  });
 
   // ==========================
   // create
@@ -99,11 +131,13 @@ describe('OrdersService', () => {
       const order = mockOrder();
       userRepo.findOne.mockResolvedValue(mockUser());
       productRepo.findOne.mockResolvedValue(mockProduct());
-      stockItemRepo.findOne.mockResolvedValue(mockStock());
+      stockItemRepo.find.mockResolvedValue([mockStock()]);   // findAvailableStockItem usa find
       calcService.calculateProduct.mockResolvedValue(mockBreakdown());
       orderItemRepo.create.mockReturnValue({});
       mockEntityManager.create.mockReturnValue(order);
       mockEntityManager.save.mockResolvedValue(order);
+      mockManagerRepo.findOne.mockResolvedValue(mockStock()); // reserveStock usa manager.getRepository().findOne
+      mockManagerRepo.save.mockResolvedValue(undefined);
       stockService.reserveStock.mockResolvedValue(undefined);
 
       const result = await service.create(1, dto as any);
@@ -142,7 +176,8 @@ describe('OrdersService', () => {
     it('should throw BadRequestException if insufficient stock', async () => {
       userRepo.findOne.mockResolvedValue(mockUser());
       productRepo.findOne.mockResolvedValue(mockProduct());
-      stockItemRepo.findOne.mockResolvedValue(mockStock({ quantityCurrent: 2, quantityReserved: 1 }));
+      // findAvailableStockItem usa find — stock con solo 1 disponible para pedido de 5
+      stockItemRepo.find.mockResolvedValue([mockStock({ quantityCurrent: 2, quantityReserved: 1 })]);
       calcService.calculateProduct.mockResolvedValue(mockBreakdown());
       await expect(service.create(1, { items: [{ productId: 1, quantity: 5 }], deliveryType: DeliveryType.PICKUP } as any)).rejects.toThrow(BadRequestException);
     });
@@ -150,13 +185,50 @@ describe('OrdersService', () => {
     it('should throw ConflictException if coupon already used by user', async () => {
       userRepo.findOne.mockResolvedValue(mockUser());
       productRepo.findOne.mockResolvedValue(mockProduct());
-      stockItemRepo.findOne.mockResolvedValue(mockStock());
+      stockItemRepo.find.mockResolvedValue([mockStock()]);
       calcService.calculateProduct.mockResolvedValue(mockBreakdown());
       orderItemRepo.create.mockReturnValue({});
-      couponRepo.findOne.mockResolvedValue({ id: 1, code: 'DESC10', usageLimit: null, usageCount: 0, startsAt: null, endsAt: null });
-      couponUsageRepo.findOne.mockResolvedValue({ id: 1 }); // ya usó el cupón
+      // dentro de la transacción: findOne(CouponEntity) → cupón, findOne(CouponUsageEntity) → ya usado
+      mockEntityManager.findOne
+        .mockResolvedValueOnce({ id: 1, code: 'DESC10', usageLimit: null, usageCount: 0, startsAt: null, endsAt: null })
+        .mockResolvedValueOnce({ id: 1 });
 
       await expect(service.create(1, { ...dto, couponCode: 'DESC10' } as any)).rejects.toThrow(ConflictException);
+    });
+
+    it('should create an order with combo and populate comboReservations', async () => {
+      const combo = mockCombo();
+      const order = mockComboOrder();
+      const stockForProduct10 = mockStock({ productId: 10, locationId: 3, quantityCurrent: 10, quantityReserved: 0 });
+      const stockForProduct11 = mockStock({ productId: 11, locationId: 3, quantityCurrent: 10, quantityReserved: 0 });
+
+      userRepo.findOne.mockResolvedValue(mockUser());
+      comboRepo.findOne.mockResolvedValue(combo);
+      stockItemRepo.find
+        .mockResolvedValueOnce([stockForProduct10])  // findAvailableStockItem para productId 10
+        .mockResolvedValueOnce([stockForProduct11]); // findAvailableStockItem para productId 11
+      calcService.calculateCombo.mockResolvedValue(mockBreakdown());
+
+      const createdItem = { combo, quantity: 1, comboReservations: [] };
+      orderItemRepo.create.mockReturnValue(createdItem);
+      mockEntityManager.create.mockReturnValue(order);
+      mockEntityManager.save.mockResolvedValue(order);
+      mockManagerRepo.findOne.mockResolvedValue(stockForProduct10);
+      mockManagerRepo.save.mockResolvedValue(undefined);
+      stockService.reserveStock.mockResolvedValue(undefined);
+
+      const result = await service.create(1, { items: [{ comboId: 1, quantity: 1 }], deliveryType: DeliveryType.PICKUP } as any);
+
+      // comboReservations deben haberse pasado al orderItemRepo.create
+      expect(orderItemRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          comboReservations: expect.arrayContaining([
+            expect.objectContaining({ productId: 10, locationId: 3 }),
+            expect.objectContaining({ productId: 11, locationId: 3 }),
+          ]),
+        }),
+      );
+      expect(result.id).toBe(1);
     });
   });
 
@@ -212,54 +284,121 @@ describe('OrdersService', () => {
 
   describe('updateStatus', () => {
     it('should confirm a pending order', async () => {
-      const order   = mockOrder();
       const updated = mockOrder({ status: OrderStatus.CONFIRMED });
-      orderRepo.findOne.mockResolvedValue(order);
-      orderRepo.save.mockResolvedValue(updated);
+      mockEntityManager.findOne.mockResolvedValue(mockOrder());
+      mockEntityManager.save.mockResolvedValue(updated);
 
       const result = await service.updateStatus(1, { status: OrderStatus.CONFIRMED } as any);
       expect(result.status).toBe(OrderStatus.CONFIRMED);
     });
 
     it('should throw BadRequestException for invalid transition', async () => {
-      orderRepo.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.DELIVERED }));
+      mockEntityManager.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.DELIVERED }));
       await expect(
         service.updateStatus(1, { status: OrderStatus.PENDING } as any),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException from CANCELLED', async () => {
-      orderRepo.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.CANCELLED }));
+      mockEntityManager.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.CANCELLED }));
       await expect(
         service.updateStatus(1, { status: OrderStatus.CONFIRMED } as any),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should dispatch stock when status is DISPATCHED', async () => {
+    it('should dispatch stock when status is DISPATCHED (product item)', async () => {
       const order = mockOrder({ status: OrderStatus.CONFIRMED });
-      orderRepo.findOne.mockResolvedValue(order);
-      stockItemRepo.findOne.mockResolvedValue(mockStock());
+      mockEntityManager.findOne.mockResolvedValue(order);
+      mockEntityManager.save.mockResolvedValue(mockOrder({ status: OrderStatus.DISPATCHED }));
       stockService.dispatchStock.mockResolvedValue(undefined);
-      orderRepo.save.mockResolvedValue(mockOrder({ status: OrderStatus.DISPATCHED }));
 
       await service.updateStatus(1, { status: OrderStatus.DISPATCHED } as any);
-      expect(stockService.dispatchStock).toHaveBeenCalled();
+      expect(stockService.dispatchStock).toHaveBeenCalledWith(
+        mockProduct().id, 1, 1, 1, expect.anything(),
+      );
     });
 
-    it('should release stock when status is CANCELLED', async () => {
+    it('should dispatch stock using comboReservations when status is DISPATCHED (combo item)', async () => {
+      const order = mockComboOrder({ status: OrderStatus.CONFIRMED });
+      mockEntityManager.findOne.mockResolvedValue(order);
+      mockEntityManager.save.mockResolvedValue(mockComboOrder({ status: OrderStatus.DISPATCHED }));
+      stockService.dispatchStock.mockResolvedValue(undefined);
+
+      await service.updateStatus(1, { status: OrderStatus.DISPATCHED } as any);
+
+      expect(stockService.dispatchStock).toHaveBeenCalledTimes(2);
+      expect(stockService.dispatchStock).toHaveBeenCalledWith(10, 3, 4, 1, expect.anything());
+      expect(stockService.dispatchStock).toHaveBeenCalledWith(11, 3, 2, 1, expect.anything());
+    });
+
+    it('should release stock when status is CANCELLED (product item)', async () => {
       const order = mockOrder({ status: OrderStatus.CONFIRMED });
-      orderRepo.findOne.mockResolvedValue(order);
-      stockItemRepo.findOne.mockResolvedValue(mockStock());
+      mockEntityManager.findOne.mockResolvedValue(order);
+      mockEntityManager.save.mockResolvedValue(mockOrder({ status: OrderStatus.CANCELLED }));
       stockService.releaseReservation.mockResolvedValue(undefined);
-      orderRepo.save.mockResolvedValue(mockOrder({ status: OrderStatus.CANCELLED }));
 
       await service.updateStatus(1, { status: OrderStatus.CANCELLED } as any);
-      expect(stockService.releaseReservation).toHaveBeenCalled();
+      expect(stockService.releaseReservation).toHaveBeenCalledWith(
+        mockProduct().id, 1, 1, 1, expect.anything(),
+      );
+    });
+
+    it('should release stock using comboReservations when status is CANCELLED (combo item)', async () => {
+      const order = mockComboOrder({ status: OrderStatus.CONFIRMED });
+      mockEntityManager.findOne.mockResolvedValue(order);
+      mockEntityManager.save.mockResolvedValue(mockComboOrder({ status: OrderStatus.CANCELLED }));
+      stockService.releaseReservation.mockResolvedValue(undefined);
+
+      await service.updateStatus(1, { status: OrderStatus.CANCELLED } as any);
+
+      expect(stockService.releaseReservation).toHaveBeenCalledTimes(2);
+      expect(stockService.releaseReservation).toHaveBeenCalledWith(10, 3, 4, 1, expect.anything());
+      expect(stockService.releaseReservation).toHaveBeenCalledWith(11, 3, 2, 1, expect.anything());
     });
 
     it('should throw NotFoundException if order not found', async () => {
-      orderRepo.findOne.mockResolvedValue(null);
+      mockEntityManager.findOne.mockResolvedValue(null);
       await expect(service.updateStatus(999, { status: OrderStatus.CONFIRMED } as any)).rejects.toThrow(NotFoundException);
     });
   });
-}); 
+
+  // ==========================
+  // releaseStockForOrder
+  // ==========================
+
+  describe('releaseStockForOrder', () => {
+    it('should do nothing if order not found', async () => {
+      orderRepo.findOne.mockResolvedValue(null);
+      await service.releaseStockForOrder(999);
+      expect(stockService.releaseReservation).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing if order is in non-cancellable status', async () => {
+      orderRepo.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.DISPATCHED }));
+      await service.releaseStockForOrder(1);
+      expect(stockService.releaseReservation).not.toHaveBeenCalled();
+    });
+
+    it('should release stock for a PENDING order', async () => {
+      orderRepo.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.PENDING }));
+      stockService.releaseReservation.mockResolvedValue(undefined);
+      await service.releaseStockForOrder(1);
+      expect(stockService.releaseReservation).toHaveBeenCalled();
+    });
+
+    it('should release stock for a CONFIRMED order', async () => {
+      orderRepo.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.CONFIRMED }));
+      stockService.releaseReservation.mockResolvedValue(undefined);
+      await service.releaseStockForOrder(1);
+      expect(stockService.releaseReservation).toHaveBeenCalled();
+    });
+
+    it('should use manager repo when manager is provided', async () => {
+      mockManagerRepo.findOne.mockResolvedValue(mockOrder({ status: OrderStatus.PENDING }));
+      stockService.releaseReservation.mockResolvedValue(undefined);
+      await service.releaseStockForOrder(1, mockEntityManager as any);
+      expect(mockEntityManager.getRepository).toHaveBeenCalled();
+      expect(stockService.releaseReservation).toHaveBeenCalled();
+    });
+  });
+});

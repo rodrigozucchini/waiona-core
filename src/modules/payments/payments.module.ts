@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import { PaymentEntity } from './entities/payment.entity';
 import { OrderEntity } from 'src/modules/orders/entities/order.entity';
+import { OrdersModule } from 'src/modules/orders/orders.module';
 
 import { PaymentsService } from './services/payments.service';
 import { MercadoPagoProvider } from './services/providers/mercadopago.provider';
@@ -16,6 +17,7 @@ import { PaymentsController } from './controllers/payments.controller';
       PaymentEntity,
       OrderEntity,
     ]),
+    OrdersModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, MercadoPagoProvider],

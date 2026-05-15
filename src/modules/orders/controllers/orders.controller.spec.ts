@@ -87,10 +87,9 @@ describe('OrdersController', () => {
       expect(result).toHaveLength(1);
     });
 
-    it('should throw ForbiddenException if client accesses another user orders', async () => {
-      await expect(
-        controller.findByUser(2, mockRequest(1, RoleType.CLIENT)),
-      ).rejects.toThrow(ForbiddenException);
+    it('should throw ForbiddenException if client accesses another user orders', () => {
+      // lanza síncronamente — no hay async
+      expect(() => controller.findByUser(2, mockRequest(1, RoleType.CLIENT))).toThrow(ForbiddenException);
     });
 
     it('should allow admin to access any user orders', async () => {
@@ -106,11 +105,22 @@ describe('OrdersController', () => {
   // ==========================
 
   describe('findOne', () => {
-    it('should return an order by id', async () => {
+    it('should return an order by id for admin', async () => {
       service.findOne.mockResolvedValue(mockOrder() as any);
-      const result = await controller.findOne(1);
+      const result = await controller.findOne(1, mockRequest(1, RoleType.ADMIN));
       expect(service.findOne).toHaveBeenCalledWith(1);
       expect(result.id).toBe(1);
+    });
+
+    it('should return own order for client', async () => {
+      service.findOne.mockResolvedValue(mockOrder({ user: { id: 1 } }) as any);
+      const result = await controller.findOne(1, mockRequest(1, RoleType.CLIENT));
+      expect(result.id).toBe(1);
+    });
+
+    it('should throw ForbiddenException if client accesses another user order', async () => {
+      service.findOne.mockResolvedValue(mockOrder({ user: { id: 2 } }) as any);
+      await expect(controller.findOne(1, mockRequest(1, RoleType.CLIENT))).rejects.toThrow(ForbiddenException);
     });
   });
 

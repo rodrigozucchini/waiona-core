@@ -19,6 +19,7 @@ import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentProvider } from '../enums/payment-provider.enum';
 import { OrderStatus } from 'src/modules/orders/enums/order-status.enum';
 import { RoleType } from 'src/common/enums/role-type.enum';
+import { OrdersService } from 'src/modules/orders/services/orders.service';
 
 @Injectable()
 export class PaymentsService {
@@ -32,6 +33,7 @@ export class PaymentsService {
 
     private readonly mercadoPagoProvider: MercadoPagoProvider,
     private readonly dataSource: DataSource,
+    private readonly ordersService: OrdersService,
   ) {}
 
   // ==========================
@@ -39,50 +41,54 @@ export class PaymentsService {
   // ==========================
 
   async create(userId: number, role: RoleType, dto: CreatePaymentDto): Promise<PaymentResponseDto> {
+    return this.dataSource.transaction(async manager => {
+      // pessimistic lock en la orden — serializa requests concurrentes para el mismo orderId:
+      // el segundo request espera el commit del primero y verá el pago pendiente ya existente
+      const order = await manager.findOne(OrderEntity, {
+        where: { id: dto.orderId, isDeleted: false },
+        relations: ['items', 'items.product', 'items.combo', 'user'],
+        lock: { mode: 'pessimistic_write' },
+      });
 
-    const order = await this.orderRepo.findOne({
-      where: { id: dto.orderId, isDeleted: false },
-      relations: ['items', 'items.product', 'items.combo', 'user'],
+      if (!order) throw new NotFoundException('Order not found');
+
+      if (role === RoleType.CLIENT && order.user.id !== userId) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      if (order.status !== OrderStatus.PENDING) {
+        throw new BadRequestException('Order is not in a payable state');
+      }
+
+      const existingPayment = await manager.findOne(PaymentEntity, {
+        where: { orderId: dto.orderId, status: PaymentStatus.PENDING },
+      });
+
+      if (existingPayment) {
+        throw new BadRequestException('Order already has a pending payment');
+      }
+
+      let externalId: string | null = null;
+      let checkoutUrl: string | null = null;
+
+      if (dto.provider === PaymentProvider.MERCADOPAGO) {
+        const preference = await this.mercadoPagoProvider.createPreference(order);
+        externalId = preference.id;
+        checkoutUrl = preference.checkoutUrl;
+      }
+
+      const payment = manager.create(PaymentEntity, {
+        orderId: dto.orderId,
+        provider: dto.provider,
+        status: PaymentStatus.PENDING,
+        externalId,
+        checkoutUrl,
+        amount: order.total,
+      });
+
+      const saved = await manager.save(PaymentEntity, payment);
+      return new PaymentResponseDto(saved);
     });
-
-    if (!order) throw new NotFoundException('Order not found');
-
-    if (role === RoleType.CLIENT && order.user.id !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException('Order is not in a payable state');
-    }
-
-    const existingPayment = await this.paymentRepo.findOne({
-      where: { orderId: dto.orderId, status: PaymentStatus.PENDING },
-    });
-
-    if (existingPayment) {
-      throw new BadRequestException('Order already has a pending payment');
-    }
-
-    let externalId: string | null = null;
-    let checkoutUrl: string | null = null;
-
-    if (dto.provider === PaymentProvider.MERCADOPAGO) {
-      const preference = await this.mercadoPagoProvider.createPreference(order);
-      externalId = preference.id;
-      checkoutUrl = preference.checkoutUrl;
-    }
-
-    const payment = this.paymentRepo.create({
-      orderId: dto.orderId,
-      provider: dto.provider,
-      status: PaymentStatus.PENDING,
-      externalId,
-      checkoutUrl,
-      amount: order.total,
-    });
-
-    const saved = await this.paymentRepo.save(payment);
-    return new PaymentResponseDto(saved);
   }
 
   // ==========================
@@ -129,27 +135,44 @@ export class PaymentsService {
 
       if (!payment) return;
 
-      // 🔥 manejar todos los status posibles de MP
+      const orderStatus = payment.order.status;
+      const cancellable = orderStatus === OrderStatus.PENDING || orderStatus === OrderStatus.CONFIRMED;
+      let orderChanged  = false;
+
+      // 🔥 manejar todos los status posibles de MP respetando el state machine de órdenes
       if (mpStatus === 'paid') {
-        payment.status         = PaymentStatus.APPROVED;
-        payment.order.status   = OrderStatus.CONFIRMED;
+        payment.status = PaymentStatus.APPROVED;
+        // solo confirmar si la orden sigue en PENDING — evita sobrescribir estados avanzados
+        if (orderStatus === OrderStatus.PENDING) {
+          payment.order.status = OrderStatus.CONFIRMED;
+          orderChanged = true;
+        }
       } else if (mpStatus === 'reverted' || mpStatus === 'charged_back') {
-        payment.status         = PaymentStatus.CANCELLED;
-        payment.order.status   = OrderStatus.CANCELLED;
+        payment.status = PaymentStatus.CANCELLED;
+        if (cancellable) {
+          payment.order.status = OrderStatus.CANCELLED;
+          orderChanged = true;
+        }
       } else if (mpStatus === 'payment_required' || mpStatus === 'payment_in_process') {
         payment.status = PaymentStatus.PENDING;
-        // orden se mantiene en PENDING
+        // orden se mantiene en su estado actual
       } else {
         // expired u otros → rechazado
-        payment.status       = PaymentStatus.REJECTED;
-        payment.order.status = OrderStatus.CANCELLED;
+        payment.status = PaymentStatus.REJECTED;
+        if (cancellable) {
+          payment.order.status = OrderStatus.CANCELLED;
+          orderChanged = true;
+        }
       }
 
       payment.metadata = { body, query };
 
-      // 🔥 transacción — si falla uno, ambos se revierten
+      // 🔥 transacción — stock release + order + payment son atómicos
       await this.dataSource.transaction(async manager => {
-        await manager.save(payment.order);
+        if (orderChanged) {
+          await this.ordersService.releaseStockForOrder(payment.orderId, manager);
+          await manager.save(payment.order);
+        }
         await manager.save(payment);
       });
 

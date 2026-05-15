@@ -11,8 +11,8 @@ import { StockItemsService } from 'src/modules/stocks/stock-item/services/stock-
 describe('ShopService', () => {
   let service: ShopService;
 
-  const mockProductRepo = { findAndCount: jest.fn(), findOne: jest.fn() };
-  const mockComboRepo   = { findAndCount: jest.fn(), findOne: jest.fn() };
+  const mockProductRepo = { find: jest.fn(), findOne: jest.fn() };
+  const mockComboRepo   = { find: jest.fn(), findOne: jest.fn() };
   const mockCalculation = { calculateProduct: jest.fn(), calculateCombo: jest.fn() };
   const mockStock       = { findByProduct: jest.fn(), findByCombo: jest.fn() };
 
@@ -57,8 +57,8 @@ describe('ShopService', () => {
 
   describe('search', () => {
     it('should return paginated products and combos', async () => {
-      mockProductRepo.findAndCount.mockResolvedValue([[mockProduct()], 1]);
-      mockComboRepo.findAndCount.mockResolvedValue([[mockCombo()], 1]);
+      mockProductRepo.find.mockResolvedValue([mockProduct()]);
+      mockComboRepo.find.mockResolvedValue([mockCombo()]);
       mockCalculation.calculateProduct.mockResolvedValue(mockPriceBreakdown());
       mockCalculation.calculateCombo.mockResolvedValue(mockPriceBreakdown());
       mockStock.findByProduct.mockResolvedValue(mockStockItem());
@@ -74,31 +74,31 @@ describe('ShopService', () => {
     });
 
     it('should filter only products when type=product', async () => {
-      mockProductRepo.findAndCount.mockResolvedValue([[mockProduct()], 1]);
+      mockProductRepo.find.mockResolvedValue([mockProduct()]);
       mockCalculation.calculateProduct.mockResolvedValue(mockPriceBreakdown());
       mockStock.findByProduct.mockResolvedValue(mockStockItem());
 
       const result = await service.search({ type: 'product' } as any);
 
-      expect(mockComboRepo.findAndCount).not.toHaveBeenCalled();
+      expect(mockComboRepo.find).not.toHaveBeenCalled();
       expect(result.data).toHaveLength(1);
       expect(result.data[0].type).toBe('product');
     });
 
     it('should filter only combos when type=combo', async () => {
-      mockComboRepo.findAndCount.mockResolvedValue([[mockCombo()], 1]);
+      mockComboRepo.find.mockResolvedValue([mockCombo()]);
       mockCalculation.calculateCombo.mockResolvedValue(mockPriceBreakdown());
       mockStock.findByCombo.mockResolvedValue({ quantityAvailable: 3, inStock: true });
 
       const result = await service.search({ type: 'combo' } as any);
 
-      expect(mockProductRepo.findAndCount).not.toHaveBeenCalled();
+      expect(mockProductRepo.find).not.toHaveBeenCalled();
       expect(result.data[0].type).toBe('combo');
     });
 
     it('should skip product without pricing', async () => {
-      mockProductRepo.findAndCount.mockResolvedValue([[mockProduct()], 1]);
-      mockComboRepo.findAndCount.mockResolvedValue([[], 0]);
+      mockProductRepo.find.mockResolvedValue([mockProduct()]);
+      mockComboRepo.find.mockResolvedValue([]);
       mockCalculation.calculateProduct.mockRejectedValue(new Error('No pricing'));
 
       const result = await service.search({} as any);
@@ -106,26 +106,51 @@ describe('ShopService', () => {
       expect(result.data).toHaveLength(0);
     });
 
-    it('should filter by minPrice', async () => {
-      mockProductRepo.findAndCount.mockResolvedValue([[mockProduct()], 1]);
-      mockComboRepo.findAndCount.mockResolvedValue([[], 0]);
+    it('should filter by minPrice and reflect correct total', async () => {
+      mockProductRepo.find.mockResolvedValue([mockProduct()]);
+      mockComboRepo.find.mockResolvedValue([]);
       mockCalculation.calculateProduct.mockResolvedValue(mockPriceBreakdown({ finalPrice: 100 }));
       mockStock.findByProduct.mockResolvedValue(mockStockItem());
 
       const result = await service.search({ minPrice: 500 } as any);
 
-      expect(result.data).toHaveLength(0); // finalPrice 100 < minPrice 500
+      // total reflects items that passed the price filter — not raw DB count
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
     });
 
-    it('should return correct pagination', async () => {
-      mockProductRepo.findAndCount.mockResolvedValue([[], 50]);
-      mockComboRepo.findAndCount.mockResolvedValue([[], 50]);
+    it('should paginate the combined list correctly', async () => {
+      // 3 products + 2 combos = 5 items total; page 2, limit 2 → items 3 and 4
+      const products = [1, 2, 3].map(i => mockProduct({ id: i, name: `Product ${i}` }));
+      const combos   = [1, 2].map(i => mockCombo({ id: i, name: `Combo ${i}` }));
+      mockProductRepo.find.mockResolvedValue(products);
+      mockComboRepo.find.mockResolvedValue(combos);
+      mockCalculation.calculateProduct.mockResolvedValue(mockPriceBreakdown());
+      mockCalculation.calculateCombo.mockResolvedValue(mockPriceBreakdown());
+      mockStock.findByProduct.mockResolvedValue(mockStockItem());
+      mockStock.findByCombo.mockResolvedValue({ quantityAvailable: 3, inStock: true });
 
-      const result = await service.search({ page: 2, limit: 10 } as any);
+      const result = await service.search({ page: 2, limit: 2 } as any);
 
-      expect(result.total).toBe(100);
-      expect(result.totalPages).toBe(10);
+      expect(result.total).toBe(5);
+      expect(result.totalPages).toBe(3);
       expect(result.hasNextPage).toBe(true);
+      expect(result.data).toHaveLength(2);
+    });
+
+    it('should return correct last page with no next page', async () => {
+      const products = [1, 2, 3].map(i => mockProduct({ id: i, name: `Product ${i}` }));
+      mockProductRepo.find.mockResolvedValue(products);
+      mockComboRepo.find.mockResolvedValue([]);
+      mockCalculation.calculateProduct.mockResolvedValue(mockPriceBreakdown());
+      mockStock.findByProduct.mockResolvedValue(mockStockItem());
+
+      const result = await service.search({ page: 2, limit: 2 } as any);
+
+      expect(result.total).toBe(3);
+      expect(result.totalPages).toBe(2);
+      expect(result.hasNextPage).toBe(false);
+      expect(result.data).toHaveLength(1);
     });
   });
 
