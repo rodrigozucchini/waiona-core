@@ -23,12 +23,14 @@ export class ComboItemEntity extends BaseEntity {
   // ==========================
 
   @Column({
+    name: 'combo_id',
     type: 'int',
     nullable: false,
   })
   comboId: number;
 
   @Column({
+    name: 'product_id',
     type: 'int',
     nullable: false,
   })
@@ -40,16 +42,16 @@ export class ComboItemEntity extends BaseEntity {
 
   @ManyToOne(() => ComboEntity, {
     nullable: false,
-    onDelete: 'RESTRICT', // compatible con soft delete
+    onDelete: 'RESTRICT',
   })
-  @JoinColumn({ name: 'comboId' })
+  @JoinColumn({ name: 'combo_id' })
   combo: ComboEntity;
 
   @ManyToOne(() => ProductEntity, {
     nullable: false,
-    onDelete: 'RESTRICT', // compatible con soft delete
+    onDelete: 'RESTRICT',
   })
-  @JoinColumn({ name: 'productId' })
+  @JoinColumn({ name: 'product_id' })
   product: ProductEntity;
 
   // ==========================

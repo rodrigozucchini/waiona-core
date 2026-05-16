@@ -41,6 +41,12 @@ export class ShopService {
   async search(dto: SearchShopDto): Promise<ShopPaginatedResponseDto> {
     const { search, type, page = 1, limit = 20, minPrice, maxPrice, categoryId } = dto;
 
+    if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {
+      throw new BadRequestException('minPrice cannot be greater than maxPrice');
+    }
+
+    const skip = (page - 1) * limit;
+
     let allItems: ShopItemResponseDto[] = [];
 
     // ==========================
@@ -88,7 +94,6 @@ export class ShopService {
 
     const total      = allItems.length;
     const totalPages = Math.ceil(total / limit);
-    const skip       = (page - 1) * limit;
 
     return {
       total,
@@ -129,13 +134,14 @@ export class ShopService {
     maxPrice?: number,
   ): Promise<ShopItemResponseDto | null> {
 
-    const priceData = await this.safeCalculateProduct(product.id);
-    if (!priceData) return null;
+    const [priceData, stock] = await Promise.all([
+      this.safeCalculateProduct(product.id),
+      this.safeGetStockByProduct(product.id),
+    ]);
 
+    if (!priceData) return null;
     if (minPrice !== undefined && priceData.finalPrice < minPrice) return null;
     if (maxPrice !== undefined && priceData.finalPrice > maxPrice) return null;
-
-    const stock = await this.safeGetStockByProduct(product.id);
 
     const image = product.images
       ?.sort((a, b) => a.position - b.position)[0]?.url;
@@ -164,13 +170,14 @@ export class ShopService {
     maxPrice?: number,
   ): Promise<ShopItemResponseDto | null> {
 
-    const priceData = await this.safeCalculateCombo(combo.id);
-    if (!priceData) return null;
+    const [priceData, comboStock] = await Promise.all([
+      this.safeCalculateCombo(combo.id),
+      this.safeGetStockByCombo(combo.id),
+    ]);
 
+    if (!priceData) return null;
     if (minPrice !== undefined && priceData.finalPrice < minPrice) return null;
     if (maxPrice !== undefined && priceData.finalPrice > maxPrice) return null;
-
-    const comboStock = await this.safeGetStockByCombo(combo.id);
     const image = combo.images
       ?.sort((a, b) => a.position - b.position)[0]?.url;
 
