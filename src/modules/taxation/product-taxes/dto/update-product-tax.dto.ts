@@ -1,9 +1,4 @@
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
+import { CreateProductTaxDto } from './create-product-tax.dto';
 
-export class UpdateProductTaxDto {
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  taxId?: number;
-}
+export class UpdateProductTaxDto extends PartialType(CreateProductTaxDto) {}

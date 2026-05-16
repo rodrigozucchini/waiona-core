@@ -1,16 +1,34 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TaxEntity } from '../entities/tax.entity';
 import { TaxTypeResponseDto } from '../../tax-types/dto/tax-type-response.dto';
 import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 export class TaxResponseDto {
+  @ApiProperty()
   id: number;
+
+  @ApiProperty()
   taxTypeId: number;
+
+  @ApiProperty()
   value: number;
+
+  @ApiProperty()
   isPercentage: boolean;
+
+  @ApiPropertyOptional({ enum: CurrencyCode })
   currency?: CurrencyCode;
+
+  @ApiProperty()
   isGlobal: boolean;
+
+  @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty()
   updatedAt: Date;
+
+  @ApiPropertyOptional({ type: () => TaxTypeResponseDto })
   taxType?: TaxTypeResponseDto;
 
   constructor(entity: TaxEntity) {

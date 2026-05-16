@@ -65,15 +65,7 @@ export class ProductTaxesService {
   // ==========================
 
   async findOne(id: number): Promise<ProductTaxResponseDto> {
-    const productTax = await this.productTaxRepository.findOne({
-      where: { id },
-    });
-
-    if (!productTax) {
-      throw new NotFoundException(`ProductTax with id ${id} not found`);
-    }
-
-    return new ProductTaxResponseDto(productTax);
+    return new ProductTaxResponseDto(await this.findEntity(id));
   }
 
   // ==========================
@@ -81,14 +73,7 @@ export class ProductTaxesService {
   // ==========================
 
   async update(id: number, dto: UpdateProductTaxDto): Promise<ProductTaxResponseDto> {
-    const productTax = await this.productTaxRepository.findOne({
-      where: { id },
-    });
-
-    if (!productTax) {
-      throw new NotFoundException(`ProductTax with id ${id} not found`);
-    }
-
+    const productTax = await this.findEntity(id);
     const merged = this.productTaxRepository.merge(productTax, dto);
     const updated = await this.productTaxRepository.save(merged);
     return new ProductTaxResponseDto(updated);
@@ -99,14 +84,17 @@ export class ProductTaxesService {
   // ==========================
 
   async remove(id: number): Promise<void> {
-    const productTax = await this.productTaxRepository.findOne({
-      where: { id },
-    });
-
-    if (!productTax) {
-      throw new NotFoundException(`ProductTax with id ${id} not found`);
-    }
-
+    const productTax = await this.findEntity(id);
     await this.productTaxRepository.softDelete(productTax.id);
+  }
+
+  // ==========================
+  // PRIVATE
+  // ==========================
+
+  private async findEntity(id: number): Promise<ProductTaxEntity> {
+    const entity = await this.productTaxRepository.findOne({ where: { id } });
+    if (!entity) throw new NotFoundException(`ProductTax with id ${id} not found`);
+    return entity;
   }
 }

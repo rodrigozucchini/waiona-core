@@ -10,14 +10,14 @@ describe('ComboTaxesService', () => {
   let comboTaxRepo: any;
   let taxRepo: any;
 
-  const mockComboTaxRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn() });
+  const mockComboTaxRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn(), softDelete: jest.fn() });
   const mockTaxRepo      = () => ({ findOne: jest.fn() });
 
   const mockTax = (overrides = {}) =>
-    ({ id: 1, isGlobal: false, isDeleted: false, ...overrides });
+    ({ id: 1, isGlobal: false, deletedAt: null, ...overrides });
 
   const mockComboTax = (overrides = {}): ComboTaxEntity =>
-    ({ id: 1, comboId: 1, taxId: 1, isDeleted: false,
+    ({ id: 1, comboId: 1, taxId: 1, deletedAt: null,
        createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as ComboTaxEntity;
 
   beforeEach(async () => {
@@ -96,9 +96,9 @@ describe('ComboTaxesService', () => {
     it('should soft delete', async () => {
       const ct = mockComboTax();
       comboTaxRepo.findOne.mockResolvedValue(ct);
-      comboTaxRepo.save.mockResolvedValue({ ...ct, isDeleted: true });
+      comboTaxRepo.softDelete.mockResolvedValue({ affected: 1 });
       await service.remove(1);
-      expect(comboTaxRepo.save).toHaveBeenCalledWith({ ...ct, isDeleted: true });
+      expect(comboTaxRepo.softDelete).toHaveBeenCalledWith(ct.id);
     });
 
     it('should throw NotFoundException', async () => {

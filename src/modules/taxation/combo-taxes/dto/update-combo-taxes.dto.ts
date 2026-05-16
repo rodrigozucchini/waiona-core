@@ -1,9 +1,4 @@
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
+import { CreateComboTaxDto } from './create-combo-taxes.dto';
 
-export class UpdateComboTaxDto {
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  taxId?: number;
-}
+export class UpdateComboTaxDto extends PartialType(CreateComboTaxDto) {}

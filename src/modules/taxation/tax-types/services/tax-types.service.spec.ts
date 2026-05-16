@@ -8,10 +8,10 @@ describe('TaxTypesService', () => {
   let service: TaxTypesService;
   let repo: any;
 
-  const mockRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn() });
+  const mockRepo = () => ({ findAndCount: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn(), softDelete: jest.fn() });
 
   const mockTaxType = (overrides = {}): TaxTypeEntity =>
-    ({ id: 1, code: 'IVA', name: 'IVA', isDeleted: false,
+    ({ id: 1, code: 'IVA', name: 'IVA', deletedAt: null,
        createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as TaxTypeEntity;
 
   beforeEach(async () => {
@@ -29,16 +29,17 @@ describe('TaxTypesService', () => {
   afterEach(() => jest.clearAllMocks());
 
   describe('findAll', () => {
-    it('should return all tax types', async () => {
-      repo.find.mockResolvedValue([mockTaxType()]);
+    it('should return paginated tax types', async () => {
+      repo.findAndCount.mockResolvedValue([[mockTaxType()], 1]);
       const result = await service.findAll();
-      expect(result).toHaveLength(1);
-      expect(result[0].code).toBe('IVA');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].code).toBe('IVA');
     });
 
-    it('should return empty array', async () => {
-      repo.find.mockResolvedValue([]);
-      expect(await service.findAll()).toEqual([]);
+    it('should return empty page', async () => {
+      repo.findAndCount.mockResolvedValue([[], 0]);
+      const result = await service.findAll();
+      expect(result.data).toEqual([]);
     });
   });
 
@@ -97,15 +98,9 @@ describe('TaxTypesService', () => {
     it('should soft delete', async () => {
       const entity = mockTaxType();
       repo.findOne.mockResolvedValue(entity);
-      repo.save.mockResolvedValue({ ...entity, isDeleted: true });
+      repo.softDelete.mockResolvedValue({ affected: 1 });
       await service.delete(1);
-      expect(repo.save).toHaveBeenCalledWith({ ...entity, isDeleted: true });
-    });
-
-    it('should do nothing if already deleted', async () => {
-      repo.findOne.mockResolvedValue(mockTaxType({ isDeleted: true }));
-      await service.delete(1);
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(repo.softDelete).toHaveBeenCalledWith(entity.id);
     });
 
     it('should throw NotFoundException', async () => {

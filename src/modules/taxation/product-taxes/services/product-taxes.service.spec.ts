@@ -10,14 +10,14 @@ describe('ProductTaxesService', () => {
   let productTaxRepo: any;
   let taxRepo: any;
 
-  const mockProductTaxRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn() });
+  const mockProductTaxRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn(), softDelete: jest.fn() });
   const mockTaxRepo        = () => ({ findOne: jest.fn() });
 
   const mockTax = (overrides = {}) =>
-    ({ id: 1, isGlobal: false, isDeleted: false, ...overrides });
+    ({ id: 1, isGlobal: false, deletedAt: null, ...overrides });
 
   const mockProductTax = (overrides = {}): ProductTaxEntity =>
-    ({ id: 1, productId: 1, taxId: 1, isDeleted: false,
+    ({ id: 1, productId: 1, taxId: 1, deletedAt: null,
        createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as ProductTaxEntity;
 
   beforeEach(async () => {
@@ -97,9 +97,9 @@ describe('ProductTaxesService', () => {
     it('should soft delete', async () => {
       const pt = mockProductTax();
       productTaxRepo.findOne.mockResolvedValue(pt);
-      productTaxRepo.save.mockResolvedValue({ ...pt, isDeleted: true });
+      productTaxRepo.softDelete.mockResolvedValue({ affected: 1 });
       await service.remove(1);
-      expect(productTaxRepo.save).toHaveBeenCalledWith({ ...pt, isDeleted: true });
+      expect(productTaxRepo.softDelete).toHaveBeenCalledWith(pt.id);
     });
 
     it('should throw NotFoundException', async () => {

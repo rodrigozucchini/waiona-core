@@ -65,15 +65,7 @@ export class ComboTaxesService {
   // ==========================
 
   async findOne(id: number): Promise<ComboTaxResponseDto> {
-    const comboTax = await this.comboTaxRepository.findOne({
-      where: { id },
-    });
-
-    if (!comboTax) {
-      throw new NotFoundException(`ComboTax with id ${id} not found`);
-    }
-
-    return new ComboTaxResponseDto(comboTax);
+    return new ComboTaxResponseDto(await this.findEntity(id));
   }
 
   // ==========================
@@ -81,14 +73,7 @@ export class ComboTaxesService {
   // ==========================
 
   async update(id: number, dto: UpdateComboTaxDto): Promise<ComboTaxResponseDto> {
-    const comboTax = await this.comboTaxRepository.findOne({
-      where: { id },
-    });
-
-    if (!comboTax) {
-      throw new NotFoundException(`ComboTax with id ${id} not found`);
-    }
-
+    const comboTax = await this.findEntity(id);
     const merged = this.comboTaxRepository.merge(comboTax, dto);
     const updated = await this.comboTaxRepository.save(merged);
     return new ComboTaxResponseDto(updated);
@@ -99,14 +84,17 @@ export class ComboTaxesService {
   // ==========================
 
   async remove(id: number): Promise<void> {
-    const comboTax = await this.comboTaxRepository.findOne({
-      where: { id },
-    });
-
-    if (!comboTax) {
-      throw new NotFoundException(`ComboTax with id ${id} not found`);
-    }
-
+    const comboTax = await this.findEntity(id);
     await this.comboTaxRepository.softDelete(comboTax.id);
+  }
+
+  // ==========================
+  // PRIVATE
+  // ==========================
+
+  private async findEntity(id: number): Promise<ComboTaxEntity> {
+    const entity = await this.comboTaxRepository.findOne({ where: { id } });
+    if (!entity) throw new NotFoundException(`ComboTax with id ${id} not found`);
+    return entity;
   }
 }

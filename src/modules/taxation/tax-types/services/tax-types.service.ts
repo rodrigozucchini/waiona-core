@@ -30,7 +30,7 @@ export class TaxTypesService {
   }
 
   async findById(id: number): Promise<TaxTypeResponseDto> {
-    const entity = await this.findOne(id);
+    const entity = await this.findEntity(id);
     return TaxTypeResponseDto.fromEntity(entity);
   }
 
@@ -47,7 +47,7 @@ export class TaxTypesService {
     id: number,
     changes: UpdateTaxTypeDto,
   ): Promise<TaxTypeResponseDto> {
-    const entity = await this.findOne(id);
+    const entity = await this.findEntity(id);
 
     if (changes.code && changes.code !== entity.code) {
       await this.ensureCodeIsUnique(changes.code);
@@ -60,14 +60,12 @@ export class TaxTypesService {
   }
 
   async delete(id: number): Promise<void> {
-    const entity = await this.findOne(id);
-
-    if (entity.deletedAt) return;
+    const entity = await this.findEntity(id);
 
     await this.taxTypeRepository.softDelete(entity.id);
   }
 
-  private async findOne(id: number): Promise<TaxTypeEntity> {
+  private async findEntity(id: number): Promise<TaxTypeEntity> {
     const entity = await this.taxTypeRepository.findOne({
       where: { id },
     });
