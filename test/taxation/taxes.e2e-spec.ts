@@ -3,18 +3,16 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 import { TaxesController } from '../../src/modules/taxation/taxes/controllers/taxes.controller';
 import { TaxesService } from '../../src/modules/taxation/taxes/services/taxes.service';
 import { TaxEntity } from '../../src/modules/taxation/taxes/entities/tax.entity';
 import { TaxTypeEntity } from '../../src/modules/taxation/tax-types/entities/tax-types.entity';
-import { TaxTypesService } from '../../src/modules/taxation/tax-types/services/tax-types.service';
 import { TaxTypesController } from '../../src/modules/taxation/tax-types/controllers/tax-types.controller';
-
-
-// 👇 IMPORTS NUEVOS
-import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from 'src/common/guards/roles.guard';
+import { TaxTypesService } from '../../src/modules/taxation/tax-types/services/tax-types.service';
 
 describe('Taxes (e2e)', () => {
   let app: INestApplication;
@@ -24,50 +22,46 @@ describe('Taxes (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
-        TypeOrmModule.forRoot({
-          type: 'sqlite',
-          database: ':memory:',
-          dropSchema: true,
-          entities: [TaxEntity, TaxTypeEntity],
-          synchronize: true,
+        ConfigModule.forRoot({ isGlobal: true }),
+        TypeOrmModule.forRootAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => ({
+            type: 'postgres',
+            host:     config.get('POSTGRES_HOST'),
+            port:     parseInt(config.get('POSTGRES_TEST_PORT') || '5433'),
+            username: config.get('POSTGRES_USER'),
+            password: config.get('POSTGRES_PASSWORD'),
+            database: config.get('POSTGRES_TEST_DB'),
+            entities: [TaxEntity, TaxTypeEntity],
+            synchronize: true,
+            dropSchema: true,
+          }),
         }),
         TypeOrmModule.forFeature([TaxEntity, TaxTypeEntity]),
       ],
       controllers: [TaxesController, TaxTypesController],
       providers: [TaxesService, TaxTypesService],
     })
-      // 👇 ESTO ES LO QUE FALTABA
-      .overrideGuard(AuthGuard('jwt'))
-      .useValue({
-        canActivate: () => true,
-      })
-      .overrideGuard(RolesGuard)
-      .useValue({
-        canActivate: () => true,
-      })
+      .overrideGuard(AuthGuard('jwt')).useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard).useValue({ canActivate: () => true })
       .compile();
 
     app = moduleFixture.createNestApplication();
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    app.useGlobalPipes(new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }));
 
     await app.init();
-
     dataSource = moduleFixture.get(DataSource);
 
-    // Crear un tax type base para todos los tests
     const res = await request(app.getHttpServer())
       .post('/tax-types')
       .send({ code: 'IVA', name: 'Impuesto al Valor Agregado' });
 
     taxTypeId = res.body.id;
-  });
+  }, 30000);
 
   afterAll(async () => {
     await dataSource.destroy();
@@ -79,11 +73,9 @@ describe('Taxes (e2e)', () => {
   // -------------------------
 
   it('POST /tax-types/:id/taxes -> should create percentage tax', async () => {
-    const dto = { value: 21, isPercentage: true };
-
     const res = await request(app.getHttpServer())
       .post(`/tax-types/${taxTypeId}/taxes`)
-      .send(dto)
+      .send({ value: 21, isPercentage: true })
       .expect(201);
 
     expect(res.body.value).toBe(21);
@@ -92,11 +84,9 @@ describe('Taxes (e2e)', () => {
   });
 
   it('POST /tax-types/:id/taxes -> should create fixed tax with currency', async () => {
-    const dto = { value: 50, isPercentage: false, currency: 'ARS' };
-
     const res = await request(app.getHttpServer())
       .post(`/tax-types/${taxTypeId}/taxes`)
-      .send(dto)
+      .send({ value: 50, isPercentage: false, currency: 'ARS' })
       .expect(201);
 
     expect(res.body.isPercentage).toBe(false);
@@ -135,7 +125,7 @@ describe('Taxes (e2e)', () => {
   // FIND ALL
   // -------------------------
 
-  it('GET /tax-types/:id/taxes -> should return all taxes for taxType', async () => {
+  it('GET /tax-types/:id/taxes -> should return array', async () => {
     const res = await request(app.getHttpServer())
       .get(`/tax-types/${taxTypeId}/taxes`)
       .expect(200);
@@ -174,7 +164,7 @@ describe('Taxes (e2e)', () => {
 
   it('GET /tax-types/:id/taxes/:taxId -> should return 404', async () => {
     await request(app.getHttpServer())
-      .get(`/tax-types/${taxTypeId}/taxes/999`)
+      .get(`/tax-types/${taxTypeId}/taxes/999999`)
       .expect(404);
   });
 
@@ -208,7 +198,7 @@ describe('Taxes (e2e)', () => {
 
   it('PATCH /tax-types/:id/taxes/:taxId -> should return 404 if not found', async () => {
     await request(app.getHttpServer())
-      .patch(`/tax-types/${taxTypeId}/taxes/999`)
+      .patch(`/tax-types/${taxTypeId}/taxes/999999`)
       .send({ value: 10 })
       .expect(404);
   });
@@ -228,6 +218,12 @@ describe('Taxes (e2e)', () => {
 
     await request(app.getHttpServer())
       .get(`/tax-types/${taxTypeId}/taxes/${createRes.body.id}`)
+      .expect(404);
+  });
+
+  it('DELETE /tax-types/:id/taxes/:taxId -> should return 404 if not found', async () => {
+    await request(app.getHttpServer())
+      .delete(`/tax-types/${taxTypeId}/taxes/999999`)
       .expect(404);
   });
 });

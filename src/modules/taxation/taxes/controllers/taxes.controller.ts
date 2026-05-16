@@ -11,6 +11,7 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 
 import { TaxesService } from '../services/taxes.service';
 import { CreateTaxDto } from '../dto/create-tax.dto';
@@ -21,6 +22,9 @@ import { RoleType } from 'src/common/enums/role-type.enum';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 
+@ApiTags('Taxes')
+@ApiBearerAuth()
+@ApiParam({ name: 'taxTypeId', type: Number })
 @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('tax-types/:taxTypeId/taxes')
@@ -28,10 +32,8 @@ export class TaxesController {
 
   constructor(private readonly taxesService: TaxesService) {}
 
-  // ==========================
-  // GET ALL
-  // ==========================
-
+  @ApiOperation({ summary: 'List taxes for a tax type' })
+  @ApiResponse({ status: 200, type: [TaxResponseDto] })
   @Get()
   findAll(
     @Param('taxTypeId', ParseIntPipe) taxTypeId: number,
@@ -39,10 +41,9 @@ export class TaxesController {
     return this.taxesService.findAll(taxTypeId);
   }
 
-  // ==========================
-  // GET BY ID
-  // ==========================
-
+  @ApiOperation({ summary: 'Get a tax by ID' })
+  @ApiResponse({ status: 200, type: TaxResponseDto })
+  @ApiResponse({ status: 404, description: 'Not found' })
   @Get(':id')
   findOne(
     @Param('id', ParseIntPipe) id: number,
@@ -50,10 +51,9 @@ export class TaxesController {
     return this.taxesService.findById(id);
   }
 
-  // ==========================
-  // CREATE
-  // ==========================
-
+  @ApiOperation({ summary: 'Create a tax' })
+  @ApiResponse({ status: 201, type: TaxResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation error or tax type not found' })
   @Post()
   create(
     @Param('taxTypeId', ParseIntPipe) taxTypeId: number,
@@ -62,10 +62,9 @@ export class TaxesController {
     return this.taxesService.create(taxTypeId, dto);
   }
 
-  // ==========================
-  // UPDATE
-  // ==========================
-
+  @ApiOperation({ summary: 'Update a tax' })
+  @ApiResponse({ status: 200, type: TaxResponseDto })
+  @ApiResponse({ status: 404, description: 'Not found' })
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -74,10 +73,9 @@ export class TaxesController {
     return this.taxesService.update(id, dto);
   }
 
-  // ==========================
-  // DELETE
-  // ==========================
-
+  @ApiOperation({ summary: 'Delete a tax' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({ status: 404, description: 'Not found' })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(

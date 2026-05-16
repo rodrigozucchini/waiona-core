@@ -53,7 +53,7 @@ describe('TaxTypesController', () => {
 
       service.findAll.mockResolvedValue(mockResponse as any);
 
-      const result = await controller.getTaxTypes();
+      const result = await controller.getTaxTypes({ page: 1, limit: 20 } as any);
 
       expect(result).toEqual(mockResponse);
       expect(service.findAll).toHaveBeenCalledTimes(1);

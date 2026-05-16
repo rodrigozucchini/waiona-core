@@ -17,8 +17,6 @@ import { ProductTaxesService } from './product-taxes/services/product-taxes.serv
 import { ProductTaxesController } from './product-taxes/controllers/product-taxes.controller';
 import { ProductTaxEntity } from './product-taxes/entities/product-taxes.entity';
 
-import { GuardsModule } from 'src/common/guards/guards.module';
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -27,7 +25,6 @@ import { GuardsModule } from 'src/common/guards/guards.module';
       ProductTaxEntity,
       ComboTaxEntity,
     ]),
-    GuardsModule,
   ],
   controllers: [
     TaxesController,

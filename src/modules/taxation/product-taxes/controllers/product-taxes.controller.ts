@@ -11,6 +11,7 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 
 import { ProductTaxesService } from '../services/product-taxes.service';
 import { CreateProductTaxDto } from '../dto/create-product-tax.dto';
@@ -21,6 +22,9 @@ import { RoleType } from 'src/common/enums/role-type.enum';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 
+@ApiTags('Product Taxes')
+@ApiBearerAuth()
+@ApiParam({ name: 'productId', type: Number })
 @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('products/:productId/taxes')
@@ -30,6 +34,8 @@ export class ProductTaxesController {
     private readonly productTaxesService: ProductTaxesService,
   ) {}
 
+  @ApiOperation({ summary: 'List taxes for a product' })
+  @ApiResponse({ status: 200, type: [ProductTaxResponseDto] })
   @Get()
   findAll(
     @Param('productId', ParseIntPipe) productId: number,
@@ -37,6 +43,9 @@ export class ProductTaxesController {
     return this.productTaxesService.findAll(productId);
   }
 
+  @ApiOperation({ summary: 'Get a product tax by ID' })
+  @ApiResponse({ status: 200, type: ProductTaxResponseDto })
+  @ApiResponse({ status: 404, description: 'Not found' })
   @Get(':id')
   findOne(
     @Param('id', ParseIntPipe) id: number,
@@ -44,6 +53,9 @@ export class ProductTaxesController {
     return this.productTaxesService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Assign a tax to a product' })
+  @ApiResponse({ status: 201, type: ProductTaxResponseDto })
+  @ApiResponse({ status: 400, description: 'Tax not found or is global' })
   @Post()
   create(
     @Param('productId', ParseIntPipe) productId: number,
@@ -52,6 +64,9 @@ export class ProductTaxesController {
     return this.productTaxesService.create({ ...dto, productId });
   }
 
+  @ApiOperation({ summary: 'Update a product tax assignment' })
+  @ApiResponse({ status: 200, type: ProductTaxResponseDto })
+  @ApiResponse({ status: 404, description: 'Not found' })
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -60,6 +75,9 @@ export class ProductTaxesController {
     return this.productTaxesService.update(id, dto);
   }
 
+  @ApiOperation({ summary: 'Remove a tax from a product' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({ status: 404, description: 'Not found' })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(

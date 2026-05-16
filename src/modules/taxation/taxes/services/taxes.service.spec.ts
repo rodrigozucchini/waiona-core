@@ -10,13 +10,13 @@ describe('TaxesService', () => {
   let taxRepo: any;
   let taxTypeRepo: any;
 
-  const mockTaxRepo     = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn() });
+  const mockTaxRepo     = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), merge: jest.fn(), softDelete: jest.fn() });
   const mockTaxTypeRepo = () => ({ findOne: jest.fn() });
 
-  const mockTaxType = () => ({ id: 1, code: 'IVA', name: 'IVA', isDeleted: false });
+  const mockTaxType = () => ({ id: 1, code: 'IVA', name: 'IVA', deletedAt: null });
   const mockTax     = (overrides = {}): TaxEntity =>
     ({ id: 1, taxTypeId: 1, value: 21, isPercentage: true, isGlobal: false,
-       currency: null, isDeleted: false,
+       currency: null, deletedAt: null,
        taxType: mockTaxType(),
        createdAt: new Date(), updatedAt: new Date(), ...overrides }) as unknown as TaxEntity;
 
@@ -140,11 +140,11 @@ describe('TaxesService', () => {
     it('should soft delete a tax', async () => {
       const tax = mockTax();
       taxRepo.findOne.mockResolvedValue(tax);
-      taxRepo.save.mockResolvedValue({ ...tax, isDeleted: true });
+      taxRepo.softDelete.mockResolvedValue({ affected: 1 });
 
       await service.delete(1);
 
-      expect(taxRepo.save).toHaveBeenCalledWith({ ...tax, isDeleted: true });
+      expect(taxRepo.softDelete).toHaveBeenCalledWith(tax.id);
     });
 
     it('should throw NotFoundException', async () => {

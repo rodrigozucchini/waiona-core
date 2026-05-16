@@ -43,7 +43,7 @@ export class TaxesService {
   // ==========================
 
   async findById(id: number): Promise<TaxResponseDto> {
-    const entity = await this.findOne(id);
+    const entity = await this.findEntity(id);
     return new TaxResponseDto(entity);
   }
 
@@ -78,7 +78,7 @@ export class TaxesService {
     });
 
     const saved = await this.taxRepository.save(newEntity);
-    return new TaxResponseDto(await this.findOne(saved.id));
+    return new TaxResponseDto(await this.findEntity(saved.id));
   }
 
   // ==========================
@@ -87,7 +87,7 @@ export class TaxesService {
 
   async update(id: number, changes: UpdateTaxDto): Promise<TaxResponseDto> {
 
-    const entity = await this.findOne(id);
+    const entity = await this.findEntity(id);
 
     const isPercentage = changes.isPercentage ?? entity.isPercentage;
     const currency = changes.currency !== undefined ? changes.currency : entity.currency;
@@ -102,7 +102,7 @@ export class TaxesService {
 
     const merged = this.taxRepository.merge(entity, changes);
     const saved = await this.taxRepository.save(merged);
-    return new TaxResponseDto(await this.findOne(saved.id));
+    return new TaxResponseDto(await this.findEntity(saved.id));
   }
 
   // ==========================
@@ -110,7 +110,7 @@ export class TaxesService {
   // ==========================
 
   async delete(id: number): Promise<void> {
-    const entity = await this.findOne(id);
+    const entity = await this.findEntity(id);
     await this.taxRepository.softDelete(entity.id);
   }
 
@@ -118,7 +118,7 @@ export class TaxesService {
   // PRIVATE
   // ==========================
 
-  private async findOne(id: number): Promise<TaxEntity> {
+  private async findEntity(id: number): Promise<TaxEntity> {
     const entity = await this.taxRepository.findOne({
       where: { id },
       relations: ['taxType'],
