@@ -111,14 +111,15 @@ export class StockItemsService {
         where: { productId: item.productId, isDeleted: false },
       });
 
-      // suma el quantityAvailable de todas las ubicaciones del producto
-      const totalAvailable = stockItems.reduce(
-        (sum, s) => sum + s.quantityAvailable,
+      // máximo stock disponible en una sola ubicación
+      // (consistente con reserveStock, que elige la mejor ubicación — no mezcla ubicaciones)
+      const bestAvailable = stockItems.reduce(
+        (best, s) => s.quantityAvailable > best ? s.quantityAvailable : best,
         0,
       );
 
       // cuántos combos puedo armar con este producto
-      const possible = Math.floor(totalAvailable / item.quantity);
+      const possible = Math.floor(bestAvailable / item.quantity);
 
       if (possible < minAvailable) {
         minAvailable = possible;
@@ -482,6 +483,13 @@ export class StockItemsService {
     stockCritical: number,
     stockMax?: number | null,
   ): void {
+    if (stockMin < 0 || stockCritical < 0) {
+      throw new BadRequestException('stockMin and stockCritical must be non-negative');
+    }
+    if (stockMax != null && stockMax < 0) {
+      throw new BadRequestException('stockMax must be non-negative');
+    }
+
     if (stockCritical >= stockMin) {
       throw new BadRequestException('stockCritical must be less than stockMin');
     }

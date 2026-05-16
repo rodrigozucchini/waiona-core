@@ -4,6 +4,7 @@ import {
   IsInt,
   IsNumber,
   Min,
+  Max,
   IsIn,
   MinLength,
   MaxLength,
@@ -67,5 +68,6 @@ export class SearchShopDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number = 20;          // 🔥 subido de 10 a 20 — más razonable para un shop
+  @Max(100)
+  limit?: number = 20;
 }

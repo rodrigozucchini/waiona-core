@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Put,
   Delete,
   Param,
@@ -16,7 +15,6 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 
 import { UsersService } from '../services/users.service';
-import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { SearchUsersDto } from '../dto/search-users.dto';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -26,15 +24,6 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-
-  // ==========================
-  // REGISTRO — público
-  // ==========================
-
-  @Post()
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
-  }
 
   // ==========================
   // GET ALL — solo admin

@@ -128,50 +128,54 @@ export class PaymentsService {
 
       if (!externalReference) return;
 
-      const payment = await this.paymentRepo.findOne({
-        where: { orderId: Number(externalReference) },
-        relations: ['order'],
-      });
-
-      if (!payment) return;
-
-      const orderStatus = payment.order.status;
-      const cancellable = orderStatus === OrderStatus.PENDING || orderStatus === OrderStatus.CONFIRMED;
-      let orderChanged  = false;
-
-      // 🔥 manejar todos los status posibles de MP respetando el state machine de órdenes
-      if (mpStatus === 'paid') {
-        payment.status = PaymentStatus.APPROVED;
-        // solo confirmar si la orden sigue en PENDING — evita sobrescribir estados avanzados
-        if (orderStatus === OrderStatus.PENDING) {
-          payment.order.status = OrderStatus.CONFIRMED;
-          orderChanged = true;
-        }
-      } else if (mpStatus === 'reverted' || mpStatus === 'charged_back') {
-        payment.status = PaymentStatus.CANCELLED;
-        if (cancellable) {
-          payment.order.status = OrderStatus.CANCELLED;
-          orderChanged = true;
-        }
-      } else if (mpStatus === 'payment_required' || mpStatus === 'payment_in_process') {
-        payment.status = PaymentStatus.PENDING;
-        // orden se mantiene en su estado actual
-      } else {
-        // expired u otros → rechazado
-        payment.status = PaymentStatus.REJECTED;
-        if (cancellable) {
-          payment.order.status = OrderStatus.CANCELLED;
-          orderChanged = true;
-        }
-      }
-
-      payment.metadata = { body, query };
-
-      // 🔥 transacción — stock release + order + payment son atómicos
+      // 🔥 toda la lógica de DB dentro de la transacción con locks de fila —
+      // evita race condition entre dos notificaciones simultáneas del mismo pago
       await this.dataSource.transaction(async manager => {
+        const payment = await manager.findOne(PaymentEntity, {
+          where: { orderId: Number(externalReference), isDeleted: false },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!payment) return;
+
+        const order = await manager.findOne(OrderEntity, {
+          where: { id: payment.orderId, isDeleted: false },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!order) return;
+
+        const orderStatus = order.status;
+        const cancellable = orderStatus === OrderStatus.PENDING || orderStatus === OrderStatus.CONFIRMED;
+        let orderChanged  = false;
+
+        if (mpStatus === 'paid') {
+          payment.status = PaymentStatus.APPROVED;
+          if (orderStatus === OrderStatus.PENDING) {
+            order.status = OrderStatus.CONFIRMED;
+            orderChanged = true;
+          }
+        } else if (mpStatus === 'reverted' || mpStatus === 'charged_back') {
+          payment.status = PaymentStatus.CANCELLED;
+          if (cancellable) {
+            order.status = OrderStatus.CANCELLED;
+            orderChanged = true;
+          }
+        } else if (mpStatus === 'payment_required' || mpStatus === 'payment_in_process') {
+          payment.status = PaymentStatus.PENDING;
+        } else {
+          payment.status = PaymentStatus.REJECTED;
+          if (cancellable) {
+            order.status = OrderStatus.CANCELLED;
+            orderChanged = true;
+          }
+        }
+
+        payment.metadata = { body, query };
+
         if (orderChanged) {
           await this.ordersService.releaseStockForOrder(payment.orderId, manager);
-          await manager.save(payment.order);
+          await manager.save(order);
         }
         await manager.save(payment);
       });

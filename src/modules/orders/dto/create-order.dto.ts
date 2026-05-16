@@ -1,11 +1,13 @@
 import {
     IsEnum,
+    IsNotEmpty,
     IsOptional,
     IsString,
     IsArray,
     IsInt,
     IsBoolean,
     Min,
+    Max,
     MaxLength,
     ArrayMinSize,
     ValidateNested,
@@ -16,18 +18,19 @@ import {
   
   export class CreateOrderItemDto {
   
-    @IsOptional()
+    @ValidateIf(o => !o.comboId)
     @IsInt()
     @Min(1)
     productId?: number;
-  
-    @IsOptional()
+
+    @ValidateIf(o => !o.productId)
     @IsInt()
     @Min(1)
     comboId?: number;
   
     @IsInt()
     @Min(1)
+    @Max(500)
     quantity: number;
   }
   
@@ -52,6 +55,7 @@ import {
   
     @ValidateIf(o => o.deliveryType === DeliveryType.DELIVERY)
     @IsString()
+    @IsNotEmpty()
     @MaxLength(500)
     address?: string;
   

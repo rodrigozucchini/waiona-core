@@ -103,7 +103,7 @@ export class OrdersService {
           product,
           quantity:   item.quantity,
           unitPrice:  breakdown.unitPrice,
-          finalPrice: breakdown.orderTotal * item.quantity,
+          finalPrice: breakdown.finalPrice * item.quantity,
           locationId: stockItem.locationId,
         });
 
@@ -148,7 +148,7 @@ export class OrdersService {
           combo,
           quantity:          item.quantity,
           unitPrice:         breakdown.unitPrice,
-          finalPrice:        breakdown.orderTotal * item.quantity,
+          finalPrice:        breakdown.finalPrice * item.quantity,
           comboReservations,
         });
 
@@ -158,7 +158,7 @@ export class OrdersService {
       }
     }
 
-    const total = subtotal - couponDiscount;
+    const total = Math.max(0, subtotal - couponDiscount);
 
     // 4. 🔥 Transacción — guardar orden + reservar stock + registrar cupón de forma atómica
     const saved = await this.dataSource.transaction(async manager => {
@@ -186,6 +186,10 @@ export class OrdersService {
           where: { couponId: lockedCoupon.id, userId: user.id },
         });
         if (alreadyUsed) throw new ConflictException('Coupon already used by this user');
+
+        if (couponDiscount === 0) {
+          throw new BadRequestException('Coupon does not apply to any item in this order');
+        }
       }
 
       // guardar orden
@@ -214,8 +218,8 @@ export class OrdersService {
         );
       }
 
-      // registrar uso del cupón
-      if (lockedCoupon) {
+      // registrar uso del cupón — solo si efectivamente generó descuento
+      if (lockedCoupon && couponDiscount > 0) {
         lockedCoupon.usageCount += 1;
         await manager.save(CouponEntity, lockedCoupon);
 
@@ -280,6 +284,7 @@ export class OrdersService {
       const order = await manager.findOne(OrderEntity, {
         where: { id, isDeleted: false },
         relations: ['items', 'items.product', 'items.combo'],
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order) throw new NotFoundException('Order not found');
 

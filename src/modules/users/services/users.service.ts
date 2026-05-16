@@ -55,7 +55,12 @@ export class UsersService {
         role:     clientRole ?? undefined,
       });
 
-      return manager.save(UserEntity, user);
+      try {
+        return await manager.save(UserEntity, user);
+      } catch (err: any) {
+        if (err.code === '23505') throw new ConflictException('Email already in use');
+        throw err;
+      }
     });
   }
 
@@ -78,12 +83,11 @@ export class UsersService {
     }
 
     if (dto?.name) {
-      return this.userRepo.find({
-        where: [
-          { isDeleted: false, profile: { name: ILike(`%${dto.name}%`) } },
-          { isDeleted: false, profile: { lastName: ILike(`%${dto.name}%`) } },
-        ],
-      });
+      const nameConditions = [
+        { isDeleted: false, ...(dto.email && { email: ILike(`%${dto.email}%`) }), profile: { name: ILike(`%${dto.name}%`) } },
+        { isDeleted: false, ...(dto.email && { email: ILike(`%${dto.email}%`) }), profile: { lastName: ILike(`%${dto.name}%`) } },
+      ];
+      return this.userRepo.find({ where: nameConditions });
     }
 
     return this.userRepo.find({ where });
