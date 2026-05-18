@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { PG_UNIQUE_VIOLATION } from 'src/common/constants/postgres-error-codes';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -54,7 +55,7 @@ export class ComboPricingService {
       const saved = await this.repo.save(entity);
       return new ComboPricingResponseDto(saved);
     } catch (err: any) {
-      if (err.code === '23505') throw new BadRequestException('Combo already has pricing');
+      if (err.code === PG_UNIQUE_VIOLATION) throw new BadRequestException('Combo already has pricing');
       throw err;
     }
   }
