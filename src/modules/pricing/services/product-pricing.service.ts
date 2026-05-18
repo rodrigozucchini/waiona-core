@@ -11,7 +11,7 @@ import { ProductPricingEntity } from '../entities/product-pricing.entity';
 import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
 import { MarginEntity } from 'src/modules/margins/entities/margin.entity';
 import { CreateProductPricingDto } from '../dto/create-product-pricing.dto';
-import { UpdateProductPricingDto } from '../dto/update-product-pricing-dto';
+import { UpdateProductPricingDto } from '../dto/update-product-pricing.dto';
 import { ProductPricingResponseDto } from '../dto/product-pricing-response.dto';
 
 @Injectable()

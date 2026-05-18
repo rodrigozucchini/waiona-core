@@ -16,7 +16,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 import { ProductPricingService } from '../services/product-pricing.service';
 import { CreateProductPricingDto } from '../dto/create-product-pricing.dto';
-import { UpdateProductPricingDto } from '../dto/update-product-pricing-dto';
+import { UpdateProductPricingDto } from '../dto/update-product-pricing.dto';
 import { ProductPricingResponseDto } from '../dto/product-pricing-response.dto';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { Roles } from 'src/common/decorators/roles.decorator';
