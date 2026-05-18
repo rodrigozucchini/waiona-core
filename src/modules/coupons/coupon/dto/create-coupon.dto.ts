@@ -12,62 +12,51 @@ import {
   IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 
 import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 export class CreateCouponDto {
 
-  // ==========================
-  // BASIC INFO
-  // ==========================
-
+  @ApiProperty({ example: 'PROMO10' })
   @IsString()
   @MinLength(3)
   @MaxLength(100)
   code: string;
 
-  // ==========================
-  // VALUE
-  // ==========================
-
+  @ApiProperty({ example: 10 })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   @Max(99999999)
   value: number;
 
+  @ApiProperty({ example: true })
   @IsBoolean()
   isPercentage: boolean;
 
+  @ApiProperty({ enum: CurrencyCode, required: false, nullable: true, example: 'ARS' })
   @IsOptional()
   @IsEnum(CurrencyCode)
   currency?: CurrencyCode;
 
-  // ==========================
-  // ALCANCE
-  // ==========================
-
+  @ApiProperty({ example: false })
   @IsBoolean()
   isGlobal: boolean;
 
-  // ==========================
-  // USO
-  // ==========================
-
+  @ApiProperty({ required: false, nullable: true, example: 100 })
   @IsOptional()
   @IsInt()
   @Min(1)
   usageLimit?: number;
 
-  // ==========================
-  // DATES
-  // ==========================
-
+  @ApiProperty({ required: false, nullable: true })
   @IsOptional()
   @Type(() => Date)
   @IsDate()
   startsAt?: Date;
 
+  @ApiProperty({ required: false, nullable: true })
   @IsOptional()
   @Type(() => Date)
   @IsDate()

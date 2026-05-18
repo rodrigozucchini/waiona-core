@@ -1,7 +1,6 @@
 export enum CouponStatus {
-    ACTIVE = 'active',
-    INACTIVE = 'inactive',
-    SCHEDULED = 'scheduled',
-    EXPIRED = 'expired',
-    EXHAUSTED = 'exhausted'
-  }
+  ACTIVE    = 'active',
+  SCHEDULED = 'scheduled',
+  EXPIRED   = 'expired',
+  EXHAUSTED = 'exhausted',
+}

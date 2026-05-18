@@ -48,11 +48,14 @@ describe('CouponController', () => {
     expect(result.code).toBe('DESCUENTO10');
   });
 
-  it('findAll should return all coupons', async () => {
-    service.findAll.mockResolvedValue([mockResponse() as any]);
-    const result = await controller.findAll();
-    expect(service.findAll).toHaveBeenCalled();
-    expect(result).toHaveLength(1);
+  it('findAll should return paginated coupons', async () => {
+    const paginated = { data: [mockResponse()], total: 1, page: 1, limit: 20 };
+    service.findAll.mockResolvedValue(paginated as any);
+
+    const result = await controller.findAll({ page: 1, limit: 20 } as any);
+
+    expect(service.findAll).toHaveBeenCalledWith(1, 20);
+    expect(result.data).toHaveLength(1);
   });
 
   it('findOne should return a coupon', async () => {

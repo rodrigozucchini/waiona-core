@@ -8,12 +8,20 @@ import { CouponEntity } from '../../../coupons/coupon/entities/coupon.entity';
 
 describe('CouponUsageService', () => {
   let service: CouponUsageService;
+  let usageRepo: any;
 
-  const mockUsageRepo  = () => ({ find: jest.fn(), findOne: jest.fn() });
-  const mockCouponRepo = () => ({ findOne: jest.fn(), save: jest.fn() });
+  const mockUsageRepo = () => ({
+    find:         jest.fn(),
+    findOne:      jest.fn(),
+    findAndCount: jest.fn(),
+  });
 
-  const mockEntityManager = { create: jest.fn(), save: jest.fn() };
-  const mockDataSource    = { transaction: jest.fn(cb => cb(mockEntityManager)) };
+  const mockEntityManager = {
+    findOne: jest.fn(),
+    create:  jest.fn(),
+    save:    jest.fn(),
+  };
+  const mockDataSource = { transaction: jest.fn(cb => cb(mockEntityManager)) };
 
   const mockCoupon = (overrides = {}): CouponEntity =>
     ({ id: 1, code: 'DESCUENTO10', usageLimit: 100, usageCount: 0,
@@ -23,22 +31,17 @@ describe('CouponUsageService', () => {
     ({ id: 1, couponId: 1, orderId: 1, userId: 1, appliedAt: new Date(),
        createdAt: new Date(), updatedAt: new Date(), ...overrides });
 
-  let usageRepo: any;
-  let couponRepo: any;
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CouponUsageService,
-        { provide: getRepositoryToken(CouponUsageEntity), useFactory: mockUsageRepo  },
-        { provide: getRepositoryToken(CouponEntity),      useFactory: mockCouponRepo },
+        { provide: getRepositoryToken(CouponUsageEntity), useFactory: mockUsageRepo },
         { provide: DataSource,                            useValue: mockDataSource   },
       ],
     }).compile();
 
-    service    = module.get<CouponUsageService>(CouponUsageService);
-    usageRepo  = module.get(getRepositoryToken(CouponUsageEntity));
-    couponRepo = module.get(getRepositoryToken(CouponEntity));
+    service   = module.get<CouponUsageService>(CouponUsageService);
+    usageRepo = module.get(getRepositoryToken(CouponUsageEntity));
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -46,10 +49,11 @@ describe('CouponUsageService', () => {
   describe('create', () => {
     const dto = { code: 'DESCUENTO10', orderId: 1, userId: 1 };
 
-    it('should create a usage and increment usageCount in transaction', async () => {
+    it('should create a usage and increment usageCount inside the transaction', async () => {
       const usage = mockUsage();
-      couponRepo.findOne.mockResolvedValue(mockCoupon());
-      usageRepo.findOne.mockResolvedValue(null); // no usado antes
+      mockEntityManager.findOne
+        .mockResolvedValueOnce(mockCoupon())  // coupon found with lock
+        .mockResolvedValueOnce(null);          // not used before
       mockEntityManager.create.mockReturnValue(usage);
       mockEntityManager.save.mockResolvedValue(usage);
 
@@ -60,39 +64,40 @@ describe('CouponUsageService', () => {
     });
 
     it('should throw NotFoundException if coupon not found', async () => {
-      couponRepo.findOne.mockResolvedValue(null);
+      mockEntityManager.findOne.mockResolvedValueOnce(null);
       await expect(service.create(dto as any)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException if coupon not active yet', async () => {
       const future = new Date(Date.now() + 100000);
-      couponRepo.findOne.mockResolvedValue(mockCoupon({ startsAt: future }));
+      mockEntityManager.findOne.mockResolvedValueOnce(mockCoupon({ startsAt: future }));
       await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if coupon expired', async () => {
       const past = new Date(Date.now() - 1000);
-      couponRepo.findOne.mockResolvedValue(mockCoupon({ endsAt: past }));
+      mockEntityManager.findOne.mockResolvedValueOnce(mockCoupon({ endsAt: past }));
       await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if usage limit reached', async () => {
-      couponRepo.findOne.mockResolvedValue(mockCoupon({ usageLimit: 5, usageCount: 5 }));
+      mockEntityManager.findOne.mockResolvedValueOnce(mockCoupon({ usageLimit: 5, usageCount: 5 }));
       await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw ConflictException if user already used the coupon', async () => {
-      couponRepo.findOne.mockResolvedValue(mockCoupon());
-      usageRepo.findOne.mockResolvedValue(mockUsage());
+      mockEntityManager.findOne
+        .mockResolvedValueOnce(mockCoupon())  // coupon
+        .mockResolvedValueOnce(mockUsage());   // already used
       await expect(service.create(dto as any)).rejects.toThrow(ConflictException);
     });
   });
 
   describe('findAll', () => {
-    it('should return all usages', async () => {
-      usageRepo.find.mockResolvedValue([mockUsage()]);
+    it('should return paginated usages', async () => {
+      usageRepo.findAndCount.mockResolvedValue([[mockUsage()], 1]);
       const result = await service.findAll();
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
   });
 

@@ -14,9 +14,6 @@ export class CouponUsageService {
     @InjectRepository(CouponUsageEntity)
     private readonly repo: Repository<CouponUsageEntity>,
 
-    @InjectRepository(CouponEntity)
-    private readonly couponRepository: Repository<CouponEntity>,
-
     private readonly dataSource: DataSource,
   ) {}
 
@@ -25,44 +22,39 @@ export class CouponUsageService {
   // ==========================
 
   async create(dto: CreateCouponUsageDto): Promise<CouponUsageResponseDto> {
-
-    // 1. Buscar cupón por code
-    const coupon = await this.couponRepository.findOne({
-      where: { code: dto.code },
-    });
-
-    if (!coupon) {
-      throw new NotFoundException(`Coupon with code "${dto.code}" not found`);
-    }
-
-    // 2. Validar que está activo
     const now = new Date();
-    if (coupon.startsAt && now < coupon.startsAt) {
-      throw new BadRequestException('Coupon is not active yet');
-    }
-    if (coupon.endsAt && now > coupon.endsAt) {
-      throw new BadRequestException('Coupon has expired');
-    }
 
-    // 3. Validar límite de uso global
-    if (coupon.usageLimit !== null && coupon.usageLimit !== undefined) {
-      if (coupon.usageCount >= coupon.usageLimit) {
-        throw new BadRequestException('Coupon usage limit reached');
-      }
-    }
-
-    // 4. Validar que el usuario no lo usó antes (unique constraint couponId+userId)
-    const alreadyUsed = await this.repo.findOne({
-      where: { couponId: coupon.id, userId: dto.userId },
-    });
-
-    if (alreadyUsed) {
-      throw new ConflictException('User has already used this coupon');
-    }
-
-    // 5 & 6. Registrar el uso e incrementar usageCount en transacción
-    // si falla cualquiera de los dos, se revierte todo
+    // Toda la validación y escritura ocurren dentro de la transacción con lock
+    // sobre la fila del cupón para evitar race conditions en el límite de uso.
     const usage = await this.dataSource.transaction(async manager => {
+
+      const coupon = await manager.findOne(CouponEntity, {
+        where: { code: dto.code },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!coupon) {
+        throw new NotFoundException(`Coupon with code "${dto.code}" not found`);
+      }
+
+      if (coupon.startsAt && now < coupon.startsAt) {
+        throw new BadRequestException('Coupon is not active yet');
+      }
+      if (coupon.endsAt && now > coupon.endsAt) {
+        throw new BadRequestException('Coupon has expired');
+      }
+      if (coupon.usageLimit !== null && coupon.usageLimit !== undefined) {
+        if (coupon.usageCount >= coupon.usageLimit) {
+          throw new BadRequestException('Coupon usage limit reached');
+        }
+      }
+
+      const alreadyUsed = await manager.findOne(CouponUsageEntity, {
+        where: { couponId: coupon.id, userId: dto.userId },
+      });
+      if (alreadyUsed) {
+        throw new ConflictException('User has already used this coupon');
+      }
 
       const newUsage = manager.create(CouponUsageEntity, {
         couponId:  coupon.id,
@@ -70,7 +62,6 @@ export class CouponUsageService {
         userId:    dto.userId,
         appliedAt: now,
       });
-
       await manager.save(newUsage);
 
       coupon.usageCount += 1;

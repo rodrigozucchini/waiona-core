@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 
 import { CouponComboTargetEntity } from '../entities/coupon-combo-target.entity';
 import { CouponEntity } from '../../coupon/entities/coupon.entity';
+import { ComboEntity } from 'src/modules/products/combos/entities/combo.entity';
 import { CreateCouponComboTargetDto } from '../dto/create-coupon-combo-target.dto';
 import { CouponComboTargetResponseDto } from '../dto/coupon-combo-target-response.dto';
 
@@ -19,6 +20,8 @@ export class CouponComboTargetService {
     private readonly repo: Repository<CouponComboTargetEntity>,
     @InjectRepository(CouponEntity)
     private readonly couponRepository: Repository<CouponEntity>,
+    @InjectRepository(ComboEntity)
+    private readonly comboRepository: Repository<ComboEntity>,
   ) {}
 
   // ==========================
@@ -29,9 +32,9 @@ export class CouponComboTargetService {
     couponId: number,
     dto: CreateCouponComboTargetDto,
   ): Promise<CouponComboTargetResponseDto> {
-    // 🔥 una sola query — reutilizamos el coupon en validateCouponNotGlobal
     const coupon = await this.findCoupon(couponId);
     this.validateCouponNotGlobal(coupon);
+    await this.validateComboExists(dto.comboId);
     await this.validateUniqueTarget(couponId, dto.comboId);
 
     const entity = this.repo.create({
@@ -92,6 +95,16 @@ export class CouponComboTargetService {
     }
 
     return coupon;
+  }
+
+  private async validateComboExists(comboId: number): Promise<void> {
+    const combo = await this.comboRepository.findOne({
+      where: { id: comboId },
+    });
+
+    if (!combo) {
+      throw new NotFoundException(`Combo with id ${comboId} not found`);
+    }
   }
 
   private validateCouponNotGlobal(coupon: CouponEntity): void {

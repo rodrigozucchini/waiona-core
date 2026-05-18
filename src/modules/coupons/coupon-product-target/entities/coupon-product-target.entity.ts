@@ -5,6 +5,7 @@ import { CouponEntity } from '../../coupon/entities/coupon.entity';
 @Entity('coupon_product_targets')
 @Index(['couponId'])
 @Index(['productId'])
+@Index(['couponId', 'productId'], { unique: true })
 export class CouponProductTargetEntity extends BaseEntity {
 
   @Column({

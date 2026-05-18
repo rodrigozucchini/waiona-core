@@ -8,7 +8,8 @@ import { Repository } from 'typeorm';
 
 import { CouponProductTargetEntity } from '../entities/coupon-product-target.entity';
 import { CouponEntity } from '../../coupon/entities/coupon.entity';
-import { CreateCouponProductTargetDto } from '../dto/create-coupon-combo-target.dto';
+import { ProductEntity } from 'src/modules/products/product/entities/product.entity';
+import { CreateCouponProductTargetDto } from '../dto/create-coupon-product-target.dto';
 import { CouponProductTargetResponseDto } from '../dto/coupon-product-target-response.dto';
 
 @Injectable()
@@ -19,6 +20,8 @@ export class CouponProductTargetService {
     private readonly repo: Repository<CouponProductTargetEntity>,
     @InjectRepository(CouponEntity)
     private readonly couponRepository: Repository<CouponEntity>,
+    @InjectRepository(ProductEntity)
+    private readonly productRepository: Repository<ProductEntity>,
   ) {}
 
   // ==========================
@@ -29,9 +32,9 @@ export class CouponProductTargetService {
     couponId: number,
     dto: CreateCouponProductTargetDto,
   ): Promise<CouponProductTargetResponseDto> {
-    // 🔥 una sola query — reutilizamos el coupon en validateCouponNotGlobal
     const coupon = await this.findCoupon(couponId);
     this.validateCouponNotGlobal(coupon);
+    await this.validateProductExists(dto.productId);
     await this.validateUniqueTarget(couponId, dto.productId);
 
     const entity = this.repo.create({
@@ -92,6 +95,16 @@ export class CouponProductTargetService {
     }
 
     return coupon;
+  }
+
+  private async validateProductExists(productId: number): Promise<void> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product with id ${productId} not found`);
+    }
   }
 
   private validateCouponNotGlobal(coupon: CouponEntity): void {

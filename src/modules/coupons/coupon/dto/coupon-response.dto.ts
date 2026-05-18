@@ -1,26 +1,47 @@
+import { ApiProperty } from '@nestjs/swagger';
+
 import { CouponEntity } from '../entities/coupon.entity';
 import { CouponStatus } from '../enums/coupon-status.enum';
 import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 export class CouponResponseDto {
+  @ApiProperty({ example: 1 })
   id: number;
+
+  @ApiProperty({ example: 'PROMO10' })
   code: string;
 
+  @ApiProperty({ enum: CouponStatus, example: CouponStatus.ACTIVE })
   status: CouponStatus;
 
+  @ApiProperty({ example: 10 })
   value: number;
+
+  @ApiProperty({ example: true })
   isPercentage: boolean;
+
+  @ApiProperty({ enum: CurrencyCode, required: false, nullable: true, example: 'ARS' })
   currency?: CurrencyCode;
 
+  @ApiProperty({ example: false })
   isGlobal: boolean;
 
+  @ApiProperty({ required: false, nullable: true, example: 100 })
   usageLimit?: number;
+
+  @ApiProperty({ example: 0 })
   usageCount: number;
 
+  @ApiProperty({ required: false, nullable: true })
   startsAt?: Date;
+
+  @ApiProperty({ required: false, nullable: true })
   endsAt?: Date;
 
+  @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty()
   updatedAt: Date;
 
   constructor(entity: CouponEntity) {
@@ -49,12 +70,10 @@ export class CouponResponseDto {
     const now = new Date();
     const { startsAt, endsAt, usageLimit, usageCount } = entity;
 
-    // Guarda contra dato corrupto
     if (startsAt && endsAt && endsAt < startsAt) {
       return CouponStatus.EXPIRED;
     }
 
-    // Agotado por uso
     if (usageLimit !== null && usageLimit !== undefined && usageCount >= usageLimit) {
       return CouponStatus.EXHAUSTED;
     }

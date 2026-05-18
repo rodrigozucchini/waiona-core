@@ -8,7 +8,7 @@ import { CouponStatus } from '../../../coupons/coupon/enums/coupon-status.enum';
 describe('CouponService', () => {
   let service: CouponService;
 
-  const mockRepo = () => ({ find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn() });
+  const mockRepo = () => ({ find: jest.fn(), findOne: jest.fn(), findAndCount: jest.fn(), create: jest.fn(), save: jest.fn(), softDelete: jest.fn() });
 
   const mockCoupon = (overrides = {}): CouponEntity =>
     ({
@@ -77,16 +77,17 @@ describe('CouponService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all coupons', async () => {
-      repo().find.mockResolvedValue([mockCoupon()]);
+    it('should return paginated coupons', async () => {
+      repo().findAndCount.mockResolvedValue([[mockCoupon()], 1]);
       const result = await service.findAll();
-      expect(result).toHaveLength(1);
-      expect(result[0].code).toBe('DESCUENTO10');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].code).toBe('DESCUENTO10');
     });
 
-    it('should return empty array', async () => {
-      repo().find.mockResolvedValue([]);
-      expect(await service.findAll()).toEqual([]);
+    it('should return empty data array', async () => {
+      repo().findAndCount.mockResolvedValue([[], 0]);
+      const result = await service.findAll();
+      expect(result.data).toEqual([]);
     });
   });
 
@@ -131,9 +132,9 @@ describe('CouponService', () => {
     it('should soft delete a coupon', async () => {
       const coupon = mockCoupon();
       repo().findOne.mockResolvedValue(coupon);
-      repo().save.mockResolvedValue({ ...coupon, isDeleted: true });
+      repo().softDelete.mockResolvedValue(undefined);
       await service.remove(1);
-      expect(repo().save).toHaveBeenCalledWith({ ...coupon, isDeleted: true });
+      expect(repo().softDelete).toHaveBeenCalledWith(coupon.id);
     });
 
     it('should throw NotFoundException', async () => {
