@@ -5,14 +5,13 @@ import { NotFoundException, ConflictException } from '@nestjs/common';
 
 import { UsersService } from './users.service';
 import { UserEntity } from '../entities/user.entity';
-import { ProfileEntity } from '../entities/profile.entity';
 import { RoleEntity } from '../entities/role.entity';
 import { RoleType } from 'src/common/enums/role-type.enum';
 
 describe('UsersService', () => {
   let service: UsersService;
 
-  const mockUserRepo    = () => ({
+  const mockUserRepo = () => ({
     findOne:      jest.fn(),
     findAndCount: jest.fn(),
     create:       jest.fn(),
@@ -20,8 +19,7 @@ describe('UsersService', () => {
     update:       jest.fn(),
     softDelete:   jest.fn(),
   });
-  const mockProfileRepo = () => ({ create: jest.fn() });
-  const mockRoleRepo    = () => ({ findOne: jest.fn() });
+  const mockRoleRepo = () => ({ findOne: jest.fn() });
 
   const mockEntityManager = { create: jest.fn(), save: jest.fn() };
   const mockDataSource    = { transaction: jest.fn(cb => cb(mockEntityManager)) };
@@ -40,9 +38,8 @@ describe('UsersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: getRepositoryToken(UserEntity),    useFactory: mockUserRepo    },
-        { provide: getRepositoryToken(ProfileEntity), useFactory: mockProfileRepo },
-        { provide: getRepositoryToken(RoleEntity),    useFactory: mockRoleRepo    },
+        { provide: getRepositoryToken(UserEntity),    useFactory: mockUserRepo },
+        { provide: getRepositoryToken(RoleEntity),    useFactory: mockRoleRepo },
         { provide: DataSource,                        useValue: mockDataSource    },
       ],
     }).compile();

@@ -19,9 +19,6 @@ export class UsersService {
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
 
-    @InjectRepository(ProfileEntity)
-    private readonly profileRepo: Repository<ProfileEntity>,
-
     @InjectRepository(RoleEntity)
     private readonly roleRepo: Repository<RoleEntity>,
 
