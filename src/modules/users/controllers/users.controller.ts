@@ -1,7 +1,7 @@
 import {
   Controller,
   Get,
-  Put,
+  Patch,
   Delete,
   Param,
   Body,
@@ -10,18 +10,23 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import type { Request } from 'express';
 
 import { UsersService } from '../services/users.service';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { SearchUsersDto } from '../dto/search-users.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { UserResponseDto } from '../dto/user-response.dto';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RoleType } from 'src/common/enums/role-type.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 
+@ApiTags('Users')
+@ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -33,6 +38,8 @@ export class UsersController {
   @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
+  @ApiOperation({ summary: 'Listar usuarios paginados' })
+  @ApiResponse({ status: 200, description: 'Lista paginada de usuarios' })
   findAll(@Query() query: SearchUsersDto) {
     return this.usersService.findAll(query, query.page, query.limit);
   }
@@ -43,6 +50,11 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get(':id')
+  @ApiOperation({ summary: 'Obtener propio usuario' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, type: UserResponseDto })
+  @ApiResponse({ status: 403, description: 'Acceso denegado' })
+  @ApiResponse({ status: 404, description: 'No encontrado' })
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: Request,
@@ -57,7 +69,12 @@ export class UsersController {
   // ==========================
 
   @UseGuards(AuthGuard('jwt'))
-  @Put(':id')
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar perfil propio (parcial)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, type: UserResponseDto })
+  @ApiResponse({ status: 403, description: 'Acceso denegado' })
+  @ApiResponse({ status: 404, description: 'No encontrado' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: Request,
@@ -74,6 +91,12 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Eliminar propia cuenta (soft delete)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 204, description: 'Eliminado' })
+  @ApiResponse({ status: 403, description: 'Acceso denegado' })
+  @ApiResponse({ status: 404, description: 'No encontrado' })
   remove(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: Request,
