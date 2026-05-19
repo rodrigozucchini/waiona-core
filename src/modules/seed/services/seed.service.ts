@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 
 import { UserEntity } from 'src/modules/users/entities/user.entity';
-import { ProfileEntity } from 'src/modules/users/entities/profile.entity';
 import { RoleEntity } from 'src/modules/users/entities/role.entity';
 import { RoleType } from 'src/common/enums/role-type.enum';
 import { Env } from 'src/env.model';
@@ -14,9 +13,6 @@ export class SeedService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
-
-    @InjectRepository(ProfileEntity)
-    private readonly profileRepo: Repository<ProfileEntity>,
 
     @InjectRepository(RoleEntity)
     private readonly roleRepo: Repository<RoleEntity>,
@@ -57,10 +53,7 @@ export class SeedService implements OnApplicationBootstrap {
       where: { type: RoleType.SUPER_ADMIN },
     });
 
-    const profile = this.profileRepo.create({
-      name: 'Super',
-      lastName: 'Admin',
-    });
+    const profile = { name: 'Super', lastName: 'Admin' };
 
     const email = this.configService.get('SUPERADMIN_EMAIL', { infer: true })!;
     const password = this.configService.get('SUPERADMIN_PASSWORD', { infer: true })!;
@@ -68,6 +61,7 @@ export class SeedService implements OnApplicationBootstrap {
     const user = this.userRepo.create({
       email,
       password,
+      isActive: true,
       profile,
       role: role!,
     });
