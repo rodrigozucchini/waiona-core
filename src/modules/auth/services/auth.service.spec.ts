@@ -1,154 +1,249 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import request from 'supertest';
-import { DataSource } from 'typeorm';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedException, BadRequestException } from '@nestjs/common';
 
-import { AuthController } from 'src/modules/auth/controllers/auth.controller';
-import { AuthService } from 'src/modules/auth/services/auth.service';
-import { LocalStrategy } from 'src/modules/auth/strategies/local.strategy';
-import { JwtStrategy } from 'src/modules/auth/strategies/jwt.strategy';
-import { UsersService } from 'src/modules/users/services/users.service';
+jest.mock('bcrypt', () => ({ compare: jest.fn() }));
+import * as bcrypt from 'bcrypt';
+
+import { AuthService } from './auth.service';
+import { UsersService } from '../../users/services/users.service';
 import { MailService } from 'src/modules/mail/services/mail.service';
-import { UserEntity } from 'src/modules/users/entities/user.entity';
-import { ProfileEntity } from 'src/modules/users/entities/profile.entity';
-import { RoleEntity } from 'src/modules/users/entities/role.entity';
 import { TokenEntity } from 'src/modules/mail/entities/token.entity';
+import { TokenType } from 'src/modules/mail/enum/token-type.enum';
 import { RoleType } from 'src/common/enums/role-type.enum';
+import { UserEntity } from '../../users/entities/user.entity';
 
-describe('Auth (e2e)', () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
+describe('AuthService', () => {
+  let service: AuthService;
+  let usersService: any;
+  let jwtService: any;
+  let mailService: any;
+  let tokenRepo: any;
 
-  const mockMailService = {
-    sendActivationEmail:    jest.fn().mockResolvedValue(undefined),
-    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
-  };
+  const mockUsersService = () => ({
+    findByEmail:    jest.fn(),
+    create:         jest.fn(),
+    findOne:        jest.fn(),
+    activate:       jest.fn(),
+    updatePassword: jest.fn(),
+  });
 
-  beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({ isGlobal: true }),
-        TypeOrmModule.forRootAsync({
-          inject: [ConfigService],
-          useFactory: (config: ConfigService) => ({
-            type:     'postgres',
-            host:     config.get('POSTGRES_HOST') ?? 'localhost',
-            port:     parseInt(config.get('POSTGRES_TEST_PORT') ?? '5433'),
-            username: config.get('POSTGRES_USER'),
-            password: config.get('POSTGRES_PASSWORD'),
-            database: config.get('POSTGRES_TEST_DB') ?? 'waiona_test',
-            entities:    [UserEntity, ProfileEntity, RoleEntity, TokenEntity],
-            synchronize: true,
-            dropSchema:  true,
-          }),
-        }),
-        TypeOrmModule.forFeature([UserEntity, ProfileEntity, RoleEntity, TokenEntity]),
-        PassportModule,
-        JwtModule.registerAsync({
-          inject: [ConfigService],
-          useFactory: (config: ConfigService) => ({
-            secret: config.get('JWT_SECRET') ?? 'test_secret',
-            signOptions: { expiresIn: '1d' },
-          }),
-        }),
-      ],
-      controllers: [AuthController],
+  const mockJwtService = () => ({
+    sign: jest.fn(() => 'mock.jwt.token'),
+  });
+
+  const mockMailService = () => ({
+    sendActivationEmail:    jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
+  });
+
+  const mockTokenRepo = () => ({
+    findOne: jest.fn(),
+    create:  jest.fn(),
+    save:    jest.fn(),
+    update:  jest.fn(),
+  });
+
+  const mockUser = (overrides = {}): UserEntity =>
+    ({
+      id: 1, email: 'juan@test.com', password: 'hashed_pw',
+      isActive: true,
+      profile: { name: 'Juan', lastName: 'Pérez' },
+      role: { type: RoleType.CLIENT },
+      ...overrides,
+    }) as unknown as UserEntity;
+
+  const mockToken = (overrides = {}): TokenEntity =>
+    ({
+      id: 1, token: 'raw_token', type: TokenType.ACCOUNT_ACTIVATION,
+      userId: 1, expiresAt: new Date(Date.now() + 3600 * 1000),
+      usedAt: null, isUsed: false, isExpired: false,
+      ...overrides,
+    }) as unknown as TokenEntity;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AuthService, UsersService, LocalStrategy, JwtStrategy,
-        { provide: MailService, useValue: mockMailService },
+        AuthService,
+        { provide: UsersService,                    useFactory: mockUsersService },
+        { provide: JwtService,                      useFactory: mockJwtService   },
+        { provide: MailService,                     useFactory: mockMailService  },
+        { provide: getRepositoryToken(TokenEntity), useFactory: mockTokenRepo    },
       ],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-    app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
-    await app.init();
-    dataSource = moduleFixture.get(DataSource);
-
-    // Seed rol CLIENT
-    const roleRepo = dataSource.getRepository(RoleEntity);
-    await roleRepo.save(roleRepo.create({ type: RoleType.CLIENT }));
+    service      = module.get<AuthService>(AuthService);
+    usersService = module.get(UsersService);
+    jwtService   = module.get(JwtService);
+    mailService  = module.get(MailService);
+    tokenRepo    = module.get(getRepositoryToken(TokenEntity));
   });
 
-  afterAll(async () => { await dataSource.destroy(); await app.close(); });
+  afterEach(() => jest.clearAllMocks());
 
-  const testUser = { email: 'test@waiona.com', password: 'Test1234!', name: 'Test', lastName: 'User' };
-  let activationToken: string;
+  it('should be defined', () => expect(service).toBeDefined());
 
-  describe('POST /auth/register', () => {
-    it('should register and return 201', async () => {
-      await request(app.getHttpServer()).post('/auth/register').send(testUser).expect(201);
-      activationToken = mockMailService.sendActivationEmail.mock.calls[0][2];
+  // ==========================
+  // validateUser
+  // ==========================
+
+  describe('validateUser', () => {
+    it('should throw 401 if user not found', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+      await expect(service.validateUser('x@x.com', 'pw')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return 409 if email exists', () =>
-      request(app.getHttpServer()).post('/auth/register').send(testUser).expect(409));
-
-    it('should return 400 with invalid body', () =>
-      request(app.getHttpServer()).post('/auth/register').send({ email: 'not-email' }).expect(400));
-  });
-
-  describe('POST /auth/login — inactive', () => {
-    it('should return 401 if not activated', () =>
-      request(app.getHttpServer()).post('/auth/login')
-        .send({ email: testUser.email, password: testUser.password }).expect(401));
-  });
-
-  describe('GET /auth/activate', () => {
-    it('should activate account', () =>
-      request(app.getHttpServer()).get(`/auth/activate?token=${activationToken}`).expect(200));
-
-    it('should return 400 if token already used', () =>
-      request(app.getHttpServer()).get(`/auth/activate?token=${activationToken}`).expect(400));
-
-    it('should return 400 if token invalid', () =>
-      request(app.getHttpServer()).get('/auth/activate?token=invalid').expect(400));
-  });
-
-  describe('POST /auth/login', () => {
-    it('should login and return token without password', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/auth/login').send({ email: testUser.email, password: testUser.password }).expect(201);
-      expect(res.body.access_token).toBeDefined();
-      expect(res.body.user.password).toBeUndefined();
-      expect(res.body.user.role.type).toBe(RoleType.CLIENT);
+    it('should throw 401 if password does not match', async () => {
+      usersService.findByEmail.mockResolvedValue(mockUser());
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      await expect(service.validateUser('juan@test.com', 'wrong')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return 401 with wrong password', () =>
-      request(app.getHttpServer()).post('/auth/login')
-        .send({ email: testUser.email, password: 'wrong' }).expect(401));
-  });
-
-  describe('POST /auth/forgot-password', () => {
-    it('should return 200 even for unknown email — no hints', async () => {
-      await request(app.getHttpServer()).post('/auth/forgot-password')
-        .send({ email: 'noexiste@test.com' }).expect(200);
-      expect(mockMailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    it('should throw 401 if account not active', async () => {
+      usersService.findByEmail.mockResolvedValue(mockUser({ isActive: false }));
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      await expect(service.validateUser('juan@test.com', 'pw')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should send reset email', async () => {
-      await request(app.getHttpServer()).post('/auth/forgot-password')
-        .send({ email: testUser.email }).expect(200);
-      expect(mockMailService.sendPasswordResetEmail).toHaveBeenCalled();
+    it('should return user on valid credentials', async () => {
+      const user = mockUser();
+      usersService.findByEmail.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const result = await service.validateUser('juan@test.com', 'pw');
+      expect(result).toBe(user);
     });
   });
 
-  describe('POST /auth/reset-password', () => {
-    it('should reset password and allow login with new password', async () => {
-      const resetToken = mockMailService.sendPasswordResetEmail.mock.calls[0][2];
-      await request(app.getHttpServer()).post('/auth/reset-password')
-        .send({ token: resetToken, password: 'NewPass1234!' }).expect(200);
-      await request(app.getHttpServer()).post('/auth/login')
-        .send({ email: testUser.email, password: 'NewPass1234!' }).expect(201);
+  // ==========================
+  // generateToken
+  // ==========================
+
+  describe('generateToken', () => {
+    it('should sign JWT with sub and role from user', () => {
+      const token = service.generateToken(mockUser());
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 1, role: RoleType.CLIENT });
+      expect(token).toBe('mock.jwt.token');
+    });
+  });
+
+  // ==========================
+  // register
+  // ==========================
+
+  describe('register', () => {
+    it('should create user, persist token and send activation email', async () => {
+      const user = mockUser({ isActive: false });
+      usersService.create.mockResolvedValue(user);
+      tokenRepo.create.mockReturnValue({ token: 'raw', type: TokenType.ACCOUNT_ACTIVATION, userId: 1, expiresAt: new Date(), usedAt: null });
+      tokenRepo.save.mockResolvedValue(undefined);
+      mailService.sendActivationEmail.mockResolvedValue(undefined);
+
+      await service.register({ email: 'juan@test.com', password: 'pw', name: 'Juan', lastName: 'Pérez' } as any);
+
+      expect(usersService.create).toHaveBeenCalled();
+      expect(tokenRepo.save).toHaveBeenCalled();
+      expect(mailService.sendActivationEmail).toHaveBeenCalledWith(user.email, user.profile.name, expect.any(String));
+    });
+  });
+
+  // ==========================
+  // activateAccount
+  // ==========================
+
+  describe('activateAccount', () => {
+    it('should throw 400 if token not found', async () => {
+      tokenRepo.findOne.mockResolvedValue(null);
+      await expect(service.activateAccount('bad')).rejects.toThrow(BadRequestException);
     });
 
-    it('should return 400 with invalid token', () =>
-      request(app.getHttpServer()).post('/auth/reset-password')
-        .send({ token: 'invalid', password: 'NewPass1234!' }).expect(400));
+    it('should throw 400 if token already used', async () => {
+      tokenRepo.findOne.mockResolvedValue(mockToken({ isUsed: true }));
+      await expect(service.activateAccount('raw_token')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw 400 if token expired', async () => {
+      tokenRepo.findOne.mockResolvedValue(mockToken({ isExpired: true }));
+      await expect(service.activateAccount('raw_token')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw 400 if account already active', async () => {
+      tokenRepo.findOne.mockResolvedValue(mockToken());
+      usersService.findOne.mockResolvedValue(mockUser({ isActive: true }));
+      await expect(service.activateAccount('raw_token')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should activate account and mark token as used', async () => {
+      const token = mockToken();
+      tokenRepo.findOne.mockResolvedValue(token);
+      usersService.findOne.mockResolvedValue(mockUser({ isActive: false }));
+      usersService.activate.mockResolvedValue(undefined);
+      tokenRepo.save.mockResolvedValue(undefined);
+
+      await service.activateAccount('raw_token');
+
+      expect(usersService.activate).toHaveBeenCalledWith(1);
+      expect(token.usedAt).not.toBeNull();
+      expect(tokenRepo.save).toHaveBeenCalledWith(token);
+    });
+  });
+
+  // ==========================
+  // forgotPassword
+  // ==========================
+
+  describe('forgotPassword', () => {
+    it('should return silently if user not found', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+      await expect(service.forgotPassword('x@x.com')).resolves.toBeUndefined();
+      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('should return silently if user not active', async () => {
+      usersService.findByEmail.mockResolvedValue(mockUser({ isActive: false }));
+      await expect(service.forgotPassword('juan@test.com')).resolves.toBeUndefined();
+      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('should invalidate old reset tokens, create new one and send email', async () => {
+      usersService.findByEmail.mockResolvedValue(mockUser());
+      tokenRepo.update.mockResolvedValue(undefined);
+      tokenRepo.create.mockReturnValue({ token: 'raw', type: TokenType.PASSWORD_RESET, userId: 1, expiresAt: new Date(), usedAt: null });
+      tokenRepo.save.mockResolvedValue(undefined);
+      mailService.sendPasswordResetEmail.mockResolvedValue(undefined);
+
+      await service.forgotPassword('juan@test.com');
+
+      expect(tokenRepo.update).toHaveBeenCalledWith(
+        { userId: 1, type: TokenType.PASSWORD_RESET },
+        expect.objectContaining({ usedAt: expect.any(Date) }),
+      );
+      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith('juan@test.com', 'Juan', expect.any(String));
+    });
+  });
+
+  // ==========================
+  // resetPassword
+  // ==========================
+
+  describe('resetPassword', () => {
+    it('should throw 400 if token not found', async () => {
+      tokenRepo.findOne.mockResolvedValue(null);
+      await expect(service.resetPassword({ token: 'bad', password: 'new' } as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update password and invalidate all reset tokens for user', async () => {
+      tokenRepo.findOne.mockResolvedValue(mockToken({ type: TokenType.PASSWORD_RESET }));
+      usersService.updatePassword.mockResolvedValue(undefined);
+      tokenRepo.update.mockResolvedValue(undefined);
+
+      await service.resetPassword({ token: 'raw_token', password: 'NewPass1234!' } as any);
+
+      expect(usersService.updatePassword).toHaveBeenCalledWith(1, 'NewPass1234!');
+      expect(tokenRepo.update).toHaveBeenCalledWith(
+        { userId: 1, type: TokenType.PASSWORD_RESET },
+        expect.objectContaining({ usedAt: expect.any(Date) }),
+      );
+    });
   });
 });

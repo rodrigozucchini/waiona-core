@@ -6,8 +6,6 @@ import {
   Query,
   UseGuards,
   Req,
-  UseInterceptors,
-  ClassSerializerInterceptor,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -53,9 +51,9 @@ export class AuthController {
   // ==========================
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @UseInterceptors(ClassSerializerInterceptor)
   @UseGuards(AuthGuard('local'))
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   login(@Req() req: Request) {
     const user = req.user as UserEntity;
     return {
@@ -81,6 +79,7 @@ export class AuthController {
   // POST /auth/reset-password
   // ==========================
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
