@@ -7,6 +7,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { ShopController } from '../../src/modules/products/shop/controllers/shop.controller';
 import { ShopService } from '../../src/modules/products/shop/services/shop.service';
+import { ShopCacheService } from '../../src/common/cache/shop-cache.service';
 import { ProductEntity } from '../../src/modules/products/product/entities/product.entity';
 import { ProductImageEntity } from '../../src/modules/products/product-images/entities/product-image.entity';
 import { ComboEntity } from '../../src/modules/products/combos/entities/combo.entity';
@@ -96,6 +97,14 @@ describe('Shop (e2e)', () => {
         ShopService,
         { provide: CalculationService, useValue: mockCalculation },
         { provide: StockItemsService, useValue: mockStock },
+        {
+          provide: ShopCacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn(),
+            invalidate: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
