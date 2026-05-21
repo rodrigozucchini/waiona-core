@@ -183,7 +183,7 @@ describe('AuthController', () => {
       const req = { user: { sub: 1, role: RoleType.CLIENT } } as any;
       const dto = { currentPassword: 'OldPass1!', newPassword: 'NewPass1!' };
 
-      const result = await controller.changePassword(req, dto as any);
+      const result = await controller.changePassword(req, dto);
 
       expect(service.changePassword).toHaveBeenCalledWith(1, dto);
       expect(result.message).toContain('changed successfully');
