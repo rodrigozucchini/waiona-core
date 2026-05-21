@@ -9,6 +9,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 
 import { MarginsController } from '../../src/modules/margins/controllers/margins.controller';
 import { MarginsService } from '../../src/modules/margins/services/margins.service';
+import { ShopCacheService } from '../../src/common/cache/shop-cache.service';
 import { MarginEntity } from '../../src/modules/margins/entities/margin.entity';
 import { ProductPricingEntity } from '../../src/modules/pricing/entities/product-pricing.entity';
 import { ComboPricingEntity } from '../../src/modules/pricing/entities/combo-pricing.entity';
@@ -52,6 +53,10 @@ describe('Margins (e2e)', () => {
         {
           provide: getRepositoryToken(ComboPricingEntity),
           useFactory: mockPricingRepo,
+        },
+        {
+          provide: ShopCacheService,
+          useValue: { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() },
         },
       ],
     })

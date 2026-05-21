@@ -9,6 +9,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 
 import { StockItemsController } from '../../src/modules/stocks/stock-item/controllers/stock-item.controller';
 import { StockItemsService } from '../../src/modules/stocks/stock-item/services/stock-item.service';
+import { MailService } from '../../src/modules/mail/services/mail.service';
 import { StockItemEntity } from '../../src/modules/stocks/stock-item/entities/stock-item.entity';
 
 import { StockMovementController } from '../../src/modules/stocks/stock-movement/controllers/stock-movement.controller';
@@ -70,7 +71,15 @@ describe('StockItems (e2e)', () => {
         ]),
       ],
       controllers: [StockItemsController, StockMovementController],
-      providers: [StockItemsService, StockMovementService],
+      providers: [
+        StockItemsService,
+        StockMovementService,
+        { provide: MailService, useValue: { sendStockAlertEmail: jest.fn() } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('admin@test.com') },
+        },
+      ],
     })
       .overrideGuard(AuthGuard('jwt'))
       .useValue({ canActivate: () => true })

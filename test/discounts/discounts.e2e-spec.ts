@@ -9,6 +9,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 
 import { DiscountsController } from '../../src/modules/discounts/discount/controllers/discounts.controller';
 import { DiscountsService } from '../../src/modules/discounts/discount/services/discounts.service';
+import { ShopCacheService } from '../../src/common/cache/shop-cache.service';
 import { DiscountEntity } from '../../src/modules/discounts/discount/entities/discounts.entity';
 
 import { DiscountProductTargetController } from '../../src/modules/discounts/discount-product-target/controllers/discount-product-target.controller';
@@ -80,6 +81,10 @@ describe('Discounts (e2e)', () => {
         DiscountsService,
         DiscountProductTargetService,
         DiscountComboTargetService,
+        {
+          provide: ShopCacheService,
+          useValue: { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() },
+        },
       ],
     })
       .overrideGuard(AuthGuard('jwt'))
