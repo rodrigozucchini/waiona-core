@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, ExecutionContext } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  ExecutionContext,
+} from '@nestjs/common';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -48,14 +52,27 @@ describe('Orders (e2e)', () => {
   let userId: number;
   let productId: number;
 
-  const mockUser: { sub: number; role: string } = { sub: 0, role: RoleType.ADMIN };
+  const mockUser: { sub: number; role: string } = {
+    sub: 0,
+    role: RoleType.ADMIN,
+  };
 
   const mockCalcService = {
     calculateProduct: jest.fn().mockResolvedValue({
-      unitPrice: 1000, finalPrice: 1000, discount: 0, fullPrice: 1000, coupon: 0, orderTotal: 1000,
+      unitPrice: 1000,
+      finalPrice: 1000,
+      discount: 0,
+      fullPrice: 1000,
+      coupon: 0,
+      orderTotal: 1000,
     }),
     calculateCombo: jest.fn().mockResolvedValue({
-      unitPrice: 2000, finalPrice: 2000, discount: 0, fullPrice: 2000, coupon: 0, orderTotal: 2000,
+      unitPrice: 2000,
+      finalPrice: 2000,
+      discount: 0,
+      fullPrice: 2000,
+      coupon: 0,
+      orderTotal: 2000,
     }),
   };
 
@@ -66,30 +83,50 @@ describe('Orders (e2e)', () => {
         TypeOrmModule.forRootAsync({
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
-            type:     'postgres',
-            host:     config.get('POSTGRES_HOST'),
-            port:     parseInt(config.get('POSTGRES_TEST_PORT') || '5433'),
+            type: 'postgres',
+            host: config.get('POSTGRES_HOST'),
+            port: parseInt(config.get('POSTGRES_TEST_PORT') || '5433'),
             username: config.get('POSTGRES_USER'),
             password: config.get('POSTGRES_PASSWORD'),
             database: config.get('POSTGRES_TEST_DB'),
             entities: [
-              OrderEntity, OrderItemEntity,
-              UserEntity, ProfileEntity, RoleEntity,
-              ProductEntity, CategoryEntity, ProductImageEntity,
-              ComboEntity, ComboItemEntity, ComboImageEntity,
-              StockItemEntity, StockLocationEntity, StockMovementEntity, StockWriteOffEntity,
-              CouponEntity, CouponProductTargetEntity, CouponComboTargetEntity, CouponUsageEntity,
+              OrderEntity,
+              OrderItemEntity,
+              UserEntity,
+              ProfileEntity,
+              RoleEntity,
+              ProductEntity,
+              CategoryEntity,
+              ProductImageEntity,
+              ComboEntity,
+              ComboItemEntity,
+              ComboImageEntity,
+              StockItemEntity,
+              StockLocationEntity,
+              StockMovementEntity,
+              StockWriteOffEntity,
+              CouponEntity,
+              CouponProductTargetEntity,
+              CouponComboTargetEntity,
+              CouponUsageEntity,
             ],
             synchronize: true,
-            dropSchema:  true,
+            dropSchema: true,
           }),
         }),
         TypeOrmModule.forFeature([
-          OrderEntity, OrderItemEntity,
-          ProductEntity, ComboEntity,
-          StockItemEntity, StockMovementEntity, StockWriteOffEntity, ComboItemEntity,
+          OrderEntity,
+          OrderItemEntity,
+          ProductEntity,
+          ComboEntity,
+          StockItemEntity,
+          StockMovementEntity,
+          StockWriteOffEntity,
+          ComboItemEntity,
           UserEntity,
-          CouponEntity, CouponProductTargetEntity, CouponComboTargetEntity,
+          CouponEntity,
+          CouponProductTargetEntity,
+          CouponComboTargetEntity,
         ]),
       ],
       controllers: [OrdersController],
@@ -99,50 +136,83 @@ describe('Orders (e2e)', () => {
         { provide: CalculationService, useValue: mockCalcService },
       ],
     })
-      .overrideGuard(AuthGuard('jwt')).useValue({
+      .overrideGuard(AuthGuard('jwt'))
+      .useValue({
         canActivate: (context: ExecutionContext) => {
           const req = context.switchToHttp().getRequest();
           req.user = { ...mockUser };
           return true;
         },
       })
-      .overrideGuard(RolesGuard).useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist:            true,
-      forbidNonWhitelisted: true,
-      transform:            true,
-    }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
 
     await app.init();
     dataSource = moduleFixture.get(DataSource);
 
     // Seed: profile → user
-    const profileRepo  = dataSource.getRepository(ProfileEntity);
-    const userRepo     = dataSource.getRepository(UserEntity);
+    const profileRepo = dataSource.getRepository(ProfileEntity);
+    const userRepo = dataSource.getRepository(UserEntity);
     const categoryRepo = dataSource.getRepository(CategoryEntity);
-    const productRepo  = dataSource.getRepository(ProductEntity);
+    const productRepo = dataSource.getRepository(ProductEntity);
     const locationRepo = dataSource.getRepository(StockLocationEntity);
-    const stockRepo    = dataSource.getRepository(StockItemEntity);
+    const stockRepo = dataSource.getRepository(StockItemEntity);
 
-    const profile  = await profileRepo.save(profileRepo.create({ name: 'Test', lastName: 'User' }));
-    const user     = await userRepo.save(userRepo.create({ email: 'test@e2e.com', password: 'password', isActive: true, profileId: profile.id }));
+    const profile = await profileRepo.save(
+      profileRepo.create({ name: 'Test', lastName: 'User' }),
+    );
+    const user = await userRepo.save(
+      userRepo.create({
+        email: 'test@e2e.com',
+        password: 'password',
+        isActive: true,
+        profileId: profile.id,
+      }),
+    );
     userId = user.id;
     mockUser.sub = userId;
 
     // Seed: category → product
-    const category = await categoryRepo.save(categoryRepo.create({ name: 'Test Category' }));
-    const product  = await productRepo.save(productRepo.create({
-      sku: 'P001', name: 'Test Product', description: 'E2E test product',
-      isActive: true, categoryId: category.id, measurementUnit: ProductMeasurementUnit.UNIT,
-    }));
+    const category = await categoryRepo.save(
+      categoryRepo.create({ name: 'Test Category' }),
+    );
+    const product = await productRepo.save(
+      productRepo.create({
+        sku: 'P001',
+        name: 'Test Product',
+        description: 'E2E test product',
+        isActive: true,
+        categoryId: category.id,
+        measurementUnit: ProductMeasurementUnit.UNIT,
+      }),
+    );
     productId = product.id;
 
     // Seed: stock location → stock item (50 units)
-    const location = await locationRepo.save(locationRepo.create({ name: 'Almacén Principal', type: StockLocationType.WAREHOUSE }));
-    await stockRepo.save(stockRepo.create({ productId: product.id, locationId: location.id, quantityCurrent: 50, quantityReserved: 0 }));
+    const location = await locationRepo.save(
+      locationRepo.create({
+        name: 'Almacén Principal',
+        type: StockLocationType.WAREHOUSE,
+      }),
+    );
+    await stockRepo.save(
+      stockRepo.create({
+        productId: product.id,
+        locationId: location.id,
+        quantityCurrent: 50,
+        quantityReserved: 0,
+      }),
+    );
   }, 30000);
 
   afterAll(async () => {
@@ -158,7 +228,10 @@ describe('Orders (e2e)', () => {
     it('201 — crea orden con pickup', async () => {
       const res = await request(app.getHttpServer())
         .post('/orders')
-        .send({ items: [{ productId, quantity: 1 }], deliveryType: DeliveryType.PICKUP })
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.PICKUP,
+        })
         .expect(201);
 
       expect(res.body.id).toBeDefined();
@@ -174,7 +247,11 @@ describe('Orders (e2e)', () => {
     it('201 — crea orden con delivery y dirección', async () => {
       const res = await request(app.getHttpServer())
         .post('/orders')
-        .send({ items: [{ productId, quantity: 1 }], deliveryType: DeliveryType.DELIVERY, address: 'Av. Corrientes 1234' })
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.DELIVERY,
+          address: 'Av. Corrientes 1234',
+        })
         .expect(201);
 
       expect(res.body.deliveryType).toBe(DeliveryType.DELIVERY);
@@ -191,7 +268,10 @@ describe('Orders (e2e)', () => {
     it('400 — delivery sin dirección', async () => {
       await request(app.getHttpServer())
         .post('/orders')
-        .send({ items: [{ productId, quantity: 1 }], deliveryType: DeliveryType.DELIVERY })
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.DELIVERY,
+        })
         .expect(400);
     });
 
@@ -205,14 +285,20 @@ describe('Orders (e2e)', () => {
     it('404 — producto inexistente', async () => {
       await request(app.getHttpServer())
         .post('/orders')
-        .send({ items: [{ productId: 999999, quantity: 1 }], deliveryType: DeliveryType.PICKUP })
+        .send({
+          items: [{ productId: 999999, quantity: 1 }],
+          deliveryType: DeliveryType.PICKUP,
+        })
         .expect(404);
     });
 
     it('400 — stock insuficiente', async () => {
       await request(app.getHttpServer())
         .post('/orders')
-        .send({ items: [{ productId, quantity: 999 }], deliveryType: DeliveryType.PICKUP })
+        .send({
+          items: [{ productId, quantity: 999 }],
+          deliveryType: DeliveryType.PICKUP,
+        })
         .expect(400);
     });
   });
@@ -231,7 +317,9 @@ describe('Orders (e2e)', () => {
     });
 
     it('200 — respeta limit=1', async () => {
-      const res = await request(app.getHttpServer()).get('/orders?page=1&limit=1').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/orders?page=1&limit=1')
+        .expect(200);
       expect(res.body.data).toHaveLength(1);
       expect(res.body.limit).toBe(1);
     });
@@ -268,12 +356,17 @@ describe('Orders (e2e)', () => {
     beforeAll(async () => {
       const res = await request(app.getHttpServer())
         .post('/orders')
-        .send({ items: [{ productId, quantity: 1 }], deliveryType: DeliveryType.PICKUP });
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.PICKUP,
+        });
       orderId = res.body.id;
     });
 
     it('200 — retorna orden por id', async () => {
-      const res = await request(app.getHttpServer()).get(`/orders/${orderId}`).expect(200);
+      const res = await request(app.getHttpServer())
+        .get(`/orders/${orderId}`)
+        .expect(200);
       expect(res.body.id).toBe(orderId);
       expect(res.body.status).toBe(OrderStatus.PENDING);
       expect(Array.isArray(res.body.items)).toBe(true);
@@ -284,10 +377,10 @@ describe('Orders (e2e)', () => {
     });
 
     it('403 — cliente accede a orden de otro usuario', async () => {
-      mockUser.sub   = 999999;
-      mockUser.role  = RoleType.CLIENT;
+      mockUser.sub = 999999;
+      mockUser.role = RoleType.CLIENT;
       await request(app.getHttpServer()).get(`/orders/${orderId}`).expect(403);
-      mockUser.sub  = userId;
+      mockUser.sub = userId;
       mockUser.role = RoleType.ADMIN;
     });
   });
@@ -302,7 +395,10 @@ describe('Orders (e2e)', () => {
     beforeAll(async () => {
       const res = await request(app.getHttpServer())
         .post('/orders')
-        .send({ items: [{ productId, quantity: 1 }], deliveryType: DeliveryType.PICKUP });
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.PICKUP,
+        });
       orderId = res.body.id;
     });
 

@@ -1,6 +1,10 @@
 import { EMAIL_THEME } from 'src/common/theme/email-theme';
 
-export function orderDeliveredTemplate(name: string, orderId: number, reviewUrl: string): string {
+export function orderDeliveredTemplate(
+  name: string,
+  orderId: number,
+  reviewUrl: string,
+): string {
   return `
 <!DOCTYPE html>
 <html lang="es">

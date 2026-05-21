@@ -1,6 +1,10 @@
 import { EMAIL_THEME } from 'src/common/theme/email-theme';
 
-export function orderDispatchedTemplate(name: string, orderId: number, orderUrl: string): string {
+export function orderDispatchedTemplate(
+  name: string,
+  orderId: number,
+  orderUrl: string,
+): string {
   return `
 <!DOCTYPE html>
 <html lang="es">

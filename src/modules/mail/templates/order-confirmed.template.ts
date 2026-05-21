@@ -1,6 +1,10 @@
 import { EMAIL_THEME } from 'src/common/theme/email-theme';
 
-export function orderConfirmedTemplate(name: string, orderId: number, orderUrl: string): string {
+export function orderConfirmedTemplate(
+  name: string,
+  orderId: number,
+  orderUrl: string,
+): string {
   return `
 <!DOCTYPE html>
 <html lang="es">

@@ -30,26 +30,27 @@ import { MailModule } from './modules/mail/mail.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
-        POSTGRES_HOST:        Joi.string().required(),
-        POSTGRES_PORT:        Joi.number().required(),
-        POSTGRES_DB:          Joi.string().required(),
-        POSTGRES_USER:        Joi.string().required(),
-        POSTGRES_PASSWORD:    Joi.string().required(),
-        JWT_SECRET:           Joi.string().required(),
-        MP_ACCESS_TOKEN:      Joi.string().required(),
-        MP_NOTIFICATION_URL:  Joi.string().required(),
-        RESEND_API_KEY:       Joi.string().required(),
-        FRONTEND_URL:         Joi.string().required(),
-        API_URL:              Joi.string().required(),
+        POSTGRES_HOST: Joi.string().required(),
+        POSTGRES_PORT: Joi.number().required(),
+        POSTGRES_DB: Joi.string().required(),
+        POSTGRES_USER: Joi.string().required(),
+        POSTGRES_PASSWORD: Joi.string().required(),
+        JWT_SECRET: Joi.string().required(),
+        MP_ACCESS_TOKEN: Joi.string().required(),
+        MP_NOTIFICATION_URL: Joi.string().required(),
+        RESEND_API_KEY: Joi.string().required(),
+        FRONTEND_URL: Joi.string().required(),
+        API_URL: Joi.string().required(),
       }),
     }),
 
     LoggerModule.forRoot({
       pinoHttp: {
         customProps: (req) => ({ requestId: req.headers['x-request-id'] }),
-        transport: process.env.NODE_ENV !== 'production'
-          ? { target: 'pino-pretty', options: { singleLine: true } }
-          : undefined,
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty', options: { singleLine: true } }
+            : undefined,
       },
     }),
 
@@ -58,9 +59,9 @@ import { MailModule } from './modules/mail/mail.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type:     'postgres',
-        host:     config.get<string>('POSTGRES_HOST'),
-        port:     config.get<number>('POSTGRES_PORT'),
+        type: 'postgres',
+        host: config.get<string>('POSTGRES_HOST'),
+        port: config.get<number>('POSTGRES_PORT'),
         username: config.get<string>('POSTGRES_USER'),
         password: config.get<string>('POSTGRES_PASSWORD'),
         database: config.get<string>('POSTGRES_DB'),

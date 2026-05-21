@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { UserEntity } from 'src/modules/users/entities/user.entity';
 import { CouponEntity } from 'src/modules/coupons/coupon/entities/coupon.entity';
@@ -9,7 +16,6 @@ import { OrderItemEntity } from './order-item.entity';
 @Entity('orders')
 @Index(['userId', 'status'])
 export class OrderEntity extends BaseEntity {
-
   // ==========================
   // Relaciones
   // ==========================
@@ -28,7 +34,7 @@ export class OrderEntity extends BaseEntity {
   @JoinColumn({ name: 'coupon_id' })
   coupon?: CouponEntity | null;
 
-  @OneToMany(() => OrderItemEntity, item => item.order, { cascade: true })
+  @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
   items: OrderItemEntity[];
 
   // ==========================
@@ -79,7 +85,7 @@ export class OrderEntity extends BaseEntity {
   @Column('decimal', {
     precision: 12,
     scale: 2,
-    transformer: { to: v => v, from: v => Number(v) },
+    transformer: { to: (v) => v, from: (v) => Number(v) },
   })
   subtotal: number;
 
@@ -87,15 +93,14 @@ export class OrderEntity extends BaseEntity {
     precision: 12,
     scale: 2,
     nullable: true,
-    transformer: { to: v => v, from: v => Number(v) },
+    transformer: { to: (v) => v, from: (v) => Number(v) },
   })
   couponDiscount?: number | null;
 
   @Column('decimal', {
     precision: 12,
     scale: 2,
-    transformer: { to: v => v, from: v => Number(v) },
+    transformer: { to: (v) => v, from: (v) => Number(v) },
   })
   total: number;
-
 }
