@@ -42,6 +42,7 @@ import { CouponProductTargetEntity } from '../../src/modules/coupons/coupon-prod
 import { CouponComboTargetEntity } from '../../src/modules/coupons/coupon-combo-target/entities/coupon-combo-target.entity';
 import { CouponUsageEntity } from '../../src/modules/coupons/usage/entities/coupon-usage.entity';
 
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { CalculationService } from '../../src/modules/pricing/calculation/services/calculation.service';
 import { MailService } from '../../src/modules/mail/services/mail.service';
 import { RoleType } from '../../src/common/enums/role-type.enum';
@@ -143,6 +144,10 @@ describe('Orders (e2e)', () => {
             sendOrderCancelledEmail: jest.fn().mockResolvedValue(undefined),
             sendOrderDeliveredEmail: jest.fn().mockResolvedValue(undefined),
           },
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn() },
         },
       ],
     })
