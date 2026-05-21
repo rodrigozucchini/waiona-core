@@ -14,7 +14,10 @@ import {
   StockAlertJobData,
 } from '../mail.constants';
 
-const MAIL_JOB_OPTIONS = { attempts: 3, backoff: { type: 'exponential', delay: 2000 } };
+const MAIL_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 2000 },
+};
 
 @Injectable()
 export class MailService {
@@ -29,7 +32,11 @@ export class MailService {
     this.frontendUrl = this.configService.get('FRONTEND_URL', { infer: true })!;
   }
 
-  async sendActivationEmail(to: string, name: string, token: string): Promise<void> {
+  async sendActivationEmail(
+    to: string,
+    name: string,
+    token: string,
+  ): Promise<void> {
     const activationUrl = `${this.frontendUrl}/auth/activate?token=${token}`;
     await this.mailQueue.add(
       MailJobType.SEND_ACTIVATION,
@@ -38,7 +45,11 @@ export class MailService {
     );
   }
 
-  async sendPasswordResetEmail(to: string, name: string, token: string): Promise<void> {
+  async sendPasswordResetEmail(
+    to: string,
+    name: string,
+    token: string,
+  ): Promise<void> {
     const resetUrl = `${this.frontendUrl}/auth/reset-password?token=${token}`;
     await this.mailQueue.add(
       MailJobType.SEND_PASSWORD_RESET,
@@ -47,7 +58,11 @@ export class MailService {
     );
   }
 
-  async sendOrderConfirmedEmail(to: string, name: string, orderId: number): Promise<void> {
+  async sendOrderConfirmedEmail(
+    to: string,
+    name: string,
+    orderId: number,
+  ): Promise<void> {
     const orderUrl = `${this.frontendUrl}/orders/${orderId}`;
     await this.mailQueue.add(
       MailJobType.SEND_ORDER_CONFIRMED,
@@ -56,7 +71,11 @@ export class MailService {
     );
   }
 
-  async sendOrderDispatchedEmail(to: string, name: string, orderId: number): Promise<void> {
+  async sendOrderDispatchedEmail(
+    to: string,
+    name: string,
+    orderId: number,
+  ): Promise<void> {
     const orderUrl = `${this.frontendUrl}/orders/${orderId}`;
     await this.mailQueue.add(
       MailJobType.SEND_ORDER_DISPATCHED,
@@ -65,7 +84,11 @@ export class MailService {
     );
   }
 
-  async sendOrderCancelledEmail(to: string, name: string, orderId: number): Promise<void> {
+  async sendOrderCancelledEmail(
+    to: string,
+    name: string,
+    orderId: number,
+  ): Promise<void> {
     await this.mailQueue.add(
       MailJobType.SEND_ORDER_CANCELLED,
       { to, name, orderId } satisfies OrderCancelledJobData,
@@ -73,7 +96,11 @@ export class MailService {
     );
   }
 
-  async sendOrderDeliveredEmail(to: string, name: string, orderId: number): Promise<void> {
+  async sendOrderDeliveredEmail(
+    to: string,
+    name: string,
+    orderId: number,
+  ): Promise<void> {
     const orderUrl = `${this.frontendUrl}/orders/${orderId}/review`;
     await this.mailQueue.add(
       MailJobType.SEND_ORDER_DELIVERED,
@@ -83,6 +110,10 @@ export class MailService {
   }
 
   async sendStockAlertEmail(data: StockAlertJobData): Promise<void> {
-    await this.mailQueue.add(MailJobType.SEND_STOCK_ALERT, data, MAIL_JOB_OPTIONS);
+    await this.mailQueue.add(
+      MailJobType.SEND_STOCK_ALERT,
+      data,
+      MAIL_JOB_OPTIONS,
+    );
   }
 }

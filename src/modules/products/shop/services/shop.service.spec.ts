@@ -79,7 +79,14 @@ describe('ShopService', () => {
         { provide: getRepositoryToken(ComboEntity), useValue: mockComboRepo },
         { provide: CalculationService, useValue: mockCalculation },
         { provide: StockItemsService, useValue: mockStock },
-        { provide: ShopCacheService, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } },
+        {
+          provide: ShopCacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn(),
+            invalidate: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

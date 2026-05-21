@@ -53,14 +53,19 @@ describe('MailService', () => {
 
   describe('sendPasswordResetEmail', () => {
     it('should enqueue SEND_PASSWORD_RESET job with correct data', async () => {
-      await service.sendPasswordResetEmail('user@test.com', 'Juan', 'reset_token');
+      await service.sendPasswordResetEmail(
+        'user@test.com',
+        'Juan',
+        'reset_token',
+      );
 
       expect(mockQueue.add).toHaveBeenCalledWith(
         MailJobType.SEND_PASSWORD_RESET,
         expect.objectContaining({
           to: 'user@test.com',
           name: 'Juan',
-          resetUrl: 'http://localhost:4200/auth/reset-password?token=reset_token',
+          resetUrl:
+            'http://localhost:4200/auth/reset-password?token=reset_token',
         }),
         expect.any(Object),
       );

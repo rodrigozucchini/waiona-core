@@ -416,7 +416,10 @@ export class StockItemsService {
     orderId: number,
     manager?: EntityManager,
   ): Promise<void> {
-    let alertThreshold: { quantityAvailable: number; stockCritical: number } | null = null;
+    let alertThreshold: {
+      quantityAvailable: number;
+      stockCritical: number;
+    } | null = null;
 
     const execute = async (mgr: EntityManager): Promise<void> => {
       const stockRepo = mgr.getRepository(StockItemEntity);
@@ -459,9 +462,13 @@ export class StockItemsService {
         }),
       );
 
-      const quantityAvailable = stockItem.quantityCurrent - stockItem.quantityReserved;
+      const quantityAvailable =
+        stockItem.quantityCurrent - stockItem.quantityReserved;
       if (quantityAvailable <= stockItem.stockCritical) {
-        alertThreshold = { quantityAvailable, stockCritical: stockItem.stockCritical };
+        alertThreshold = {
+          quantityAvailable,
+          stockCritical: stockItem.stockCritical,
+        };
       }
     };
 
@@ -546,7 +553,9 @@ export class StockItemsService {
         locationName: location?.name ?? `#${locationId}`,
         quantityAvailable: alert.quantityAvailable,
         threshold: alert.stockCritical,
-        adminEmail: this.configService.get('SUPERADMIN_EMAIL', { infer: true })!,
+        adminEmail: this.configService.get('SUPERADMIN_EMAIL', {
+          infer: true,
+        })!,
       });
     } catch {
       // swallow — alert failure must not affect order dispatch

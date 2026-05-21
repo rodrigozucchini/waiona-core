@@ -102,8 +102,13 @@ export class MailProcessor {
 
   @Process(MailJobType.SEND_STOCK_ALERT)
   async sendStockAlert(job: Job): Promise<void> {
-    const { productName, locationName, quantityAvailable, threshold, adminEmail } =
-      job.data as StockAlertJobData;
+    const {
+      productName,
+      locationName,
+      quantityAvailable,
+      threshold,
+      adminEmail,
+    } = job.data as StockAlertJobData;
     await this.resend.emails.send({
       from: this.from,
       to: adminEmail,

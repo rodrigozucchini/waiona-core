@@ -33,7 +33,11 @@ describe('DiscountsService', () => {
     ...overrides,
   });
 
-  const mockShopCacheService = { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() };
+  const mockShopCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    invalidate: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

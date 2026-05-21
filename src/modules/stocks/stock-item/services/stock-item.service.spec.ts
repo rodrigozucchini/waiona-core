@@ -70,7 +70,9 @@ describe('StockItemsService', () => {
 
     mockDataSource = {
       transaction: jest.fn().mockImplementation((fn: any) => fn(mockManager)),
-      getRepository: jest.fn().mockReturnValue({ findOne: jest.fn().mockResolvedValue(null) }),
+      getRepository: jest
+        .fn()
+        .mockReturnValue({ findOne: jest.fn().mockResolvedValue(null) }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -100,7 +102,10 @@ describe('StockItemsService', () => {
         },
         { provide: DataSource, useValue: mockDataSource },
         { provide: MailService, useValue: { sendStockAlertEmail: jest.fn() } },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('admin@test.com') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('admin@test.com') },
+        },
       ],
     }).compile();
 

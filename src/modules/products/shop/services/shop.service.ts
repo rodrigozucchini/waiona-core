@@ -46,7 +46,8 @@ export class ShopService {
 
   async search(dto: SearchShopDto): Promise<ShopPaginatedResponseDto> {
     const cacheKey = `search:${JSON.stringify(dto)}`;
-    const cached = await this.shopCacheService.get<ShopPaginatedResponseDto>(cacheKey);
+    const cached =
+      await this.shopCacheService.get<ShopPaginatedResponseDto>(cacheKey);
     if (cached) return cached;
 
     const {
@@ -128,7 +129,14 @@ export class ShopService {
         )
       ).filter((i): i is ShopItemResponseDto => i !== null);
 
-      result = { total, page, limit, totalPages, hasNextPage: page < totalPages, data };
+      result = {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        data,
+      };
     } else {
       // Con filtro de precio: hay que calcular todos para saber cuáles pasan el filtro
       const allItems = (
@@ -170,7 +178,8 @@ export class ShopService {
     }
 
     const cacheKey = `detail:${type}:${id}`;
-    const cached = await this.shopCacheService.get<ShopDetailResponseDto>(cacheKey);
+    const cached =
+      await this.shopCacheService.get<ShopDetailResponseDto>(cacheKey);
     if (cached) return cached;
 
     let result: ShopDetailResponseDto;
