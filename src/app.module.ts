@@ -100,7 +100,9 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
         password: config.get<string>('POSTGRES_PASSWORD'),
         database: config.get<string>('POSTGRES_DB'),
         autoLoadEntities: true,
-        synchronize: process.env.NODE_ENV !== 'production',
+        synchronize:
+          process.env.DB_SYNCHRONIZE === 'true' ||
+          process.env.NODE_ENV !== 'production',
       }),
     }),
 

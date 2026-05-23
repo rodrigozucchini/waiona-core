@@ -212,8 +212,10 @@ describe('StockItemsService', () => {
     };
 
     it('creates a new stock item', async () => {
-      stockRepo.findOne.mockResolvedValue(null);
       const item = mockStockItem();
+      stockRepo.findOne
+        .mockResolvedValueOnce(null) // conflict check → no existing item
+        .mockResolvedValueOnce(item); // reload with location relation
       stockRepo.create.mockReturnValue(item);
       stockRepo.save.mockResolvedValue(item);
       const result = await service.create(dto);

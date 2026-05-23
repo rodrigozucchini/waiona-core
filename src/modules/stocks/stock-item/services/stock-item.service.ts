@@ -183,7 +183,12 @@ export class StockItemsService {
 
     const saved = await this.stockItemRepository.save(stockItem);
 
-    return new StockItemResponseDto(saved);
+    const withLocation = await this.stockItemRepository.findOne({
+      where: { id: saved.id },
+      relations: ['location'],
+    });
+
+    return new StockItemResponseDto(withLocation!);
   }
 
   // ==========================

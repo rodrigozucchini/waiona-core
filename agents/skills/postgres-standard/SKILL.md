@@ -5,7 +5,7 @@ description: >
   Load when working with the database schema, naming columns, debugging queries, or managing the DB in development.
 metadata:
   author: @rodrigozucchini
-  version: "2.1"
+  version: "2.2"
 ---
 
 # PostgreSQL Standard Skill
@@ -34,17 +34,24 @@ In **development**, `synchronize: true` is active in `app.module.ts`. TypeORM au
 ```typescript
 // app.module.ts — current setup
 TypeOrmModule.forRoot({
-  synchronize: process.env.NODE_ENV !== 'production', // true in dev, false in prod
+  // enabled when DB_SYNCHRONIZE=true OR when not in production
+  synchronize:
+    process.env.DB_SYNCHRONIZE === 'true' ||
+    process.env.NODE_ENV !== 'production',
   autoLoadEntities: true,
 })
 ```
 
+`DB_SYNCHRONIZE=true` is set in `docker-compose.yaml` for the `api` service so that Docker local dev always runs with sync enabled — even though the Dockerfile sets `NODE_ENV=production` (required for the production build/logger).
+
 **Day-to-day workflow in dev:**
 1. Modify the entity (add column, relation, index)
-2. Restart the app (`npm run start:dev`)
+2. Restart the app:
+   - Local: `npm run start:dev`
+   - Docker: `docker compose up -d --build api`
 3. TypeORM applies the change automatically
 
-**⚠️ Never use `synchronize: true` in production.** It can drop columns if you rename them.
+**⚠️ Never set `DB_SYNCHRONIZE=true` or `NODE_ENV !== 'production'` in a real production environment.** Synchronize can drop columns if you rename them.
 
 ---
 
