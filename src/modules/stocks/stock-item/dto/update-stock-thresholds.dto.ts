@@ -2,7 +2,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsOptional, Min } from 'class-validator';
 
 export class UpdateStockThresholdsDto {
-  @ApiPropertyOptional({ example: 10, minimum: 1, description: 'Debe ser al menos 1' })
+  @ApiPropertyOptional({
+    example: 10,
+    minimum: 1,
+    description: 'Debe ser al menos 1',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)

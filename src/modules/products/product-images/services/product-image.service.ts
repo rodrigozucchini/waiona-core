@@ -36,7 +36,9 @@ export class ProductImageService {
     });
 
     if (!product) {
-      throw new NotFoundException(`Producto con id ${dto.productId} no encontrado`);
+      throw new NotFoundException(
+        `Producto con id ${dto.productId} no encontrado`,
+      );
     }
 
     const image = this.productImageRepository.create(dto);
@@ -94,7 +96,9 @@ export class ProductImageService {
       where: { id: dto.productId },
     });
     if (!product) {
-      throw new NotFoundException(`Producto con id ${dto.productId} no encontrado`);
+      throw new NotFoundException(
+        `Producto con id ${dto.productId} no encontrado`,
+      );
     }
 
     const { url, publicId } = await this.storageService.upload(
@@ -133,7 +137,9 @@ export class ProductImageService {
   private async findEntity(id: number): Promise<ProductImageEntity> {
     const image = await this.productImageRepository.findOne({ where: { id } });
     if (!image)
-      throw new NotFoundException(`Imagen de producto con id ${id} no encontrada`);
+      throw new NotFoundException(
+        `Imagen de producto con id ${id} no encontrada`,
+      );
     return image;
   }
 }

@@ -209,7 +209,9 @@ export class ComboService {
     const seen = new Set<number>();
     for (const id of ids) {
       if (seen.has(id)) {
-        throw new BadRequestException(`Producto con id ${id} duplicado en el combo`);
+        throw new BadRequestException(
+          `Producto con id ${id} duplicado en el combo`,
+        );
       }
       seen.add(id);
     }
@@ -229,7 +231,9 @@ export class ComboService {
     });
 
     if (!category) {
-      throw new BadRequestException(`Categoría con id ${categoryId} no encontrada`);
+      throw new BadRequestException(
+        `Categoría con id ${categoryId} no encontrada`,
+      );
     }
   }
 }

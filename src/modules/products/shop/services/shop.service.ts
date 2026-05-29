@@ -174,7 +174,9 @@ export class ShopService {
     type: 'product' | 'combo',
   ): Promise<ShopDetailResponseDto> {
     if (!type) {
-      throw new BadRequestException('El parámetro type es requerido (product | combo)');
+      throw new BadRequestException(
+        'El parámetro type es requerido (product | combo)',
+      );
     }
 
     const cacheKey = `detail:${type}:${id}`;

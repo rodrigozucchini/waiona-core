@@ -72,9 +72,7 @@ describe('StockItemsService', () => {
     mockDataSource = {
       transaction: jest.fn().mockImplementation((fn: any) => fn(mockManager)),
       getRepository: jest.fn().mockReturnValue({
-        findOne: jest
-          .fn()
-          .mockResolvedValue({ id: 1, name: 'Mock Entity' }),
+        findOne: jest.fn().mockResolvedValue({ id: 1, name: 'Mock Entity' }),
       }),
     };
 
@@ -225,20 +223,24 @@ describe('StockItemsService', () => {
     });
 
     it('throws NotFoundException when product not found', async () => {
-      mockDataSource.getRepository.mockReturnValueOnce({
-        findOne: jest.fn().mockResolvedValue(null), // product not found
-      }).mockReturnValueOnce({
-        findOne: jest.fn().mockResolvedValue({ id: 1 }), // location found
-      });
+      mockDataSource.getRepository
+        .mockReturnValueOnce({
+          findOne: jest.fn().mockResolvedValue(null), // product not found
+        })
+        .mockReturnValueOnce({
+          findOne: jest.fn().mockResolvedValue({ id: 1 }), // location found
+        });
       await expect(service.create(dto)).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when location not found', async () => {
-      mockDataSource.getRepository.mockReturnValueOnce({
-        findOne: jest.fn().mockResolvedValue({ id: 1 }), // product found
-      }).mockReturnValueOnce({
-        findOne: jest.fn().mockResolvedValue(null), // location not found
-      });
+      mockDataSource.getRepository
+        .mockReturnValueOnce({
+          findOne: jest.fn().mockResolvedValue({ id: 1 }), // product found
+        })
+        .mockReturnValueOnce({
+          findOne: jest.fn().mockResolvedValue(null), // location not found
+        });
       await expect(service.create(dto)).rejects.toThrow(NotFoundException);
     });
 

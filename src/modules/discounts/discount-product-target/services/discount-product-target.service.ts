@@ -93,7 +93,9 @@ export class DiscountProductTargetService {
     });
 
     if (!discount) {
-      throw new NotFoundException(`Descuento con id ${discountId} no encontrado`);
+      throw new NotFoundException(
+        `Descuento con id ${discountId} no encontrado`,
+      );
     }
 
     return discount;

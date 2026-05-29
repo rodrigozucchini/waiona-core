@@ -15,7 +15,6 @@ import { StockLocationEntity } from '../../stock-locations/entities/stock-locati
 import { ComboItemEntity } from 'src/modules/products/combos/entities/combo-item.entity';
 import { ProductEntity } from 'src/modules/products/product/entities/product.entity';
 
-
 import { CreateStockItemDto } from '../dto/create-stock-item.dto';
 import { UpdateStockThresholdsDto } from '../dto/update-stock-thresholds.dto';
 import { CreateStockWriteOffDto } from '../../stock-writeoff/dto/create-stock-writeoff.dto';
@@ -95,7 +94,9 @@ export class StockItemsService {
     });
 
     if (!items.length) {
-      throw new NotFoundException(`No se encontró stock para el producto ${productId}`);
+      throw new NotFoundException(
+        `No se encontró stock para el producto ${productId}`,
+      );
     }
 
     // devuelve la ubicación con mayor stock disponible
@@ -166,10 +167,14 @@ export class StockItemsService {
     ]);
 
     if (!product) {
-      throw new NotFoundException(`Producto con id ${dto.productId} no encontrado`);
+      throw new NotFoundException(
+        `Producto con id ${dto.productId} no encontrado`,
+      );
     }
     if (!location) {
-      throw new NotFoundException(`Ubicación con id ${dto.locationId} no encontrada`);
+      throw new NotFoundException(
+        `Ubicación con id ${dto.locationId} no encontrada`,
+      );
     }
 
     const existing = await this.stockItemRepository.findOne({
@@ -596,7 +601,9 @@ export class StockItemsService {
     }
 
     if (stockCritical >= stockMin) {
-      throw new BadRequestException('stockCritical debe ser menor que stockMin');
+      throw new BadRequestException(
+        'stockCritical debe ser menor que stockMin',
+      );
     }
   }
 }

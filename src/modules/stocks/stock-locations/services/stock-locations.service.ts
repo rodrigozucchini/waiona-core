@@ -120,7 +120,9 @@ export class StockLocationsService {
     });
 
     if (!location) {
-      throw new NotFoundException(`Ubicación de stock con id ${id} no encontrada`);
+      throw new NotFoundException(
+        `Ubicación de stock con id ${id} no encontrada`,
+      );
     }
 
     return location;

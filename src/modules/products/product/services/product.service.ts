@@ -77,7 +77,9 @@ export class ProductService {
     });
 
     if (existingSku) {
-      throw new ConflictException(`Ya existe un producto con el SKU ${dto.sku}`);
+      throw new ConflictException(
+        `Ya existe un producto con el SKU ${dto.sku}`,
+      );
     }
 
     const product = this.productRepository.create({
@@ -149,7 +151,9 @@ export class ProductService {
     });
 
     if (!category) {
-      throw new BadRequestException(`Categoría con id ${categoryId} no encontrada`);
+      throw new BadRequestException(
+        `Categoría con id ${categoryId} no encontrada`,
+      );
     }
   }
 

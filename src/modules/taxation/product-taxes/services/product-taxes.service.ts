@@ -120,7 +120,9 @@ export class ProductTaxesService {
   private async findEntity(id: number): Promise<ProductTaxEntity> {
     const entity = await this.productTaxRepository.findOne({ where: { id } });
     if (!entity)
-      throw new NotFoundException(`Impuesto de producto con id ${id} no encontrado`);
+      throw new NotFoundException(
+        `Impuesto de producto con id ${id} no encontrado`,
+      );
     return entity;
   }
 }

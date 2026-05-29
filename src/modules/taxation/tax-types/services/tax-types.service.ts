@@ -83,7 +83,9 @@ export class TaxTypesService {
     });
 
     if (!entity) {
-      throw new NotFoundException(`Tipo de impuesto con id ${id} no encontrado`);
+      throw new NotFoundException(
+        `Tipo de impuesto con id ${id} no encontrado`,
+      );
     }
 
     return entity;
