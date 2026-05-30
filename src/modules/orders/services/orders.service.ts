@@ -78,25 +78,27 @@ export class OrdersService {
     const user = await this.userRepo.findOne({
       where: { id: userId },
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('Usuario no encontrado');
 
     // 1. Validar items
     for (const item of dto.items) {
       if (!item.productId && !item.comboId) {
         throw new BadRequestException(
-          'Each item must have a productId or comboId',
+          'Cada ítem debe tener un productId o comboId',
         );
       }
       if (item.productId && item.comboId) {
         throw new BadRequestException(
-          'Each item must have either productId or comboId, not both',
+          'Cada ítem debe tener productId o comboId, no ambos',
         );
       }
     }
 
     // 2. Validar dirección si es delivery
     if (dto.deliveryType === DeliveryType.DELIVERY && !dto.address) {
-      throw new BadRequestException('Address is required for delivery orders');
+      throw new BadRequestException(
+        'La dirección es requerida para órdenes con delivery',
+      );
     }
 
     // 3. Calcular precios, validar stock y cupón ANTES de la transacción
@@ -119,7 +121,9 @@ export class OrdersService {
           where: { id: item.productId },
         });
         if (!product)
-          throw new NotFoundException(`Product ${item.productId} not found`);
+          throw new NotFoundException(
+            `Producto con id ${item.productId} no encontrado`,
+          );
 
         const stockItem = await this.findAvailableStockItem(
           item.productId,
@@ -154,7 +158,9 @@ export class OrdersService {
           relations: ['items'],
         });
         if (!combo)
-          throw new NotFoundException(`Combo ${item.comboId} not found`);
+          throw new NotFoundException(
+            `Combo con id ${item.comboId} no encontrado`,
+          );
 
         const comboReservations: {
           productId: number;
@@ -214,27 +220,30 @@ export class OrdersService {
           lock: { mode: 'pessimistic_write' },
         });
 
-        if (!lockedCoupon) throw new NotFoundException('Coupon not found');
+        if (!lockedCoupon)
+          throw new NotFoundException('Cupón no encontrado');
 
         if (lockedCoupon.startsAt && now < lockedCoupon.startsAt)
-          throw new BadRequestException('Coupon is not active yet');
+          throw new BadRequestException('El cupón aún no está vigente');
         if (lockedCoupon.endsAt && now > lockedCoupon.endsAt)
-          throw new BadRequestException('Coupon has expired');
+          throw new BadRequestException('El cupón ha expirado');
         if (
           lockedCoupon.usageLimit &&
           lockedCoupon.usageCount >= lockedCoupon.usageLimit
         )
-          throw new BadRequestException('Coupon has reached its usage limit');
+          throw new BadRequestException(
+            'El cupón ha alcanzado su límite de usos',
+          );
 
         const alreadyUsed = await manager.findOne(CouponUsageEntity, {
           where: { couponId: lockedCoupon.id, userId: user.id },
         });
         if (alreadyUsed)
-          throw new ConflictException('Coupon already used by this user');
+          throw new ConflictException('El usuario ya utilizó este cupón');
 
         if (couponDiscount === 0) {
           throw new BadRequestException(
-            'Coupon does not apply to any item in this order',
+            'El cupón no aplica a ningún ítem de esta orden',
           );
         }
       }
@@ -316,7 +325,7 @@ export class OrdersService {
       where: { id },
       relations: ['user', 'items', 'items.product', 'items.combo', 'coupon'],
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException('Orden no encontrada');
     return new OrderResponseDto(order);
   }
 
@@ -347,13 +356,13 @@ export class OrdersService {
         where: { id },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!locked) throw new NotFoundException('Order not found');
+      if (!locked) throw new NotFoundException('Orden no encontrada');
 
       const order = await manager.findOne(OrderEntity, {
         where: { id },
         relations: ['user', 'items', 'items.product', 'items.combo', 'coupon'],
       });
-      if (!order) throw new NotFoundException('Order not found');
+      if (!order) throw new NotFoundException('Orden no encontrada');
 
       this.validateStatusTransition(order.status, dto.status);
 
@@ -394,7 +403,7 @@ export class OrdersService {
 
     if (!allowed[current].includes(next)) {
       throw new BadRequestException(
-        `Cannot transition order from "${current}" to "${next}"`,
+        `No se puede cambiar la orden de "${current}" a "${next}"`,
       );
     }
   }
@@ -447,7 +456,9 @@ export class OrdersService {
     });
 
     if (!items.length) {
-      throw new NotFoundException(`No stock found for product ${productId}`);
+      throw new NotFoundException(
+        `No se encontró stock para el producto ${productId}`,
+      );
     }
 
     // misma lógica que ShopService: la ubicación con más stock disponible
@@ -457,7 +468,7 @@ export class OrdersService {
 
     if (best.quantityAvailable < quantity) {
       throw new BadRequestException(
-        `Insufficient stock for product ${productId}`,
+        `Stock disponible insuficiente para el producto ${productId}`,
       );
     }
 
@@ -482,8 +493,7 @@ export class OrdersService {
     if (coupon.endsAt && now > coupon.endsAt) return 0;
     if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) return 0;
 
-    const apply = (base: number) =>
-      coupon.isPercentage ? base * (coupon.value / 100) : coupon.value;
+    const apply = (base: number) => base * (coupon.value / 100);
 
     if (coupon.isGlobal) {
       const total = items.reduce((sum, i) => sum + i.subtotal, 0);

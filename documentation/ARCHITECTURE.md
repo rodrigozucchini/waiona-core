@@ -54,8 +54,7 @@ src/
     ├── taxation/
     │   ├── taxes/                       → impuestos globales
     │   ├── tax-types/                  → tipos de impuesto (IVA, IIBB, etc.)
-    │   ├── product-taxes/              → impuestos por producto
-    │   └── combo-taxes/               → impuestos por combo
+    │   └── product-taxes/              → impuestos por producto (combos usan prorrateo lineal)
     ├── margins/                         → márgenes de ganancia
     ├── discounts/
     │   ├── discount/                    → descuentos con rango de fechas

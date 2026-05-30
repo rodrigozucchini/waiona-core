@@ -93,7 +93,7 @@ Todos los campos son opcionales (`PartialType` de `CreateMarginDto`):
 
 Todos requieren JWT con rol `SUPER_ADMIN` o `ADMIN`.
 
-### `POST /margins`
+### `POST /v1/margins`
 
 Crea un nuevo margen. Los márgenes son siempre porcentuales.
 
@@ -121,7 +121,7 @@ Crea un nuevo margen. Los márgenes son siempre porcentuales.
 
 ---
 
-### `GET /margins?page=1&limit=20`
+### `GET /v1/margins?page=1&limit=20`
 
 Lista paginada de márgenes activos (no eliminados).
 
@@ -154,7 +154,7 @@ limit → default: 20, máx: 100
 
 ---
 
-### `GET /margins/:id`
+### `GET /v1/margins/:id`
 
 Obtiene un margen por ID.
 
@@ -165,7 +165,7 @@ Obtiene un margen por ID.
 
 ---
 
-### `PATCH /margins/:id`
+### `PATCH /v1/margins/:id`
 
 Actualización parcial. Solo se actualiza lo que se envía.
 
@@ -182,7 +182,7 @@ Actualización parcial. Solo se actualiza lo que se envía.
 
 ---
 
-### `DELETE /margins/:id`
+### `DELETE /v1/margins/:id`
 
 Soft delete. **Bloqueado** si el margen está asignado a algún `ProductPricing` o `ComboPricing`.
 
@@ -203,6 +203,7 @@ Soft delete. **Bloqueado** si el margen está asignado a algún `ProductPricing`
 | `value` entre 0.01 y 1000 (siempre porcentaje) | `@Min` / `@Max` en el DTO |
 | No eliminar si está en uso | `remove` — verifica `productPricing` y `comboPricing` en paralelo |
 | Soft delete — `deletedAt` nunca `null` en registros eliminados | `remove` vía `softDelete()` |
+| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ---
 
@@ -210,20 +211,20 @@ Soft delete. **Bloqueado** si el margen está asignado a algún `ProductPricing`
 
 **Margen para categoría general:**
 ```json
-POST /margins
+POST /v1/margins
 { "name": "General 20%", "value": 20 }
 // guardado como: "GENERAL 20%"
 ```
 
 **Actualizar solo el valor:**
 ```json
-PATCH /margins/1
+PATCH /v1/margins/1
 { "value": 22.5 }
 ```
 
 **Intentar eliminar un margen en uso — responde 409:**
 ```json
-DELETE /margins/1
+DELETE /v1/margins/1
 → 409 Conflict: "El margen está en uso por uno o más pricings y no puede eliminarse"
 ```
 
@@ -249,6 +250,8 @@ DELETE /margins/1
 | Swagger — `@ApiTags`, `@ApiOperation`, `@ApiResponse` en controller | ✅ |
 | Swagger — `@ApiProperty` en todos los DTOs | ✅ |
 | `@Transform` en campos `name` del CreateDto — normalización a mayúsculas | ✅ |
+| Mensajes de error en español | ✅ |
+| Cache invalidation en mutations | ✅ |
 
 ---
 

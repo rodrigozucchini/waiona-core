@@ -166,6 +166,8 @@ describe('OrdersService', () => {
   let orderRepo: any;
   let productRepo: any;
   let comboRepo: any;
+  let couponRepo: any;
+  let couponProductTargetRepo: any;
   let stockItemRepo: any;
   let userRepo: any;
   let stockService: any;
@@ -214,6 +216,10 @@ describe('OrdersService', () => {
     orderRepo = module.get(getRepositoryToken(OrderEntity));
     productRepo = module.get(getRepositoryToken(ProductEntity));
     comboRepo = module.get(getRepositoryToken(ComboEntity));
+    couponRepo = module.get(getRepositoryToken(CouponEntity));
+    couponProductTargetRepo = module.get(
+      getRepositoryToken(CouponProductTargetEntity),
+    );
     stockItemRepo = module.get(getRepositoryToken(StockItemEntity));
     userRepo = module.get(getRepositoryToken(UserEntity));
     stockService = module.get(StockItemsService);
@@ -339,6 +345,98 @@ describe('OrdersService', () => {
       await expect(
         service.create(1, { ...dto, couponCode: 'DESC10' } as any),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException if coupon not found in transaction', async () => {
+      userRepo.findOne.mockResolvedValue(mockUser());
+      productRepo.findOne.mockResolvedValue(mockProduct());
+      stockItemRepo.find.mockResolvedValue([mockStock()]);
+      calcService.calculateProduct.mockResolvedValue(mockBreakdown());
+      orderItemRepo.create.mockReturnValue({});
+      // computeOrderCouponDiscount: couponRepo.findOne devuelve undefined → retorna 0 silenciosamente
+      // dentro de la transacción: locked coupon → null → NotFoundException
+      mockEntityManager.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.create(1, { ...dto, couponCode: 'NOEXISTE' } as any),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if coupon is expired', async () => {
+      userRepo.findOne.mockResolvedValue(mockUser());
+      productRepo.findOne.mockResolvedValue(mockProduct());
+      stockItemRepo.find.mockResolvedValue([mockStock()]);
+      calcService.calculateProduct.mockResolvedValue(mockBreakdown());
+      orderItemRepo.create.mockReturnValue({});
+      mockEntityManager.findOne.mockResolvedValueOnce({
+        id: 1,
+        code: 'VENCIDO',
+        usageLimit: null,
+        usageCount: 0,
+        startsAt: null,
+        endsAt: new Date(Date.now() - 60_000), // expirado hace 1 minuto
+      });
+
+      await expect(
+        service.create(1, { ...dto, couponCode: 'VENCIDO' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if coupon usage limit is reached', async () => {
+      userRepo.findOne.mockResolvedValue(mockUser());
+      productRepo.findOne.mockResolvedValue(mockProduct());
+      stockItemRepo.find.mockResolvedValue([mockStock()]);
+      calcService.calculateProduct.mockResolvedValue(mockBreakdown());
+      orderItemRepo.create.mockReturnValue({});
+      mockEntityManager.findOne.mockResolvedValueOnce({
+        id: 1,
+        code: 'AGOTADO',
+        usageLimit: 10,
+        usageCount: 10, // límite alcanzado
+        startsAt: null,
+        endsAt: null,
+      });
+
+      await expect(
+        service.create(1, { ...dto, couponCode: 'AGOTADO' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if coupon does not apply to any item', async () => {
+      userRepo.findOne.mockResolvedValue(mockUser());
+      productRepo.findOne.mockResolvedValue(mockProduct());
+      stockItemRepo.find.mockResolvedValue([mockStock()]);
+      calcService.calculateProduct.mockResolvedValue(mockBreakdown());
+      orderItemRepo.create.mockReturnValue({});
+      // computeOrderCouponDiscount: cupón válido no global, sin target para este producto → retorna 0
+      couponRepo.findOne.mockResolvedValueOnce({
+        id: 1,
+        code: 'NOAPLICA',
+        value: 10,
+        isGlobal: false,
+        usageLimit: null,
+        usageCount: 0,
+        startsAt: null,
+        endsAt: null,
+      });
+      couponProductTargetRepo.findOne.mockResolvedValueOnce(null);
+      // dentro de la transacción: cupón válido, sin uso previo, pero couponDiscount === 0
+      mockEntityManager.findOne
+        .mockResolvedValueOnce({
+          id: 1,
+          code: 'NOAPLICA',
+          value: 10,
+          isGlobal: false,
+          usageLimit: null,
+          usageCount: 0,
+          startsAt: null,
+          endsAt: null,
+        })
+        .mockResolvedValueOnce(null); // sin uso previo
+
+      await expect(
+        service.create(1, { ...dto, couponCode: 'NOAPLICA' } as any),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should create an order with combo and populate comboReservations', async () => {

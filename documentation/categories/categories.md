@@ -14,7 +14,7 @@ Una categoría es el agrupador del catálogo de Waiona. Todo producto y combo de
 | Reasignación de padre | Admin mueve "Aguas" bajo "Hidratación" |
 | Desactivación temporal | Admin pone `isActive: false` sin borrar la categoría |
 | Eliminación lógica | Admin elimina una categoría vacía (sin productos ni combos) |
-| Vista de árbol | Front obtiene `GET /categories/tree` para mostrar el menú de navegación |
+| Vista de árbol | Front obtiene `GET /v1/categories/tree` para mostrar el menú de navegación |
 
 ## Tipos de datos
 
@@ -101,13 +101,13 @@ La relación es auto-referencial: una categoría puede tener una categoría padr
 
 ## Endpoints
 
-### GET /categories
+### GET /v1/categories
 
 Lista todas las categorías no eliminadas, paginadas y ordenadas por nombre A→Z. Devuelve estructura plana (sin árbol).
 
 **Request:**
 ```
-GET /categories?page=1&limit=20
+GET /v1/categories?page=1&limit=20
 Authorization: Bearer <token>
 ```
 
@@ -145,13 +145,13 @@ Authorization: Bearer <token>
 
 ---
 
-### GET /categories/tree
+### GET /v1/categories/tree
 
 Devuelve el árbol completo de categorías: solo las raíces (sin padre), cada una con sus hijos anidados. Se construye en memoria desde una sola query que trae todas las categorías.
 
 **Request:**
 ```
-GET /categories/tree
+GET /v1/categories/tree
 Authorization: Bearer <token>
 ```
 
@@ -176,17 +176,17 @@ Authorization: Bearer <token>
 
 **Errores posibles:** ninguno (devuelve array vacío si no hay categorías).
 
-> **Nota técnica:** `GET /categories/tree` está declarado ANTES que `GET /categories/:id` en el controlador para que NestJS no lo interprete como un ID = `"tree"`.
+> **Nota técnica:** `GET /v1/categories/tree` está declarado ANTES que `GET /v1/categories/:id` en el controlador para que NestJS no lo interprete como un ID = `"tree"`.
 
 ---
 
-### GET /categories/:id
+### GET /v1/categories/:id
 
 Devuelve una categoría por ID (estructura plana, sin hijos).
 
 **Request:**
 ```
-GET /categories/1
+GET /v1/categories/1
 Authorization: Bearer <token>
 ```
 
@@ -198,7 +198,7 @@ Authorization: Bearer <token>
 
 ---
 
-### POST /categories
+### POST /v1/categories
 
 Crea una nueva categoría. Si se envía `parentId`, valida que la categoría padre exista.
 
@@ -221,7 +221,7 @@ Crea una nueva categoría. Si se envía `parentId`, valida que la categoría pad
 
 ---
 
-### PATCH /categories/:id
+### PATCH /v1/categories/:id
 
 Actualización parcial. Solo se aplican los campos enviados. Si se cambia el `parentId`, el sistema valida que no genere una jerarquía circular.
 
@@ -244,13 +244,13 @@ Actualización parcial. Solo se aplican los campos enviados. Si se cambia el `pa
 
 ---
 
-### DELETE /categories/:id
+### DELETE /v1/categories/:id
 
 Soft delete. Antes de eliminar, verifica que la categoría no tenga productos ni combos activos asignados.
 
 **Request:**
 ```
-DELETE /categories/1
+DELETE /v1/categories/1
 Authorization: Bearer <token>
 ```
 
@@ -274,6 +274,7 @@ Authorization: Bearer <token>
 | No se puede eliminar una categoría con combos activos | `delete()` cuenta combos → `ConflictException` si > 0 |
 | Los deletedAt no aparecen en ninguna query | TypeORM filtra `WHERE deleted_at IS NULL` automáticamente |
 | `isActive: false` no elimina la categoría | El campo existe independientemente del soft delete |
+| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ### Detección de ciclos
 
@@ -290,7 +291,7 @@ Ejemplo: no se puede poner "Bebidas" como hijo de "Gaseosas" si "Gaseosas" ya es
 
 **Crear una categoría raíz:**
 ```json
-POST /categories
+POST /v1/categories
 {
   "name": "Bebidas",
   "description": "Todo tipo de bebidas"
@@ -299,7 +300,7 @@ POST /categories
 
 **Crear una subcategoría:**
 ```json
-POST /categories
+POST /v1/categories
 {
   "name": "Gaseosas",
   "parentId": 1
@@ -308,7 +309,7 @@ POST /categories
 
 **Mover una categoría a otro padre:**
 ```json
-PATCH /categories/2
+PATCH /v1/categories/2
 {
   "parentId": 7
 }
@@ -316,7 +317,7 @@ PATCH /categories/2
 
 **Desactivar una categoría:**
 ```json
-PATCH /categories/2
+PATCH /v1/categories/2
 {
   "isActive": false
 }
@@ -337,6 +338,8 @@ PATCH /categories/2
 | Guards a nivel de clase (`ADMIN` + `SUPER_ADMIN`) | ✅ |
 | Ruta específica `/tree` declarada antes que `/:id` | ✅ |
 | Swagger: `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiResponse` | ✅ |
+| Mensajes de error en español | ✅ |
+| Cache invalidation en mutations | ✅ |
 | Unit tests (service + controller) | ✅ |
 | E2E tests con PostgreSQL real | ✅ |
 
@@ -396,4 +399,4 @@ ProductEntity  ComboEntity
   shop
 ```
 
-Las categorías son el punto de partida del árbol de navegación del shop. El front usa `GET /categories/tree` para construir el menú de categorías y filtrar productos/combos por sección.
+Las categorías son el punto de partida del árbol de navegación del shop. El front usa `GET /v1/categories/tree` para construir el menú de categorías y filtrar productos/combos por sección.

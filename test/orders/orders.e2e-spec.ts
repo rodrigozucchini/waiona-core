@@ -318,6 +318,18 @@ describe('Orders (e2e)', () => {
         })
         .expect(400);
     });
+
+    it('201 — orden con notes persiste el campo', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/v1/orders')
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.PICKUP,
+          notes: 'Sin cebolla',
+        })
+        .expect(201);
+      expect(res.body.notes).toBe('Sin cebolla');
+    });
   });
 
   // =============================================
@@ -467,6 +479,65 @@ describe('Orders (e2e)', () => {
         .patch('/v1/orders/999999/status')
         .send({ status: OrderStatus.CONFIRMED })
         .expect(404);
+    });
+
+    it('200 — camino completo PENDING→CONFIRMED→DISPATCHED→DELIVERED', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/v1/orders')
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.PICKUP,
+        })
+        .expect(201);
+      const id = createRes.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/v1/orders/${id}/status`)
+        .send({ status: OrderStatus.CONFIRMED })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/v1/orders/${id}/status`)
+        .send({ status: OrderStatus.DISPATCHED })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/v1/orders/${id}/status`)
+        .send({ status: OrderStatus.DELIVERED })
+        .expect(200);
+
+      expect(res.body.status).toBe(OrderStatus.DELIVERED);
+    });
+
+    it('400 — transición inválida DELIVERED → CANCELLED', async () => {
+      // reusa la orden delivered del test anterior via beforeAll de la suite
+      // crea una nueva delivered para aislar
+      const createRes = await request(app.getHttpServer())
+        .post('/v1/orders')
+        .send({
+          items: [{ productId, quantity: 1 }],
+          deliveryType: DeliveryType.PICKUP,
+        })
+        .expect(201);
+      const id = createRes.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/v1/orders/${id}/status`)
+        .send({ status: OrderStatus.CONFIRMED })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/v1/orders/${id}/status`)
+        .send({ status: OrderStatus.DISPATCHED })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/v1/orders/${id}/status`)
+        .send({ status: OrderStatus.DELIVERED })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/v1/orders/${id}/status`)
+        .send({ status: OrderStatus.CANCELLED })
+        .expect(400);
     });
   });
 });

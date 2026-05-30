@@ -109,8 +109,11 @@ export class DiscountProductTargetService {
     productId: number,
   ): Promise<void> {
     // Unicidad dentro del mismo descuento: este producto ya está asignado a este descuento.
+    // withDeleted: true + deletedAt: IsNull() para buscar solo targets activos,
+    // de modo que un target previamente borrado no bloquee una reasignación.
     const existing = await this.repo.findOne({
-      where: { discountId, productId },
+      where: { discountId, productId, deletedAt: IsNull() },
+      withDeleted: true,
     });
 
     if (existing) {
@@ -124,11 +127,16 @@ export class DiscountProductTargetService {
     productId: number,
   ): Promise<void> {
     // Unicidad global: este producto ya está asignado a ALGÚN descuento (de cualquiera).
-    // Busca solo por productId, sin filtrar por discountId.
+    // Usa QueryBuilder con innerJoin para verificar que tanto el target como
+    // el descuento padre estén activos (no borrados).
     // Garantiza que un producto tenga como máximo un descuento activo en todo el sistema.
-    const existing = await this.repo.findOne({
-      where: { productId },
-    });
+    const existing = await this.repo
+      .createQueryBuilder('target')
+      .innerJoin('target.discount', 'discount')
+      .where('target.productId = :productId', { productId })
+      .andWhere('target.deletedAt IS NULL')
+      .andWhere('discount.deletedAt IS NULL')
+      .getOne();
 
     if (existing) {
       throw new ConflictException(

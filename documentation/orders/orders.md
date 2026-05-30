@@ -5,11 +5,11 @@
 El módulo de órdenes gestiona el ciclo de vida de los pedidos en Waiona: creación por el cliente, seguimiento de estados por el administrador, reserva y liberación de stock, y aplicación de cupones con transacción atómica. Es el núcleo operativo de la plataforma — conecta productos, stock, precios, cupones y pagos.
 
 ```
-POST   /orders                 → cliente crea pedido (throttle: 5 req/60s)
-GET    /orders                 → admin lista pedidos paginados
-GET    /orders/user/:userId    → cliente ve sus pedidos / admin ve los de cualquier usuario
-GET    /orders/:id             → cliente ve propia orden / admin ve cualquier orden
-PATCH  /orders/:id/status      → admin avanza el estado de la orden
+POST   /v1/orders                 → cliente crea pedido (throttle: 5 req/60s)
+GET    /v1/orders                 → admin lista pedidos paginados
+GET    /v1/orders/user/:userId    → cliente ve sus pedidos / admin ve los de cualquier usuario
+GET    /v1/orders/:id             → cliente ve propia orden / admin ve cualquier orden
+PATCH  /v1/orders/:id/status      → admin avanza el estado de la orden
 ```
 
 ### Máquina de estados
@@ -121,10 +121,15 @@ Cada transición tiene efectos secundarios en stock y cupones (ver reglas de neg
 
 ## Endpoints
 
-### `POST /orders` — Crear orden
+Todas las rutas tienen prefijo `/v1/` — el controller usa `{ version: '1', path: 'orders' }`.
+
+---
+
+### `POST /v1/orders` — Crear orden
 
 **Auth:** JWT requerido (cualquier rol autenticado)  
-**Throttle:** 5 peticiones por 60 segundos por cliente
+**Throttle:** máx 5 requests por minuto por IP  
+**Idempotencia:** `IdempotencyInterceptor` activo — si se envía el mismo body dos veces en la misma ventana de tiempo, el segundo request devuelve la respuesta cacheada sin crear una segunda orden (previene duplicados por doble click o retry).
 
 **Request body:**
 
@@ -132,38 +137,42 @@ Cada transición tiene efectos secundarios en stock y cupones (ver reglas de neg
 {
   "items": [
     { "productId": 3, "quantity": 2 },
-    { "comboId": 1, "quantity": 1 }
+    { "comboId": 1,   "quantity": 1 }
   ],
   "deliveryType": "delivery",
-  "address": "Av. Corrientes 1234",
-  "couponCode": "PROMO10",
-  "notes": "Sin cebolla"
+  "address": "Av. Corrientes 1234, CABA",
+  "couponCode": "promo10",
+  "notes": "Sin cebolla en la milanesa"
 }
 ```
 
-**Reglas del body:**
-- `items`: mínimo 1 elemento. Cada item debe tener exactamente `productId` o `comboId` (no ambos, no ninguno)
-- `quantity`: entre 1 y 500
-- `address`: requerido si `deliveryType = delivery`, max 500 chars
-- `couponCode`: opcional, max 100 chars
-- `notes`: opcional, max 500 chars
+| Campo | Tipo | Requerido | Reglas |
+|---|---|---|---|
+| `items` | array | ✅ | mínimo 1 elemento |
+| `items[].productId` | number ≥ 1 | uno u otro | mutuamente excluyente con `comboId` |
+| `items[].comboId` | number ≥ 1 | uno u otro | mutuamente excluyente con `productId` |
+| `items[].quantity` | integer 1–500 | ✅ | entero positivo |
+| `deliveryType` | `'delivery'` \| `'pickup'` | ✅ | |
+| `address` | string ≤ 500 | solo si `delivery` | requerida cuando `deliveryType === 'delivery'` |
+| `couponCode` | string ≤ 100 | ❌ | normalizado a MAYÚSCULAS + trim automáticamente; omitir si no hay cupón |
+| `notes` | string ≤ 500 | ❌ | texto libre |
 
-**Response 201:**
+**Response `201`:**
 
 ```json
 {
   "id": 42,
-  "createdAt": "2025-10-15T14:00:00.000Z",
-  "updatedAt": "2025-10-15T14:00:00.000Z",
+  "createdAt": "2026-05-30T14:22:00.000Z",
+  "updatedAt": "2026-05-30T14:22:00.000Z",
   "userId": 7,
   "status": "pending",
   "deliveryType": "delivery",
-  "address": "Av. Corrientes 1234",
-  "notes": "Sin cebolla",
-  "subtotal": 5500,
-  "couponDiscount": 550,
+  "address": "Av. Corrientes 1234, CABA",
+  "notes": "Sin cebolla en la milanesa",
+  "subtotal": 4960.80,
+  "couponDiscount": 496.08,
   "couponCode": "PROMO10",
-  "total": 4950,
+  "total": 4464.72,
   "items": [
     {
       "id": 101,
@@ -172,8 +181,8 @@ Cada transición tiene efectos secundarios en stock y cupones (ver reglas de neg
       "comboId": null,
       "comboName": null,
       "quantity": 2,
-      "unitPrice": 1500,
-      "finalPrice": 3000
+      "unitPrice": 1500.40,
+      "finalPrice": 3000.80
     },
     {
       "id": 102,
@@ -182,73 +191,96 @@ Cada transición tiene efectos secundarios en stock y cupones (ver reglas de neg
       "comboId": 1,
       "comboName": "Combo Familiar",
       "quantity": 1,
-      "unitPrice": 2500,
-      "finalPrice": 2500
+      "unitPrice": 1960.00,
+      "finalPrice": 1960.00
     }
   ]
 }
 ```
 
-**Errors:**
-- `400` — body inválido, stock insuficiente, cupón vencido/agotado/no aplica, delivery sin dirección
-- `404` — producto, combo o cupón no encontrado
+**Errores:**
+
+| Código | Cuándo |
+|---|---|
+| `400` | Body inválido (campo faltante, tipo incorrecto) |
+| `400` | `deliveryType: 'delivery'` sin `address` |
+| `400` | Ítem sin `productId` ni `comboId`, o con ambos |
+| `400` | Stock insuficiente para algún producto |
+| `400` | Cupón expirado, no vigente aún, o agotado |
+| `400` | Cupón no aplica a ningún ítem de la orden |
+| `404` | Producto o combo no encontrado |
+| `404` | Sin stock registrado para algún producto |
+| `404` | Cupón no encontrado |
+| `409` | El usuario ya utilizó ese cupón |
 
 ---
 
-### `GET /orders` — Listar órdenes (admin)
+### `GET /v1/orders` — Listar todas las órdenes (admin)
 
-**Auth:** JWT + rol ADMIN o SUPER_ADMIN
+**Auth:** JWT + rol `ADMIN` o `SUPER_ADMIN`
 
 **Query params:**
 
-| Param | Tipo | Default | Descripción |
+| Param | Tipo | Default | |
 |---|---|---|---|
-| `page` | number | 1 | Página actual |
-| `limit` | number | 20 | Resultados por página |
+| `page` | number | 1 | |
+| `limit` | number | 20 | |
 
-**Response 200:**
+**Response `200`:**
 
 ```json
 {
-  "data": [...],
-  "total": 150,
+  "data": [ /* Order[] — ver estructura completa en POST 201 */ ],
+  "total": 284,
   "page": 1,
   "limit": 20,
-  "totalPages": 8,
+  "totalPages": 15,
   "hasNextPage": true
 }
 ```
 
+Ordenadas por `createdAt DESC` (más recientes primero).
+
 ---
 
-### `GET /orders/user/:userId` — Órdenes por usuario
+### `GET /v1/orders/user/:userId` — Órdenes de un usuario
 
 **Auth:** JWT requerido  
-**Autorización:** cliente solo puede ver sus propias órdenes (`req.user.sub === userId`). Admin puede ver cualquier usuario.
+**Autorización:**
+- `client` — solo puede consultar sus propias órdenes. Si `userId` no coincide con `req.user.sub` → `403`.
+- `admin` / `super_admin` — puede ver las de cualquier usuario.
 
-**Response 200:** Array de `OrderResponseDto` ordenado por `createdAt DESC`
+**Response `200`:** `Order[]` — array directo sin paginación, ordenado por `createdAt DESC`.
 
-**Errors:**
-- `403` — cliente intenta ver órdenes de otro usuario
+**Errores:**
+
+| Código | Cuándo |
+|---|---|
+| `403` | Cliente intentando ver órdenes de otro usuario |
 
 ---
 
-### `GET /orders/:id` — Obtener orden por ID
+### `GET /v1/orders/:id` — Ver una orden por ID
 
 **Auth:** JWT requerido  
-**Autorización:** cliente solo puede ver sus propias órdenes (`order.userId === req.user.sub`). Admin sin restricción.
+**Autorización:**
+- `client` — solo puede ver su propia orden. Si `order.userId !== req.user.sub` → `403`.
+- `admin` / `super_admin` — puede ver cualquier orden.
 
-**Response 200:** `OrderResponseDto` con items, producto/combo, cupón
+**Response `200`:** `Order` con todos los campos (ver estructura en POST 201).
 
-**Errors:**
-- `403` — cliente intenta ver orden de otro usuario
-- `404` — orden no encontrada
+**Errores:**
+
+| Código | Cuándo |
+|---|---|
+| `403` | Cliente intentando ver orden de otro usuario |
+| `404` | Orden no encontrada |
 
 ---
 
-### `PATCH /orders/:id/status` — Actualizar estado
+### `PATCH /v1/orders/:id/status` — Cambiar estado (admin)
 
-**Auth:** JWT + rol ADMIN o SUPER_ADMIN
+**Auth:** JWT + rol `ADMIN` o `SUPER_ADMIN`
 
 **Request body:**
 
@@ -256,25 +288,73 @@ Cada transición tiene efectos secundarios en stock y cupones (ver reglas de neg
 { "status": "confirmed" }
 ```
 
-**Valores válidos de `status`:** `confirmed`, `dispatched`, `delivered`, `cancelled`
-
 **Transiciones válidas:**
 
-| Estado actual | Puede ir a |
+| Estado actual | Puede ir a | Efecto secundario |
+|---|---|---|
+| `pending` | `confirmed` | envía email al cliente |
+| `pending` | `cancelled` | libera stock reservado + revierte cupón + email |
+| `confirmed` | `dispatched` | descuenta stock físico + email |
+| `confirmed` | `cancelled` | libera stock reservado + revierte cupón + email |
+| `dispatched` | `delivered` | email al cliente |
+| `delivered` | — | terminal, sin acciones |
+| `cancelled` | — | terminal, sin acciones |
+
+**Response `200`:** `Order` actualizada.
+
+**Errores:**
+
+| Código | Cuándo |
 |---|---|
-| `pending` | `confirmed`, `cancelled` |
-| `confirmed` | `dispatched`, `cancelled` |
-| `dispatched` | `delivered` |
-| `delivered` | — (terminal) |
-| `cancelled` | — (terminal) |
+| `400` | Transición inválida (ej: `delivered → pending`) |
+| `400` | Valor de `status` no reconocido |
+| `404` | Orden no encontrada |
 
-**Efectos secundarios:**
-- `dispatched` → descuenta stock real con `StockItemsService.dispatchStock()`
-- `cancelled` → libera reserva con `StockItemsService.releaseReservation()` + revierte uso del cupón
+---
 
-**Errors:**
-- `400` — transición inválida o status no reconocido
-- `404` — orden no encontrada
+## Integración para el panel admin
+
+### Mostrar el listado de órdenes
+
+- Usar `GET /v1/orders?page=1&limit=20` con paginación.
+- Los precios (`unitPrice`, `finalPrice`, `subtotal`, `couponDiscount`, `total`) son **snapshot** del momento de la compra — no cambian si el precio del producto se modifica después. Mostrarlos directamente sin recalcular.
+- `couponCode` y `couponDiscount` son `null` si no se usó cupón — condicionar el render de la sección de descuento.
+- `address` es `null` si `deliveryType === 'pickup'` — condicionar el render del campo de dirección.
+
+### Botones de acción por estado
+
+Habilitar solo las transiciones válidas según el estado actual:
+
+```
+pending    → [Confirmar, Cancelar]
+confirmed  → [Despachar, Cancelar]
+dispatched → [Marcar entregado]
+delivered  → sin acciones (readonly)
+cancelled  → sin acciones (readonly)
+```
+
+Usar `PATCH /v1/orders/:id/status` con el valor correspondiente.
+
+> **Importante:** pasar a `dispatched` descuenta stock físico — es irreversible hacia atrás. Solo habilitarlo cuando el admin confirme físicamente el despacho.
+
+### Emails automáticos al cliente
+
+El servidor los envía automáticamente al cambiar el estado — el frontend no hace nada extra:
+
+| Transición | Email enviado |
+|---|---|
+| `→ confirmed` | Confirmación de pedido |
+| `→ dispatched` | Pedido en camino |
+| `→ cancelled` | Pedido cancelado |
+| `→ delivered` | Pedido entregado |
+
+### Historial de un cliente
+
+Para ver todas las órdenes de un usuario específico desde el panel admin:
+```
+GET /v1/orders/user/:userId
+```
+Devuelve un array directo (sin paginación) ordenado por fecha descendente.
 
 ---
 
@@ -339,13 +419,16 @@ Cada transición tiene efectos secundarios en stock y cupones (ver reglas de neg
 | Regla | Estado |
 |---|---|
 | Guards a nivel clase con `@UseGuards(AuthGuard('jwt'))` | ✅ |
-| `@Roles()` + `RolesGuard` para endpoints de admin | ✅ GET /orders y PATCH /:id/status |
+| `@Roles()` + `RolesGuard` para endpoints de admin | ✅ GET /v1/orders y PATCH /:id/status |
+| URI versioning `/v1/` en el controller | ✅ `@Controller({ version: '1', path: 'orders' })` |
 | Rutas específicas antes de genéricas | ✅ `GET /user/:userId` está antes de `GET /:id` |
 | `ValidationPipe` con `whitelist`, `forbidNonWhitelisted`, `transform` | ✅ (global, configurado en main.ts) |
 | `@ApiTags`, `@ApiBearerAuth` a nivel clase | ✅ |
 | `@ApiResponse` con `type: OrderResponseDto` en todos los endpoints | ✅ |
 | `@ApiProperty` en todos los campos de DTOs | ✅ |
-| Throttle en endpoints de creación sensibles | ✅ 5/60s en POST /orders |
+| Throttle en endpoints de creación sensibles | ✅ 5/60s en POST /v1/orders |
+| Mensajes de error en español | ✅ |
+| `couponCode` normalizado a mayúsculas + trim | ✅ `@Transform` en `CreateOrderDto` |
 
 ### typeorm-standard
 
@@ -364,16 +447,16 @@ Cada transición tiene efectos secundarios en stock y cupones (ver reglas de neg
 
 ### Unitarios (`orders.service.spec.ts`, `orders.controller.spec.ts`)
 
-- **37 tests** — `OrdersService` + `OrdersController`
-- Repositorios mockeados con `jest.fn()`
+- **41 tests** — `OrdersService` + `OrdersController`
+- Repositorios mockeados con `jest.fn()`; `couponRepo` y `couponProductTargetRepo` extraídos para tests de cupón
 - Factory `mockOrder(overrides)` para datos de prueba
-- Cubren: create (con/sin cupón, stock insuficiente, producto no encontrado), findAll (paginado), findOne (ownership), findByUser (ownership), updateStatus (todas las transiciones válidas e inválidas)
+- Cubren: create (con/sin cupón, stock insuficiente, producto no encontrado, cupón no encontrado, cupón expirado, cupón agotado, cupón no aplica a ítems, cupón ya usado, con combo), findAll (paginado, vacío), findOne (200, 404), findByUser (200), updateStatus (confirmar, despachar producto, despachar combo, cancelar producto, cancelar combo, transición inválida desde DELIVERED, transición inválida desde CANCELLED, 404), releaseStockForOrder (5 casos)
 
 ### E2E (`test/orders/orders.e2e-spec.ts`)
 
-- **20 tests** — PostgreSQL real (puerto 5433), schema sincronizado y destruido en cada suite
+- **23 tests** — PostgreSQL real (puerto 5433), schema sincronizado y destruido en cada suite
 - `CalculationService` mockeado (precios fijos: `unitPrice=1000`, `finalPrice=1000`)
-- `StockItemsService` real — valida la integración de reservas
+- `StockItemsService` real — valida la integración de reservas y despacho
 - JWT override con `mockUser` mutable para simular cambio de rol/usuario
 - Seed completo: perfil → usuario → categoría → producto → ubicación de stock → stock (50 unidades)
-- Cubren: POST (201 pickup, 201 delivery con dirección, 400 items vacíos, 400 delivery sin dirección, 400 sin productId/comboId, 404 producto inexistente, 400 stock insuficiente), GET /orders (paginado, limit), GET /orders/user/:id (200 + 403 cliente), GET /orders/:id (200 + 404 + 403 cliente), PATCH /:id/status (PENDING→CONFIRMED, CONFIRMED→PENDING inválido, CONFIRMED→CANCELLED, CANCELLED→CONFIRMED inválido, status inválido, 404)
+- Cubren: POST (201 pickup, 201 delivery + dirección, 201 con notes, 400 items vacíos, 400 delivery sin dirección, 400 sin productId/comboId, 404 producto inexistente, 400 stock insuficiente), GET /v1/orders (paginado, limit=1), GET /v1/orders/user/:id (200 + 403 cliente), GET /v1/orders/:id (200 + 404 + 403 cliente), PATCH /:id/status (PENDING→CONFIRMED, CONFIRMED→PENDING inválido, CONFIRMED→CANCELLED, CANCELLED→CONFIRMED inválido, camino completo PENDING→CONFIRMED→DISPATCHED→DELIVERED, DELIVERED→CANCELLED inválido, status inválido, 404)
