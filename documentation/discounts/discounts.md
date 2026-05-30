@@ -170,7 +170,7 @@ Todos los endpoints requieren JWT con rol `SUPER_ADMIN` o `ADMIN`.
 
 ---
 
-### `POST /discounts`
+### `POST /v1/discounts`
 
 Crea un nuevo descuento.
 
@@ -207,7 +207,7 @@ Los descuentos son siempre porcentuales.
 
 ---
 
-### `GET /discounts?page=1&limit=20`
+### `GET /v1/discounts?page=1&limit=20`
 
 Lista paginada de descuentos activos (no eliminados), orden descendente por `createdAt`.
 
@@ -240,7 +240,7 @@ limit → default: 20, min: 1, máx: 100
 
 ---
 
-### `GET /discounts/:id`
+### `GET /v1/discounts/:id`
 
 Obtiene un descuento por ID.
 
@@ -251,7 +251,7 @@ Obtiene un descuento por ID.
 
 ---
 
-### `PATCH /discounts/:id`
+### `PATCH /v1/discounts/:id`
 
 Actualización parcial. Solo se actualiza lo que se envía. Reconstruye el estado final explícitamente campo a campo (sin spread de DTO) para evitar pisar valores existentes con `undefined`.
 
@@ -268,7 +268,7 @@ Actualización parcial. Solo se actualiza lo que se envía. Reconstruye el estad
 
 ---
 
-### `DELETE /discounts/:id`
+### `DELETE /v1/discounts/:id`
 
 Soft delete. El descuento queda marcado con `deletedAt` y deja de aparecer en listados.
 
@@ -279,7 +279,7 @@ Soft delete. El descuento queda marcado con `deletedAt` y deja de aparecer en li
 
 ---
 
-### `POST /discounts/:discountId/targets/products`
+### `POST /v1/discounts/:discountId/targets/products`
 
 Asigna un producto a un descuento.
 
@@ -306,7 +306,7 @@ Asigna un producto a un descuento.
 
 ---
 
-### `GET /discounts/:discountId/targets/products`
+### `GET /v1/discounts/:discountId/targets/products`
 
 Lista todos los productos asignados a un descuento.
 
@@ -317,7 +317,7 @@ Lista todos los productos asignados a un descuento.
 
 ---
 
-### `DELETE /discounts/:discountId/targets/products/:productId`
+### `DELETE /v1/discounts/:discountId/targets/products/:productId`
 
 Quita un producto de un descuento (soft delete del target).
 
@@ -329,7 +329,7 @@ Quita un producto de un descuento (soft delete del target).
 
 ---
 
-### `POST /discounts/:discountId/targets/combos`
+### `POST /v1/discounts/:discountId/targets/combos`
 
 Asigna un combo a un descuento.
 
@@ -356,7 +356,7 @@ Asigna un combo a un descuento.
 
 ---
 
-### `GET /discounts/:discountId/targets/combos`
+### `GET /v1/discounts/:discountId/targets/combos`
 
 Lista todos los combos asignados a un descuento.
 
@@ -367,7 +367,7 @@ Lista todos los combos asignados a un descuento.
 
 ---
 
-### `DELETE /discounts/:discountId/targets/combos/:comboId`
+### `DELETE /v1/discounts/:discountId/targets/combos/:comboId`
 
 Quita un combo de un descuento (soft delete del target).
 
@@ -387,9 +387,12 @@ Quita un combo de un descuento (soft delete del target).
 | `value` entre 0.01 y 100 (siempre porcentaje) | `@Min` / `@Max` en el DTO |
 | Un producto solo puede tener un target activo en toda la tabla | `create` target — `validateProductHasNoActiveDiscount()` |
 | Un combo solo puede tener un target activo en toda la tabla | `create` target — `validateComboHasNoActiveDiscount()` |
-| `validateUniqueTarget` evita duplicado en el mismo descuento | `create` target — antes de la validación cross-discount |
+| `validateUniqueTarget` evita duplicado en el mismo descuento | `create` target — usa `{ discountId, productId/comboId, deletedAt: IsNull() }` con `withDeleted: true` para ignorar los soft-deleted |
+| `validateProductHasNoActiveDiscount` / `validateComboHasNoActiveDiscount` | QueryBuilder con `innerJoin('target.discount', 'discount')` + filtros `deletedAt IS NULL` en ambas tablas — evita falsos positivos con targets o descuentos borrados |
+| Eliminar un descuento también soft-deletes sus targets | `DiscountsService.remove()` llama `softDelete({ discountId })` en `productTargetRepo` y `comboTargetRepo` antes de invalidar la caché |
 | `status` calculado en tiempo real — no persiste en DB | `DiscountResponseDto.calculateStatus()` |
 | Soft delete — `deletedAt` — TypeORM filtra `IS NULL` automáticamente | `remove` y `findDiscount` — `repo.softDelete()` |
+| Mutations invalidan la caché del shop | `DiscountsService`, `DiscountProductTargetService` y `DiscountComboTargetService` llaman `shopCacheService.invalidate()` (fire-and-forget) en `create` y `remove` |
 
 ### Lógica de `calculateStatus()`
 
@@ -408,7 +411,7 @@ Un descuento sin fechas siempre devuelve `ACTIVE`.
 
 **Descuento porcentual con fechas:**
 ```json
-POST /discounts
+POST /v1/discounts
 {
   "name": "Black Friday 20%",
   "value": 20,
@@ -419,19 +422,19 @@ POST /discounts
 
 **Asignar un producto:**
 ```json
-POST /discounts/1/targets/products
+POST /v1/discounts/1/targets/products
 { "productId": 7 }
 ```
 
 **Quitar un producto del descuento:**
 ```json
-DELETE /discounts/1/targets/products/7
+DELETE /v1/discounts/1/targets/products/7
 → 204 No Content
 ```
 
 **Intentar asignar un producto que ya tiene otro descuento — responde 409:**
 ```json
-POST /discounts/2/targets/products
+POST /v1/discounts/2/targets/products
 { "productId": 7 }
 → 409 Conflict: "El producto 7 ya tiene un descuento activo asignado"
 ```
@@ -455,6 +458,7 @@ POST /discounts/2/targets/products
 | `status` calculado en DTO, no persiste en DB | ✅ |
 | `validateDates()` usa `>=` para bloquear rango vacío | ✅ |
 | Validación cross-discount: un producto/combo solo tiene un descuento activo | ✅ |
+| Cache invalidation en mutations de discount y targets | ✅ |
 | Unit tests — service y controller, 6 suites | ✅ |
 | E2E tests — PostgreSQL real, `dropSchema: true`, 46 tests | ✅ |
 | Swagger — `@ApiTags`, `@ApiOperation`, `@ApiResponse` en los 3 controllers | ✅ |

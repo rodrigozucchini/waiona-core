@@ -383,7 +383,7 @@ describe('Nombre (e2e)', () => {
 Cuando el módulo bajo prueba tiene dependencias de servicios globales o externos, agregarlos como mocks en el array `providers`. Los más comunes:
 
 ```typescript
-// Módulos que usan ShopCacheService (margins, taxes, pricing, discounts, shop):
+// Módulos que usan ShopCacheService (margins, taxes, tax-types, product-taxes, pricing, discounts, discount-product-target, discount-combo-target, categories, products, combos, product-images, combo-images, shop):
 import { ShopCacheService } from 'src/common/cache/shop-cache.service';
 { provide: ShopCacheService, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } }
 

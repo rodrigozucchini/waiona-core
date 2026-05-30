@@ -12,13 +12,15 @@ El módulo se ubica entre el catálogo (productos/combos) y el motor de órdenes
 
 ```
 unitPrice
-  → descuento activo (por fechas)   → priceAfterDiscount
-  → margen del pricing               → priceAfterMargin
-  → impuestos específicos + globales → finalPrice      ← precio con descuento
-  → cupón (nivel orden)              → orderTotal       ← lo que paga el cliente
+  → descuento activo (%, por fechas)   → priceAfterDiscount
+  → margen (%, del pricing)             → priceAfterMargin
+  → impuestos específicos + globales (%)→ finalPrice      ← precio con descuento
+  → cupón (%, nivel orden)              → orderTotal       ← lo que paga el cliente
 
 fullPrice = unitPrice + margen(sobre unitPrice) + impuestos(sobre eso)  ← precio tachado del front
 ```
+
+Todos los valores — descuento, margen, impuestos y cupón — son **siempre porcentuales**.
 
 ---
 
@@ -29,9 +31,9 @@ fullPrice = unitPrice + margen(sobre unitPrice) + impuestos(sobre eso)  ← prec
 | Alta de producto nuevo | Se crea `ProductPricing` con unitPrice y moneda al cargar un producto al catálogo |
 | Asignar margen de ganancia | Admin vincula un margen `20%` al pricing de un producto |
 | Quitar el margen | Admin envía `marginId: null` en el update para desvincular el margen |
-| Shop mostrando precio | `POST /pricing/calculate/product` retorna `finalPrice` y `fullPrice` para mostrar precio actual y tachado |
-| Probar combinaciones antes de publicar | Admin usa `POST /pricing/calculate/preview` con valores manuales sin tocar datos reales |
-| Actualizar precio base | `PATCH /product-pricing/:id` con el nuevo `unitPrice` |
+| Shop mostrando precio | `POST /v1/pricing/calculate/product` retorna `finalPrice` y `fullPrice` para mostrar precio actual y tachado |
+| Probar combinaciones antes de publicar | Admin usa `POST /v1/pricing/calculate/preview` con valores manuales sin tocar datos reales |
+| Actualizar precio base | `PATCH /v1/product-pricing/:id` con el nuevo `unitPrice` |
 
 ---
 
@@ -112,10 +114,12 @@ Todos los campos son opcionales. `productId` / `comboId` están excluidos (no se
 
 ```typescript
 {
-  data:  ProductPricingResponseDto[];  // (o ComboPricingResponseDto[])
-  total: number;
-  page:  number;
-  limit: number;
+  data:        ProductPricingResponseDto[];  // (o ComboPricingResponseDto[])
+  total:       number;
+  page:        number;
+  limit:       number;
+  totalPages:  number;
+  hasNextPage: boolean;
 }
 ```
 
@@ -133,21 +137,19 @@ Todos los campos son opcionales. `productId` / `comboId` están excluidos (no se
 
 ### Request: preview sin DB (`CalculatePreviewDto`)
 
+Todos los valores son porcentuales. Todos los campos excepto `unitPrice` son opcionales.
+
 ```typescript
 {
-  unitPrice:            number;           // requerido
-  discountValue?:       number;           // opcional — monto del descuento
-  discountIsPercentage?: boolean;         // true = %, false = monto fijo
-  marginValue?:         number;           // opcional
-  marginIsPercentage?:  boolean;
-  taxes?: {
-    value:        number;
-    isPercentage: boolean;
-  }[];                                    // array de impuestos a simular
-  couponValue?:         number;           // opcional — se aplica sobre finalPrice
-  couponIsPercentage?:  boolean;
+  unitPrice:      number;              // requerido
+  discountValue?: number;              // % de descuento — 0.01 a 100
+  marginValue?:   number;              // % de margen — 0.01 a 1000
+  taxes?:         { value: number }[]; // array de impuestos en % (0.01–100 c/u)
+  couponValue?:   number;              // % del cupón sobre finalPrice — 0 a 100
 }
 ```
+
+> Todos los campos son porcentuales. No existe `isPercentage`, `discountIsPercentage`, `marginIsPercentage` ni `couponIsPercentage` — todos se aplican como porcentaje de forma hardcodeada.
 
 ### Response: desglose de precio (`PriceBreakdownDto`)
 
@@ -172,35 +174,10 @@ Todos los campos son opcionales. `productId` / `comboId` están excluidos (no se
 
 ## Endpoints
 
-### `POST /product-pricing` — Crear pricing de producto
-
-Requiere: `SUPER_ADMIN` o `ADMIN`.
-
-**Request:**
-```json
-{
-  "productId": 1,
-  "currency": "ARS",
-  "unitPrice": 500,
-  "marginId": 1
-}
-```
-
-**Response 201:**
-```json
-{
-  "id": 1,
-  "productId": 1,
-  "currency": "ARS",
-  "unitPrice": 500,
-  "marginId": 1,
-  "createdAt": "2026-05-18T00:00:00.000Z",
-  "updatedAt": "2026-05-18T00:00:00.000Z"
-}
-```
+### `POST /v1/product-pricing` — Crear pricing de producto
 
 **Errores:**
-- `400` — El producto ya tiene pricing (check previo + manejo de `PG_UNIQUE_VIOLATION 23505` para race condition)
+- `409` — El producto ya tiene pricing (check previo + manejo de `PG_UNIQUE_VIOLATION 23505` para race condition)
 - `400` — Datos inválidos (validación de DTO)
 - `404` — El `marginId` no existe
 
@@ -208,25 +185,13 @@ Requiere: `SUPER_ADMIN` o `ADMIN`.
 
 ### `GET /product-pricing` — Listar pricings de productos (paginado)
 
-Requiere: `SUPER_ADMIN` o `ADMIN`. Query params: `page` (default 1), `limit` (default 20).
-
-**Response 200:**
-```json
-{
-  "data": [{ "id": 1, "productId": 1, "currency": "ARS", "unitPrice": 500, "marginId": 1, "createdAt": "...", "updatedAt": "..." }],
-  "total": 1,
-  "page": 1,
-  "limit": 20
-}
-```
+Query params: `page` (default 1), `limit` (default 20).
 
 ---
 
 ### `GET /product-pricing/product/:productId` — Obtener pricing por producto
 
-Requiere: `SUPER_ADMIN` o `ADMIN`. Ruta específica declarada **antes** de `GET /:id` para evitar conflicto de rutas.
-
-**Response 200:** `ProductPricingResponseDto`
+Ruta específica declarada **antes** de `GET /:id` para evitar conflicto de rutas.
 
 **Errores:** `404` — No hay pricing para ese producto.
 
@@ -234,38 +199,24 @@ Requiere: `SUPER_ADMIN` o `ADMIN`. Ruta específica declarada **antes** de `GET 
 
 ### `GET /product-pricing/:id` — Obtener pricing por ID
 
-Requiere: `SUPER_ADMIN` o `ADMIN`.
-
-**Response 200:** `ProductPricingResponseDto`
-
 **Errores:** `404` — No encontrado.
 
 ---
 
-### `PATCH /product-pricing/:id` — Actualizar pricing (parcial)
-
-Requiere: `SUPER_ADMIN` o `ADMIN`. Acepta cualquier subconjunto de `UpdateProductPricingDto`.
+### `PATCH /v1/product-pricing/:id` — Actualizar pricing (parcial)
 
 **Request (desvincula margen):**
 ```json
 { "marginId": null }
 ```
 
-**Response 200:** `ProductPricingResponseDto` actualizado.
-
-**Errores:**
-- `404` — Pricing no encontrado
-- `404` — `marginId` referencia un margen inexistente
+**Errores:** `404` — Pricing o margen no encontrado.
 
 ---
 
 ### `DELETE /product-pricing/:id` — Eliminar pricing (soft delete)
 
-Requiere: `SUPER_ADMIN` o `ADMIN`.
-
-**Response 204:** Sin cuerpo.
-
-**Errores:** `404` — No encontrado.
+**Response 204.** **Errores:** `404` — No encontrado.
 
 ---
 
@@ -275,60 +226,36 @@ Mismos endpoints, misma lógica, mismos códigos de error. Rutas: `/combo-pricin
 
 ---
 
-### `POST /pricing/calculate/preview` — Preview sin DB
+### `POST /v1/pricing/calculate/preview` — Preview sin DB
 
 Requiere: `SUPER_ADMIN` o `ADMIN`. Calcula el desglose completo con valores manuales sin consultar la base de datos.
 
 **Request:**
 ```json
 {
-  "unitPrice": 500,
+  "unitPrice":     500,
   "discountValue": 10,
-  "discountIsPercentage": true,
-  "marginValue": 20,
-  "marginIsPercentage": true,
-  "taxes": [{ "value": 21, "isPercentage": true }],
-  "couponValue": 50,
-  "couponIsPercentage": false
+  "marginValue":   20,
+  "taxes":         [{ "value": 21 }],
+  "couponValue":   15
 }
 ```
 
-**Response 200:**
-```json
-{
-  "unitPrice": 500,
-  "discount": 50,
-  "priceAfterDiscount": 450,
-  "margin": 90,
-  "priceAfterMargin": 540,
-  "taxes": 113.4,
-  "finalPrice": 653.4,
-  "fullPrice": 726,
-  "coupon": 50,
-  "orderTotal": 603.4
-}
-```
+**Response 200:** `PriceBreakdownDto`
 
 ---
 
-### `POST /pricing/calculate/product` — Calcular precio real de producto
+### `POST /v1/pricing/calculate/product` — Calcular precio real de producto
 
 **Público** — sin autenticación. El shop lo consume para mostrar precios en la vitrina.
-
-**Request:**
-```json
-{ "productId": 1 }
-```
-
-**Response 200:** `PriceBreakdownDto` con `coupon: 0` y `orderTotal === finalPrice` (el cupón se aplica a nivel orden, no aquí).
 
 **Errores:** `404` — El producto no tiene pricing configurado.
 
 ---
 
-### `POST /pricing/calculate/combo` — Calcular precio real de combo
+### `POST /v1/pricing/calculate/combo` — Calcular precio real de combo
 
-**Público** — sin autenticación. Misma lógica que el anterior para combos.
+**Público** — sin autenticación. Los impuestos del combo se calculan con prorrateo lineal entre los productos componentes.
 
 **Errores:** `404` — El combo no tiene pricing configurado.
 
@@ -339,14 +266,17 @@ Requiere: `SUPER_ADMIN` o `ADMIN`. Calcula el desglose completo con valores manu
 | Regla | Dónde se aplica |
 |---|---|
 | Un producto/combo puede tener exactamente UN pricing | Unique index en DB + check previo en `create()` + manejo de error `23505` |
+| "Ya tiene pricing" lanza `409 Conflict`, no 400 | `ConflictException` en pre-check y en catch de `PG_UNIQUE_VIOLATION` |
 | El margen es opcional | `marginId` ausente o `null` → `margin = null` → no se aplica margen en cálculo |
-| Para desasignar el margen en un update, enviar `marginId: null` | `UpdateProductPricingDto.marginId?: number | null` con `@ValidateIf` |
-| Soft delete — no se borra físicamente | `repo.softDelete(id)` setea `deletedAt`; el registro no aparece en futuras consultas |
-| El descuento activo se verifica por fechas en memoria | `isActive(startsAt, endsAt, now)` en `CalculationService` — sin índices adicionales |
-| Los impuestos globales y específicos no se duplican | `Set<number>` de IDs en `fetchTaxesForProduct/Combo` descarta globales ya incluidos como específicos |
+| Para desasignar el margen en un update, enviar `marginId: null` | `UpdateProductPricingDto.marginId?: number \| null` con `@ValidateIf` |
+| Todos los porcentajes (descuento, margen, impuestos, cupón) son siempre % | `applyValue(base, value, true)` hardcodeado — sin modo monto fijo |
+| Soft delete — no se borra físicamente | `repo.softDelete(id)` setea `deletedAt` |
+| El descuento activo se verifica por fechas en memoria | `isActive(startsAt, endsAt, now)` en `CalculationService` |
+| Los impuestos globales y específicos no se duplican | `Set<number>` de IDs en `fetchTaxesForProduct` descarta globales ya incluidos como específicos |
+| Impuestos de combo por prorrateo — no hay `combo-taxes` | `fetchTaxDataForCombo()` fetcha globales + items + pricings de referencia + taxes de productos en queries batched; `computeTaxesFromData()` aplica el prorrateo (precio_combo × refPrice/totalRef) sin queries adicionales |
 | `calculateProduct` y `calculateCombo` son públicos | El shop los llama sin autenticación; `preview` requiere admin |
-| `fullPrice` = precio sin descuento, con margen e impuestos recalculados sobre `unitPrice` | Calculado en paralelo dentro del mismo método — para mostrar precio tachado en el front |
-| Race condition en `create` cubierta con `PG_UNIQUE_VIOLATION` | Si dos requests concurrentes pasan el check previo, la segunda falla en `repo.save()` con error `23505` → `400` |
+| Mutations de pricing invalidan la caché del shop | `ProductPricingService` y `ComboPricingService` llaman `shopCacheService.invalidate()` (fire-and-forget) en `create`, `update` y `remove` |
+| Race condition en `create` cubierta con `PG_UNIQUE_VIOLATION` | Si dos requests concurrentes pasan el check previo, la segunda falla en `repo.save()` con error `23505` → `409` |
 
 ---
 
@@ -354,42 +284,29 @@ Requiere: `SUPER_ADMIN` o `ADMIN`. Calcula el desglose completo con valores manu
 
 **Crear pricing de un producto con margen:**
 ```json
-POST /product-pricing
-{
-  "productId": 5,
-  "currency": "ARS",
-  "unitPrice": 1200,
-  "marginId": 2
-}
+POST /v1/product-pricing
+{ "productId": 5, "currency": "ARS", "unitPrice": 1200, "marginId": 2 }
 ```
 
 **Cambiar solo el precio base:**
 ```json
-PATCH /product-pricing/3
+PATCH /v1/product-pricing/3
 { "unitPrice": 1350 }
 ```
 
 **Quitar el margen de un pricing:**
 ```json
-PATCH /product-pricing/3
+PATCH /v1/product-pricing/3
 { "marginId": null }
-```
-
-**Shop consultando el precio de un producto:**
-```json
-POST /pricing/calculate/product
-{ "productId": 5 }
-→ { "finalPrice": 1742.4, "fullPrice": 1742.4, "discount": 0, ... }
 ```
 
 **Preview antes de cargar datos:**
 ```json
-POST /pricing/calculate/preview
+POST /v1/pricing/calculate/preview
 {
   "unitPrice": 1000,
   "marginValue": 30,
-  "marginIsPercentage": true,
-  "taxes": [{ "value": 21, "isPercentage": true }]
+  "taxes": [{ "value": 21 }]
 }
 → { "finalPrice": 1573, "fullPrice": 1573, "discount": 0, "coupon": 0, ... }
 ```
@@ -398,22 +315,21 @@ POST /pricing/calculate/preview
 
 ## Cumplimiento con agent skills
 
-| Convención | Estado |
-|---|---|
-| Entidades extienden `BaseEntity` | ✅ |
-| Soft delete con `softDelete()` | ✅ |
-| Snake_case en columnas, camelCase en TS | ✅ |
-| Services devuelven DTOs, nunca la entidad | ✅ |
-| `findOneEntity()` privado con `NotFoundException` | ✅ |
-| Guards a nivel de clase donde todos los endpoints requieren el mismo acceso | ✅ (product-pricing y combo-pricing controllers) |
-| Rutas específicas antes de genéricas (`/product/:productId` antes de `/:id`) | ✅ |
-| `@Type(() => Number)` en query params numéricos | ✅ (vía `PaginationQueryDto`) |
-| `PartialType` + `OmitType` para UpdateDto | ✅ |
-| `class-validator` en todos los DTOs | ✅ |
-| Decoradores Swagger (`@ApiTags`, `@ApiOperation`, `@ApiResponse`, `@ApiBearerAuth`) | ✅ en product/combo pricing; ⚠️ ausentes en `CalculationController` |
-| Unit tests con factory functions y `jest.clearAllMocks()` | ✅ |
-| `overrideGuard` en controller specs | ✅ |
-| E2E tests con DB real (postgres test) | ✅ para product-pricing y combo-pricing; ⚠️ ausentes para calculation |
+| Convención | Estado | Detalle |
+|---|---|---|
+| Entidades extienden `BaseEntity` | ✅ | |
+| Soft delete con `softDelete()` | ✅ | |
+| Snake_case en columnas, camelCase en TS | ✅ | |
+| Services devuelven DTOs, nunca la entidad | ✅ | |
+| `findOneEntity()` privado con `NotFoundException` | ✅ | |
+| Guards a nivel de clase | ✅ | product-pricing y combo-pricing controllers |
+| Rutas específicas antes de genéricas | ✅ | `/product/:productId` antes de `/:id` |
+| `ConflictException` para recursos ya existentes | ✅ | `create()` lanza 409 en lugar de 400 |
+| Mensajes de error en español | ✅ | Todos los servicios del módulo |
+| Prorrateo de impuestos en combos sin N+1 | ✅ | `fetchTaxDataForCombo()` (queries batched con `In([...])`) + `computeTaxesFromData()` (cómputo puro, sin DB) |
+| Cache invalidation en mutations | ✅ | `shopCacheService.invalidate()` en create/update/remove de product y combo pricing |
+| `PartialType` + `OmitType` para UpdateDto | ✅ | |
+| Unit tests con factory functions | ✅ | |
 
 ---
 
@@ -422,53 +338,45 @@ POST /pricing/calculate/preview
 ### Unit tests
 
 ```bash
-npx jest --testPathPattern="pricing"
+npx jest --testPathPattern="pricing" --no-coverage
 ```
 
 | Suite | Tests | Qué cubre |
 |---|---|---|
-| `ProductPricingService` | 16 | create (con/sin margen, ya existe, margen no existe, race condition), findAll (con/sin resultados), findOne (200/404), findByProduct (200/404), update (actualiza, desvincula margen, 404), remove (soft delete, 404) |
+| `ProductPricingService` | 16 | create (con/sin margen, 409 ya existe, 404 margen, race condition 409), findAll, findOne, findByProduct, update, remove |
 | `ComboPricingService` | 14 | Misma cobertura que ProductPricingService para combos |
-| `CalculationService` | 5 | calculateProduct (200, 404), calculateCombo (200, 404), preview (sin DB) |
+| `CalculationService` | 8 | calculateProduct (200, 404), calculateCombo (prorrateo, globales, doble conteo, quantity>1, sin pricing), preview |
 | `ProductPricingController` | 7 | Delegación a service para cada endpoint |
 | `ComboPricingController` | 7 | Delegación a service para cada endpoint |
-| `CalculationController` | 5 | preview (admin), calculateProduct (público + coupon=0), calculateCombo |
+| `CalculationController` | 6 | preview (admin), calculateProduct (público), calculateCombo |
 
-**Total unit: 54 tests**
+**Total unit: 58 tests**
 
 ### E2E tests
 
 ```bash
-npx jest --testPathPattern="test/pricing"
+npx jest --config test/jest-e2e.json --testPathPattern="pricing"
 ```
 
-Los e2e usan una DB de test real (`POSTGRES_TEST_PORT=5433`, `POSTGRES_TEST_DB`). `dropSchema: true` limpia el esquema en cada ejecución.
+| Caso | Status esperado |
+|---|---|
+| Crear sin margen | 201 |
+| Crear con margen | 201 |
+| Crear cuando ya existe | **409** |
+| Crear con campos faltantes | 400 |
+| Crear con margen inexistente | 404 |
+| Listar paginado | 200 |
+| Obtener por ID | 200 / 404 |
+| Obtener por productId/comboId | 200 / 404 |
+| Actualizar precio | 200 |
+| Desvincular margen con null | 200 |
+| Actualizar inexistente | 404 |
+| Eliminar y verificar 404 | 204 → 404 |
+| Eliminar inexistente | 404 |
 
-| Caso | Endpoint | Status esperado |
-|---|---|---|
-| Crear sin margen | `POST /product-pricing` | 201 |
-| Crear con margen | `POST /product-pricing` | 201 |
-| Crear cuando ya existe | `POST /product-pricing` | 400 |
-| Crear con campos faltantes | `POST /product-pricing` | 400 |
-| Crear con margen inexistente | `POST /product-pricing` | 404 |
-| Listar paginado | `GET /product-pricing` | 200 |
-| Respetar limit=1 | `GET /product-pricing?page=1&limit=1` | 200 |
-| Obtener por ID | `GET /product-pricing/:id` | 200 |
-| Obtener por ID inexistente | `GET /product-pricing/:id` | 404 |
-| Obtener por productId | `GET /product-pricing/product/:productId` | 200 |
-| Obtener por productId inexistente | `GET /product-pricing/product/:productId` | 404 |
-| Actualizar precio | `PATCH /product-pricing/:id` | 200 |
-| Asignar margen | `PATCH /product-pricing/:id` | 200 |
-| Desvincular margen con null | `PATCH /product-pricing/:id` | 200 |
-| Actualizar inexistente | `PATCH /product-pricing/:id` | 404 |
-| Eliminar y verificar 404 | `DELETE /product-pricing/:id` | 204 → 404 |
-| Eliminar inexistente | `DELETE /product-pricing/:id` | 404 |
+Los mismos casos existen para `combo-pricing`. **Total e2e: 34 tests**
 
-Los mismos 17 casos existen para `combo-pricing` en `combo-pricing.e2e-spec.ts`.
-
-**Total e2e: 34 tests**
-
-> `CalculationController` no tiene e2e — sus endpoints públicos son ejercitados indirectamente a través del shop y del flujo de órdenes en sus propios e2e. El cálculo matemático está cubierto en unit tests del service.
+> `CalculationController` no tiene e2e — sus endpoints son ejercitados indirectamente a través del shop y del flujo de órdenes.
 
 ---
 
@@ -481,18 +389,12 @@ ComboEntity  ─────────────────┤
 MarginEntity ──────────── ProductPricingEntity / ComboPricingEntity
                                ↓
                          CalculationService
-                         ↑           ↑           ↑
-              TaxEntity  DiscountProductTarget  DiscountComboTarget
-              (global +  (descuento vigente     (descuento vigente
-              específico) por fechas)            por fechas)
+                         ↑           ↑           ↑           ↑
+              TaxEntity  DiscountProductTarget  DiscountComboTarget  ComboItemEntity
+              (global +  (descuento vigente     (descuento vigente   (prorrateo de
+              específico) por fechas)            por fechas)          impuestos)
                                ↓
                     PriceBreakdownDto
                     ↑                ↑
-               ShopModule       OrdersService (calcula precio al crear orden)
+               ShopModule       OrdersService
 ```
-
-- **ShopModule** — llama `calculateProduct` y `calculateCombo` para mostrar precios en la vitrina pública.
-- **OrdersService** — llama `calculateProduct` / `calculateCombo` al crear una orden para fijar el precio en ese momento.
-- **MarginsModule** — provee las entidades `MarginEntity` que se vinculan al pricing.
-- **TaxationModule** — provee `TaxEntity`, `ProductTaxEntity`, `ComboTaxEntity` que el `CalculationService` consulta para sumar impuestos.
-- **DiscountsModule** — provee `DiscountProductTargetEntity` y `DiscountComboTargetEntity` para aplicar descuentos vigentes.

@@ -5,16 +5,16 @@
 El módulo de pagos gestiona la integración con MercadoPago y el ciclo de vida de cada intento de pago asociado a una orden. Cuando un cliente quiere abonar una orden en estado `PENDING`, este módulo crea una preferencia en MP, devuelve la URL de checkout y luego escucha el webhook de notificación para actualizar el estado del pago y de la orden automáticamente.
 
 ```
-POST   /payments                          → cliente crea pago para una orden PENDING
-POST   /payments/webhook/mercadopago      → webhook público — MP notifica resultado (siempre 200)
-GET    /payments/order/:orderId           → lista pagos de una orden
-GET    /payments/:id                      → obtiene un pago por id
+POST   /v1/payments                          → cliente crea pago para una orden PENDING
+POST   /v1/payments/webhook/mercadopago      → webhook público — MP notifica resultado (siempre 200)
+GET    /v1/payments/order/:orderId           → lista pagos de una orden
+GET    /v1/payments/:id                      → obtiene un pago por id
 ```
 
 ### Flujo completo
 
 ```
-Cliente → POST /payments { orderId, provider }
+Cliente → POST /v1/payments { orderId, provider }
             ↓ lock pesimista en orden
             ↓ valida PENDING + sin pago activo
             ↓ MercadoPagoProvider.createPreference(order)
@@ -23,7 +23,7 @@ Cliente → POST /payments { orderId, provider }
             ↓
           Cliente redirige a MP → procesa el pago
             ↓
-          MP llama POST /payments/webhook/mercadopago
+          MP llama POST /v1/payments/webhook/mercadopago
             ↓ verifica firma HMAC-SHA256 (x-signature)
             ↓ fetch Payment o MerchantOrder desde MP API
             ↓ mapea order_status → PaymentStatus + OrderStatus
@@ -43,7 +43,7 @@ Cliente → POST /payments { orderId, provider }
 | MP confirma el pago | Webhook `paid` → orden pasa a CONFIRMED automáticamente |
 | Cliente abandona el pago | Webhook `expired` → pago REJECTED, orden CANCELLED, stock liberado |
 | Contracargo o reversión | Webhook `reverted`/`charged_back` → pago CANCELLED, orden CANCELLED |
-| Admin consulta el historial de pagos | `GET /payments/order/:orderId` |
+| Admin consulta el historial de pagos | `GET /v1/payments/order/:orderId` |
 
 ---
 
@@ -120,7 +120,7 @@ No hay UpdateDto — los pagos no se modifican desde la API; solo los actualiza 
 
 ## Endpoints
 
-### `POST /payments`
+### `POST /v1/payments`
 
 Crea un pago para una orden en estado `PENDING`. Requiere JWT. El cliente solo puede pagar sus propias órdenes; el admin puede pagar cualquier orden.
 
@@ -160,7 +160,7 @@ Crea un pago para una orden en estado `PENDING`. Requiere JWT. El cliente solo p
 
 ---
 
-### `POST /payments/webhook/mercadopago`
+### `POST /v1/payments/webhook/mercadopago`
 
 Endpoint público (sin JWT). MercadoPago llama a este endpoint tras procesar un pago. Siempre retorna `200` — si retorna otro código, MP reintenta indefinidamente. Decorado con `@SkipThrottle()` para no ser limitado por el rate limiter global.
 
@@ -200,7 +200,7 @@ Cuando la orden pasa a `CANCELLED`, se llama a `OrdersService.releaseStockForOrd
 
 ---
 
-### `GET /payments/order/:orderId`
+### `GET /v1/payments/order/:orderId`
 
 Lista todos los pagos de una orden, ordenados por `createdAt DESC`. Requiere JWT.
 
@@ -234,7 +234,7 @@ Lista todos los pagos de una orden, ordenados por `createdAt DESC`. Requiere JWT
 
 ---
 
-### `GET /payments/:id`
+### `GET /v1/payments/:id`
 
 Obtiene un pago por su id. Requiere JWT. El cliente solo puede ver pagos de sus propias órdenes (carga la relación `order` para verificar `order.userId`).
 
@@ -346,25 +346,25 @@ npx jest --config test/jest-e2e.json --testPathPattern="payments"
 
 | Caso | Código esperado |
 |---|---|
-| `POST /payments` — orden PENDING con MercadoPago | `201` |
-| `POST /payments` — orden ya tiene pago PENDING | `400` |
-| `POST /payments` — orden no está en PENDING | `400` |
-| `POST /payments` — cliente paga orden de otro usuario | `403` |
-| `POST /payments` — orden no encontrada | `404` |
-| `POST /payments` — body inválido (sin provider) | `400` |
-| `POST /payments/webhook/mercadopago` — sin id en query | `200` |
-| `POST /payments/webhook/mercadopago` — topic desconocido | `200` |
-| `POST /payments/webhook/mercadopago` — topic=merchant_order, MP API falla | `200` |
-| `POST /payments/webhook/mercadopago` — topic=payment, MP API falla | `200` |
-| `GET /payments/order/:orderId` — admin ve pagos | `200` |
-| `GET /payments/order/:orderId` — cliente ve pagos de su orden | `200` |
-| `GET /payments/order/:orderId` — admin con orderId inexistente → array vacío | `200` |
-| `GET /payments/order/:orderId` — cliente accede a orden de otro usuario | `403` |
-| `GET /payments/order/:orderId` — orden no encontrada (cliente) | `404` |
-| `GET /payments/:id` — admin obtiene pago | `200` |
-| `GET /payments/:id` — cliente ve su propio pago | `200` |
-| `GET /payments/:id` — cliente accede a pago de otro usuario | `403` |
-| `GET /payments/:id` — pago no encontrado | `404` |
+| `POST /v1/payments` — orden PENDING con MercadoPago | `201` |
+| `POST /v1/payments` — orden ya tiene pago PENDING | `400` |
+| `POST /v1/payments` — orden no está en PENDING | `400` |
+| `POST /v1/payments` — cliente paga orden de otro usuario | `403` |
+| `POST /v1/payments` — orden no encontrada | `404` |
+| `POST /v1/payments` — body inválido (sin provider) | `400` |
+| `POST /v1/payments/webhook/mercadopago` — sin id en query | `200` |
+| `POST /v1/payments/webhook/mercadopago` — topic desconocido | `200` |
+| `POST /v1/payments/webhook/mercadopago` — topic=merchant_order, MP API falla | `200` |
+| `POST /v1/payments/webhook/mercadopago` — topic=payment, MP API falla | `200` |
+| `GET /v1/payments/order/:orderId` — admin ve pagos | `200` |
+| `GET /v1/payments/order/:orderId` — cliente ve pagos de su orden | `200` |
+| `GET /v1/payments/order/:orderId` — admin con orderId inexistente → array vacío | `200` |
+| `GET /v1/payments/order/:orderId` — cliente accede a orden de otro usuario | `403` |
+| `GET /v1/payments/order/:orderId` — orden no encontrada (cliente) | `404` |
+| `GET /v1/payments/:id` — admin obtiene pago | `200` |
+| `GET /v1/payments/:id` — cliente ve su propio pago | `200` |
+| `GET /v1/payments/:id` — cliente accede a pago de otro usuario | `403` |
+| `GET /v1/payments/:id` — pago no encontrado | `404` |
 
 ---
 

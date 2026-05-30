@@ -2,17 +2,20 @@
 
 ## ¿Qué es el módulo auth?
 
-El módulo de autenticación gestiona el ciclo de vida de la sesión en Waiona: registro, activación por email, login con JWT, recuperación y reset de contraseña. No tiene entidad propia — opera sobre `UserEntity` (del módulo `users`) y `TokenEntity` (del módulo `mail`). Es el único punto de entrada para obtener un JWT válido que el resto de los módulos protegidos requieren.
+El módulo de autenticación gestiona el ciclo de vida de la sesión en Waiona: registro, activación por email, login con JWT + refresh token, recuperación y reset de contraseña. No tiene entidad propia — opera sobre `UserEntity` (del módulo `users`) y `TokenEntity` (del módulo `mail`). Es el único punto de entrada para obtener un JWT válido que el resto de los módulos protegidos requieren.
 
 ```
-POST /auth/register    → crea UserEntity inactivo + envía token de activación
-GET  /auth/activate    → valida token → isActive = true
-POST /auth/login       → valida credenciales → emite JWT { sub, role }
-                                ↓
-                   Authorization: Bearer <jwt>  ← requerido por todos los módulos protegidos
-
-POST /auth/forgot-password → invalida tokens previos + envía token de reset
-POST /auth/reset-password  → valida token → actualiza password
+POST /v1/auth/register         → crea UserEntity inactivo + envía token de activación
+GET  /v1/auth/activate         → valida token → isActive = true
+POST /v1/auth/login            → valida credenciales → emite access_token + refresh_token
+POST /v1/auth/refresh          → rota refresh token → nuevos access_token + refresh_token
+POST /v1/auth/logout           → revoca refresh token (logout de un dispositivo)
+POST /v1/auth/logout-all       → revoca todos los refresh tokens del usuario (JWT requerido)
+PATCH /v1/auth/change-password → cambia contraseña validando la actual (JWT requerido)
+POST /v1/auth/forgot-password  → invalida tokens de reset previos + envía email de reset
+POST /v1/auth/reset-password   → valida token de reset → actualiza password
+                                        ↓
+                   Authorization: Bearer <access_token>  ← requerido por todos los módulos protegidos
 ```
 
 ---
@@ -26,6 +29,9 @@ POST /auth/reset-password  → valida token → actualiza password
 | Login | El cliente ingresa email y contraseña y obtiene un JWT para operar |
 | Recuperación de contraseña | El cliente solicita un link de reset por email |
 | Reset de contraseña | El cliente ingresa el token del email y elige una nueva contraseña |
+| Cambio de contraseña autenticado | El cliente cambia su contraseña estando logueado, validando la actual |
+| Logout en un dispositivo | El cliente revoca su refresh token (invalida esa sesión) |
+| Logout en todos los dispositivos | El cliente revoca todos sus refresh tokens activos |
 
 ---
 
@@ -40,7 +46,25 @@ POST /auth/reset-password  → valida token → actualiza password
 }
 ```
 
-### Entidad token (`TokenEntity`) — compartida con módulo `mail`
+### Entidad refresh token (`RefreshTokenEntity`)
+
+```typescript
+{
+  id:        number;
+  userId:    number;          // FK → users.id — CASCADE al eliminar el usuario
+  tokenHash: string;          // SHA-256 del refresh token — no se guarda el token en claro; unique index
+  expiresAt: Date;            // timestamptz — +7 días desde emisión
+  revokedAt: Date | null;     // timestamptz — null = activo; != null = revocado
+  // computed getters:
+  isExpired: boolean;         // new Date() > expiresAt
+  isRevoked:  boolean;        // revokedAt !== null
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Entidad token de email (`TokenEntity`) — compartida con módulo `mail`
 
 ```typescript
 {
@@ -105,6 +129,23 @@ Passport LocalStrategy extrae `email` y `password` del body directamente. No hay
 }
 ```
 
+### Request: refresh / logout (`RefreshTokenDto`)
+
+```typescript
+{
+  refresh_token: string; // requerido — el refresh token emitido por login o refresh
+}
+```
+
+### Request: change-password (`ChangePasswordDto`)
+
+```typescript
+{
+  currentPassword: string; // requerido — contraseña actual para verificar identidad
+  newPassword:     string; // requerido, 8–100 chars — debe tener mayúscula + minúscula + número
+}
+```
+
 ### Request: forgot-password (`ForgotPasswordDto`)
 
 ```typescript
@@ -126,7 +167,9 @@ Passport LocalStrategy extrae `email` y `password` del body directamente. No hay
 
 ## Endpoints
 
-### `POST /auth/register`
+Todas las rutas tienen prefijo `/v1/` — el controller usa `{ version: '1', path: 'auth' }`.
+
+### `POST /v1/auth/register`
 
 Crea un usuario inactivo y envía un email de activación.
 
@@ -153,7 +196,7 @@ Crea un usuario inactivo y envía un email de activación.
 
 ---
 
-### `GET /auth/activate?token=xxx`
+### `GET /v1/auth/activate?token=xxx`
 
 Activa la cuenta usando el token recibido por email.
 
@@ -168,9 +211,9 @@ Activa la cuenta usando el token recibido por email.
 
 ---
 
-### `POST /auth/login`
+### `POST /v1/auth/login`
 
-Valida credenciales y emite un JWT. Gestionado por `AuthGuard('local')` → `LocalStrategy` → `AuthService.validateUser()`.
+Valida credenciales y emite un access token + refresh token. Gestionado por `AuthGuard('local')` → `LocalStrategy` → `AuthService.validateUser()`.
 
 **Request:**
 ```json
@@ -197,7 +240,8 @@ Valida credenciales y emite un JWT. Gestionado por `AuthGuard('local')` → `Loc
     "createdAt": "2026-05-19T10:00:00.000Z",
     "updatedAt": "2026-05-19T10:00:00.000Z"
   },
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "abc123..."
 }
 ```
 
@@ -208,7 +252,46 @@ Valida credenciales y emite un JWT. Gestionado por `AuthGuard('local')` → `Loc
 
 ---
 
-### `POST /auth/forgot-password`
+### `POST /v1/auth/refresh`
+
+Rota el refresh token: revoca el anterior y emite uno nuevo. Implementa token rotation — un refresh token solo se puede usar una vez.
+
+**Request:**
+```json
+{ "refresh_token": "abc123..." }
+```
+
+**Response 200:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "xyz789..."
+}
+```
+
+**Errores posibles:**
+- `401` — token no existe, ya fue revocado, o está expirado
+
+---
+
+### `POST /v1/auth/logout`
+
+Revoca el refresh token del body. No requiere JWT — solo el refresh token válido.
+
+**Request:**
+```json
+{ "refresh_token": "abc123..." }
+```
+
+**Response 204** (sin cuerpo)
+
+**Errores posibles:**
+- `401` — token no existe o ya fue revocado
+- `400` — body inválido
+
+---
+
+### `POST /v1/auth/forgot-password`
 
 Envía un email con link de reset de contraseña. Invalida todos los tokens de reset previos del usuario antes de crear uno nuevo.
 
@@ -228,7 +311,7 @@ Envía un email con link de reset de contraseña. Invalida todos los tokens de r
 
 ---
 
-### `POST /auth/reset-password`
+### `POST /v1/auth/reset-password`
 
 Valida el token de reset e invalida todos los tokens de reset del usuario.
 
@@ -252,6 +335,40 @@ Valida el token de reset e invalida todos los tokens de reset del usuario.
 
 ---
 
+### `PATCH /v1/auth/change-password`
+
+Cambia la contraseña del usuario autenticado. Requiere JWT. Valida la contraseña actual antes de actualizar.
+
+**Request:**
+```json
+{
+  "currentPassword": "Password123",
+  "newPassword": "NuevoPassword456"
+}
+```
+
+**Response 200:**
+```json
+{ "message": "Password changed successfully" }
+```
+
+**Errores posibles:**
+- `400` — contraseña actual incorrecta o `newPassword` no cumple el formato
+- `401` — no autenticado (sin JWT)
+
+---
+
+### `POST /v1/auth/logout-all`
+
+Revoca todos los refresh tokens activos del usuario. Requiere JWT. Cierra sesión en todos los dispositivos.
+
+**Response 204** (sin cuerpo)
+
+**Errores posibles:**
+- `401` — no autenticado (sin JWT)
+
+---
+
 ## Reglas de negocio
 
 | Regla | Dónde se aplica |
@@ -263,7 +380,12 @@ Valida el token de reset e invalida todos los tokens de reset del usuario.
 | `forgotPassword` silencioso si email no existe o cuenta inactiva | early return sin enviar email ni error |
 | Login rechazado si `isActive === false` | `validateUser` → `401 UnauthorizedException` |
 | `password` jamás expuesto en respuestas | `@Exclude()` en `UserEntity` + `ClassSerializerInterceptor` global en `main.ts` |
-| JWT expira en 6 días | `JwtModule` con `signOptions: { expiresIn: '6d' }` |
+| JWT (access token) expira en 6 días | `JwtModule` con `signOptions: { expiresIn: '6d' }` |
+| Refresh token expira en 7 días | `issueRefreshToken()` — se guarda el hash (SHA-256), no el token en claro |
+| Refresh token rotation — un refresh token es de un solo uso | `refresh()` revoca el anterior y emite uno nuevo en la misma operación |
+| `logout` revoca el refresh token del body sin JWT | `findValidRefreshToken()` valida que exista, no esté revocado ni expirado; luego `revokedAt = new Date()` |
+| `logout-all` revoca todos los refresh tokens activos del usuario | `refreshTokenRepo.update({ userId, revokedAt: IsNull() }, { revokedAt: new Date() })` |
+| `change-password` valida contraseña actual antes de actualizar | `usersService.findEntityWithPassword()` + `bcrypt.compare()` → `400` si no coincide |
 | `RolesGuard` lee rol del JWT — sin query a DB | `JwtStrategy.validate()` retorna el payload completo |
 
 ---
@@ -272,21 +394,37 @@ Valida el token de reset e invalida todos los tokens de reset del usuario.
 
 **Flujo completo de registro y primer login:**
 ```
-POST /auth/register   { email, password, name, lastName }  → 201
-GET  /auth/activate?token=<token-del-email>                → 200
-POST /auth/login      { email, password }                  → 200 + JWT
+POST /v1/auth/register   { email, password, name, lastName }  → 201
+GET  /v1/auth/activate?token=<token-del-email>                → 200
+POST /v1/auth/login      { email, password }                  → 200 + access_token + refresh_token
+```
+
+**Renovar el access token con el refresh token:**
+```
+POST /v1/auth/refresh  { refresh_token: "abc..." }  → 200 + nuevos access_token + refresh_token
+```
+
+**Cerrar sesión:**
+```
+POST /v1/auth/logout      { refresh_token: "xyz..." }  → 204  (invalida ese dispositivo)
+POST /v1/auth/logout-all                               → 204  (invalida todos los dispositivos, requiere JWT)
 ```
 
 **Flujo de reset de contraseña:**
 ```
-POST /auth/forgot-password  { email }                            → 200
-POST /auth/reset-password   { token: <token-del-email>, password } → 200
-POST /auth/login            { email, nuevaPassword }             → 200 + JWT
+POST /v1/auth/forgot-password  { email }                              → 200
+POST /v1/auth/reset-password   { token: <token-del-email>, password } → 200
+POST /v1/auth/login            { email, nuevaPassword }               → 200 + tokens
+```
+
+**Cambiar contraseña estando logueado:**
+```
+PATCH /v1/auth/change-password  { currentPassword, newPassword }  → 200  (requiere JWT)
 ```
 
 **Usar el JWT en rutas protegidas:**
 ```
-GET /users/1
+GET /v1/users/1
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 → 200
 ```
@@ -303,13 +441,18 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | `JWT_SECRET` via `ConfigService<Env>` — nunca `process.env` | ✅ |
 | `validateUser()` verifica `isActive` → 401 | ✅ |
 | `forgotPassword` no revela existencia del email | ✅ |
-| Token generado con `randomBytes(32)` | ✅ |
+| Token de email generado con `randomBytes(32)` | ✅ |
 | Throttle en todos los endpoints sensibles | ✅ register / login / forgot-password / reset-password |
 | `ClassSerializerInterceptor` global en `main.ts` — sin redundancia en controller | ✅ |
-| Swagger — `@ApiTags`, `@ApiOperation`, `@ApiResponse` en los 5 endpoints | ✅ |
-| Tipo de retorno explícito en `login` | ✅ `{ user: UserEntity; access_token: string }` |
-| Unit tests | ✅ 23 casos — service (18) + controller (5) |
-| E2E tests — PostgreSQL real, `dropSchema: true`, 13 casos | ✅ |
+| Refresh token guardado como hash (SHA-256), no en claro | ✅ |
+| Token rotation — un refresh token es de un solo uso | ✅ `refresh()` revoca el anterior antes de emitir el nuevo |
+| `logout-all` revoca todas las sesiones activas | ✅ `UPDATE ... WHERE userId = X AND revokedAt IS NULL` |
+| `change-password` valida contraseña actual con bcrypt | ✅ `usersService.findEntityWithPassword()` + `bcrypt.compare()` |
+| Swagger — `@ApiTags`, `@ApiOperation`, `@ApiResponse` en los 9 endpoints | ✅ |
+| Tipo de retorno explícito en `login` | ✅ `{ user: UserEntity; access_token: string; refresh_token: string }` |
+| URI versioning `/v1/` en el controller | ✅ `@Controller({ version: '1', path: 'auth' })` |
+| Unit tests | ✅ 40 casos — service (30) + controller (10) |
+| E2E tests — PostgreSQL real, `dropSchema: true`, 29 casos | ✅ |
 
 ---
 
@@ -323,8 +466,8 @@ npx jest --testPathPattern="src/modules/auth" --no-coverage
 
 | Suite | Tests | Cobertura |
 |---|---|---|
-| `auth.service.spec.ts` | 18 | validateUser (4), generateToken (1), register (1), activateAccount (4), forgotPassword (3), resetPassword (2), defined (1) |
-| `auth.controller.spec.ts` | 5 | register, activate, login, forgotPassword, resetPassword — happy path + delegación al service |
+| `auth.service.spec.ts` | 30 | validateUser (4), generateToken (1), login (1), refresh (4), logout (2), register (1), activateAccount (5), forgotPassword (3), resetPassword (2), changePassword (3), logoutAll (2), defined (1) |
+| `auth.controller.spec.ts` | 10 | register, activate, login, refresh, logout, forgotPassword, resetPassword, changePassword, logoutAll + defined |
 
 ### E2E tests (`test/auth/auth.e2e-spec.ts`)
 
@@ -335,19 +478,34 @@ npx jest --config test/jest-e2e.json --testPathPattern="auth"
 
 | Caso | Status esperado |
 |---|---|
-| POST /auth/register con datos válidos | 201 |
-| POST /auth/register email duplicado | 409 |
-| POST /auth/register body inválido | 400 |
-| POST /auth/login cuenta no activada | 401 |
-| GET /auth/activate token válido | 200 |
-| GET /auth/activate token ya usado | 400 |
-| GET /auth/activate token inválido | 400 |
-| POST /auth/login credenciales correctas — 200 + sin password en respuesta | 200 |
-| POST /auth/login password incorrecta | 401 |
-| POST /auth/forgot-password email inexistente — sin email enviado | 200 |
-| POST /auth/forgot-password email válido — envía email | 200 |
-| POST /auth/reset-password token válido + login con nueva contraseña | 200 → 200 |
-| POST /auth/reset-password token inválido | 400 |
+| POST /v1/auth/register con datos válidos | 201 |
+| POST /v1/auth/register email duplicado | 409 |
+| POST /v1/auth/register body inválido | 400 |
+| POST /v1/auth/login cuenta no activada | 401 |
+| GET /v1/auth/activate token válido | 200 |
+| GET /v1/auth/activate token ya usado | 400 |
+| GET /v1/auth/activate token inválido | 400 |
+| POST /v1/auth/login credenciales correctas — 200 + access_token + refresh_token | 200 |
+| POST /v1/auth/login password incorrecta | 401 |
+| POST /v1/auth/refresh — retorna nuevos tokens | 200 |
+| POST /v1/auth/refresh — token inválido | 401 |
+| POST /v1/auth/refresh — token ya rotado (revocado) | 401 |
+| POST /v1/auth/refresh — body inválido | 400 |
+| POST /v1/auth/logout — revoca refresh token | 204 |
+| POST /v1/auth/logout — token ya revocado | 401 |
+| POST /v1/auth/logout — token inválido | 401 |
+| POST /v1/auth/logout — body inválido | 400 |
+| POST /v1/auth/forgot-password email inexistente — sin email enviado | 200 |
+| POST /v1/auth/forgot-password email válido — envía email | 200 |
+| POST /v1/auth/reset-password token válido + login con nueva contraseña | 200 → 200 |
+| POST /v1/auth/reset-password token inválido | 400 |
+| PATCH /v1/auth/change-password sin JWT | 401 |
+| PATCH /v1/auth/change-password contraseña actual incorrecta | 400 |
+| PATCH /v1/auth/change-password body inválido | 400 |
+| PATCH /v1/auth/change-password exitoso + login con nueva contraseña | 200 → 200 |
+| POST /v1/auth/logout-all sin JWT | 401 |
+| POST /v1/auth/logout-all revoca todas las sesiones | 204 |
+| POST /v1/auth/refresh con token previo al logout-all | 401 |
 
 ---
 
@@ -356,19 +514,25 @@ npx jest --config test/jest-e2e.json --testPathPattern="auth"
 ```
 AuthModule
   ├── consume UsersService
-  │     ├── create()          → POST /auth/register
-  │     ├── findByEmail()     → validateUser (login)
-  │     ├── findOne()         → activateAccount (verifica isActive)
-  │     ├── activate()        → GET /auth/activate
-  │     └── updatePassword()  → POST /auth/reset-password
+  │     ├── create()                   → POST /v1/auth/register
+  │     ├── findByEmail()              → validateUser (login)
+  │     ├── findOne()                  → activateAccount (verifica isActive)
+  │     ├── findEntityWithPassword()   → PATCH /v1/auth/change-password (expone hash para bcrypt.compare)
+  │     ├── activate()                 → GET /v1/auth/activate
+  │     └── updatePassword()           → POST /v1/auth/reset-password y PATCH /v1/auth/change-password
   │
   ├── consume MailService
-  │     ├── sendActivationEmail()    → POST /auth/register
-  │     └── sendPasswordResetEmail() → POST /auth/forgot-password
+  │     ├── sendActivationEmail()    → POST /v1/auth/register
+  │     └── sendPasswordResetEmail() → POST /v1/auth/forgot-password
   │
-  └── consume TokenEntity (repo directo — no via MailModule service)
-        ├── createToken()     → genera y persiste token
-        └── findValidToken()  → valida token en activate y reset
+  ├── consume TokenEntity (repo directo — no via MailModule service)
+  │     ├── createToken()     → genera y persiste token de activación/reset
+  │     └── findValidToken()  → valida token en activate y reset-password
+  │
+  └── consume RefreshTokenEntity (repo directo)
+        ├── issueRefreshToken()      → genera token, guarda hash
+        ├── findValidRefreshToken()  → valida en refresh y logout
+        └── revokedAt = new Date()   → en refresh (rotación), logout y logout-all
 
 JwtStrategy (jwt)
   └── emitido por AuthModule → validado en TODOS los módulos con AuthGuard('jwt')

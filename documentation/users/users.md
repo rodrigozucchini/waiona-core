@@ -5,11 +5,11 @@
 Un usuario es la entidad central de la plataforma Waiona. Concentra las credenciales de autenticación (email/password), el perfil personal (nombre, apellido, avatar) y el rol que determina qué puede hacer en el sistema. Es el punto de entrada del flujo de auth y el sujeto de todas las operaciones protegidas por propiedad.
 
 ```
-POST /auth/register  → crea el usuario (inactivo)
-GET  /auth/activate  → activa la cuenta
-POST /auth/login     → emite JWT con { sub: userId, role: RoleType }
+POST /v1/auth/register  → crea el usuario (inactivo)
+GET  /v1/auth/activate  → activa la cuenta
+POST /v1/auth/login     → emite JWT con { sub: userId, role: RoleType }
                              ↓
-                       userId se usa como guardián en GET/PATCH/DELETE /users/:id
+                       userId se usa como guardián en GET/PATCH/DELETE /v1/users/:id
 ```
 
 ---
@@ -149,7 +149,9 @@ Usado por `POST /auth/register` — no hay endpoint `POST /users`.
 
 ## Endpoints
 
-### `GET /users?page&limit&email&name`
+Todas las rutas tienen prefijo `/v1/` — el controller usa `{ version: '1', path: 'users' }`.
+
+### `GET /v1/users?page&limit&email&name`
 
 Lista paginada de usuarios activos. Requiere JWT con rol `SUPER_ADMIN` o `ADMIN`.
 
@@ -190,7 +192,7 @@ name  → filtra por name O lastName con ILIKE (OR entre ambos campos)
 
 ---
 
-### `GET /users/:id`
+### `GET /v1/users/:id`
 
 Obtiene el propio usuario. Requiere JWT. Solo puede acceder a su propio perfil (`req.user.sub === id`).
 
@@ -202,7 +204,7 @@ Obtiene el propio usuario. Requiere JWT. Solo puede acceder a su propio perfil (
 
 ---
 
-### `PATCH /users/:id`
+### `PATCH /v1/users/:id`
 
 Actualización parcial del perfil. Requiere JWT. Solo puede modificar su propio perfil.
 
@@ -222,7 +224,7 @@ Actualización parcial del perfil. Requiere JWT. Solo puede modificar su propio 
 
 ---
 
-### `DELETE /users/:id`
+### `DELETE /v1/users/:id`
 
 Soft delete del propio usuario. Requiere JWT. Solo puede eliminar su propia cuenta.
 
@@ -246,6 +248,7 @@ Soft delete del propio usuario. Requiere JWT. Solo puede eliminar su propia cuen
 | Soft delete — `deletedAt` nunca `null` en registros eliminados | `remove` vía `repo.softDelete(id)` |
 | Creación en transacción (usuario + perfil atómicos) | `create` — `dataSource.transaction()` evita perfiles huérfanos |
 | Avatar `null` borra el valor; omitido no lo modifica | `update` — check `!== undefined` antes de asignar |
+| `findEntityWithPassword` expone el hash de bcrypt | Usado internamente por `AuthService` en el flujo de `PATCH /v1/auth/change-password`; usa `addSelect('user.password')` porque la columna tiene `select: false` |
 
 ---
 
@@ -253,42 +256,42 @@ Soft delete del propio usuario. Requiere JWT. Solo puede eliminar su propia cuen
 
 **Listar usuarios paginados (admin):**
 ```json
-GET /users?page=1&limit=10
+GET /v1/users?page=1&limit=10
 ```
 
 **Filtrar por email:**
 ```json
-GET /users?email=juan
+GET /v1/users?email=juan
 ```
 
 **Filtrar por nombre:**
 ```json
-GET /users?name=Pérez
+GET /v1/users?name=Pérez
 ```
 
 **Ver propio perfil:**
 ```json
-GET /users/1
+GET /v1/users/1
 Authorization: Bearer <jwt-con-sub=1>
 ```
 
 **Actualizar nombre y quitar avatar:**
 ```json
-PATCH /users/1
+PATCH /v1/users/1
 Authorization: Bearer <jwt-con-sub=1>
 { "name": "Carlos", "avatar": null }
 ```
 
 **Eliminar propia cuenta:**
 ```json
-DELETE /users/1
+DELETE /v1/users/1
 Authorization: Bearer <jwt-con-sub=1>
 → 204 No Content
 ```
 
 **Intentar acceder a otro usuario:**
 ```json
-GET /users/2
+GET /v1/users/2
 Authorization: Bearer <jwt-con-sub=1>
 → 403 Forbidden: "Access denied"
 ```
@@ -344,20 +347,20 @@ npx jest --config test/jest-e2e.json --testPathPattern="users"
 
 | Caso | Status code esperado |
 |---|---|
-| GET /users paginado | 200 |
-| GET /users?email=test filtra por email | 200 |
-| GET /users?name=Test filtra por nombre | 200 |
-| GET /users/:id propio usuario | 200 |
-| GET /users/:id otro usuario | 403 |
-| GET /users/999999 inexistente | 404 |
-| PATCH /users/:id actualiza nombre | 200 |
-| PATCH /users/:id limpia avatar con null | 200 |
-| PATCH /users/:id con campo email (no permitido) | 400 |
-| PATCH /users/:id otro usuario | 403 |
-| PATCH /users/999999 inexistente | 404 |
-| DELETE /users/:id otro usuario | 403 |
-| DELETE /users/999999 inexistente | 404 |
-| DELETE /users/:id propio + GET posterior | 204 → 404 |
+| GET /v1/users paginado | 200 |
+| GET /v1/users?email=test filtra por email | 200 |
+| GET /v1/users?name=Test filtra por nombre | 200 |
+| GET /v1/users/:id propio usuario | 200 |
+| GET /v1/users/:id otro usuario | 403 |
+| GET /v1/users/999999 inexistente | 404 |
+| PATCH /v1/users/:id actualiza nombre | 200 |
+| PATCH /v1/users/:id limpia avatar con null | 200 |
+| PATCH /v1/users/:id con campo email (no permitido) | 400 |
+| PATCH /v1/users/:id otro usuario | 403 |
+| PATCH /v1/users/999999 inexistente | 404 |
+| DELETE /v1/users/:id otro usuario | 403 |
+| DELETE /v1/users/999999 inexistente | 404 |
+| DELETE /v1/users/:id propio + GET posterior | 204 → 404 |
 
 > La creación de usuarios en e2e se hace directamente via `UsersService.create()` — no existe `POST /users` en el controller (el registro es responsabilidad del módulo `auth`).
 
@@ -380,10 +383,11 @@ Decoradores aplicados:
 AuthModule
   └── consume UsersService
         ├── create()          → POST /auth/register (crea usuario + perfil en transacción)
-        ├── findByEmail()     → POST /auth/login (valida credenciales, retorna UserEntity con hash)
-        ├── findOne()         → JwtStrategy.validate() (verifica que el usuario exista y esté activo)
-        ├── activate()        → GET /auth/activate (marca isActive = true con token)
-        └── updatePassword()  → POST /auth/reset-password (hashea y actualiza password)
+        ├── findByEmail()             → POST /auth/login (valida credenciales, retorna UserEntity con hash)
+        ├── findOne()                 → JwtStrategy.validate() (verifica que el usuario exista y esté activo)
+        ├── findEntityWithPassword()  → PATCH /v1/auth/change-password (expone hash con addSelect para comparar)
+        ├── activate()                → GET /auth/activate (marca isActive = true con token)
+        └── updatePassword()          → POST /auth/reset-password (hashea y actualiza password)
 
 SeedModule
   └── crea RoleEntity al arrancar (SUPER_ADMIN, ADMIN, CLIENT)

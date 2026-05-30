@@ -5,6 +5,15 @@ export class DiscountsService {
     @InjectRepository(DiscountEntity)
     private readonly discountRepository: Repository<DiscountEntity>,
 
+    // Los repos de targets se inyectan aquí para hacer cascade-soft-delete
+    // cuando se elimina el descuento padre (remove()). Sin esto, los targets
+    // quedarían huérfanos y bloquearían futuras asignaciones.
+    @InjectRepository(DiscountProductTargetEntity)
+    private readonly productTargetRepo: Repository<DiscountProductTargetEntity>,
+
+    @InjectRepository(DiscountComboTargetEntity)
+    private readonly comboTargetRepo: Repository<DiscountComboTargetEntity>,
+
     // Invalida la caché del shop cuando cambia un descuento, porque los descuentos
     // afectan el precio que ve el cliente.
     private readonly shopCacheService: ShopCacheService,
@@ -82,6 +91,11 @@ export class DiscountsService {
   async remove(id: number): Promise<void> {
     const discount = await this.findEntity(id);
     await this.discountRepository.softDelete(discount.id);
+    // Al borrar el descuento, también se borran en cascada sus targets de producto y combo.
+    // Sin esto, los targets quedan huérfanos y bloquearían futuras asignaciones en
+    // validateProductHasNoActiveDiscount / validateComboHasNoActiveDiscount.
+    await this.productTargetRepo.softDelete({ discountId: discount.id });
+    await this.comboTargetRepo.softDelete({ discountId: discount.id });
     void this.shopCacheService.invalidate();
   }
 

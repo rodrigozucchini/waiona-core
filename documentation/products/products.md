@@ -101,13 +101,13 @@ Todos los campos son opcionales (`PartialType(CreateProductDto)`). Solo se enví
 
 ## Endpoints
 
-### GET /products
+### GET /v1/products
 
 Lista todos los productos no eliminados, paginados y ordenados por nombre A→Z.
 
 **Request:**
 ```
-GET /products?page=1&limit=20
+GET /v1/products?page=1&limit=20
 Authorization: Bearer <token>
 ```
 
@@ -140,13 +140,13 @@ Authorization: Bearer <token>
 
 ---
 
-### GET /products/:id
+### GET /v1/products/:id
 
 Devuelve un producto por ID incluyendo el nombre de su categoría.
 
 **Request:**
 ```
-GET /products/1
+GET /v1/products/1
 Authorization: Bearer <token>
 ```
 
@@ -173,7 +173,7 @@ Authorization: Bearer <token>
 
 ---
 
-### POST /products
+### POST /v1/products
 
 Crea un nuevo producto. El SKU se guarda en mayúsculas automáticamente.
 
@@ -213,7 +213,7 @@ Crea un nuevo producto. El SKU se guarda en mayúsculas automáticamente.
 
 ---
 
-### PATCH /products/:id
+### PATCH /v1/products/:id
 
 Actualización parcial. Solo se aplican los campos enviados.
 
@@ -231,18 +231,18 @@ Actualización parcial. Solo se aplican los campos enviados.
 |---|---|
 | 400 | Datos inválidos |
 | 400 | `categoryId` enviado no existe |
-| 400 | `sku` enviado ya pertenece a otro producto |
 | 404 | Producto no encontrado |
+| 409 | `sku` enviado ya pertenece a otro producto |
 
 ---
 
-### DELETE /products/:id
+### DELETE /v1/products/:id
 
 Soft delete: el producto desaparece de todas las queries pero no se borra de la DB.
 
 **Request:**
 ```
-DELETE /products/1
+DELETE /v1/products/1
 Authorization: Bearer <token>
 ```
 
@@ -256,18 +256,19 @@ Authorization: Bearer <token>
 
 | Regla | Dónde se aplica |
 |---|---|
-| SKU único en todo el sistema | `create()` → `ConflictException` si ya existe |
+| SKU único en todo el sistema | `create()` y `update()` → `ConflictException` (409) si ya existe |
 | SKU se guarda en mayúsculas | `create()` y `update()` hacen `.toUpperCase()` antes de guardar |
 | La categoría debe existir antes de asignarla | `validateCategoryExists()` en create y update |
 | No se puede borrar una categoría que tiene productos | `onDelete: 'RESTRICT'` en la FK de la entidad |
 | Los productos eliminados no aparecen en ninguna query | TypeORM filtra `WHERE deleted_at IS NULL` automáticamente |
 | `isActive: false` no elimina el producto, solo lo oculta del shop | El campo existe independientemente del soft delete |
+| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ## Ejemplos de uso real
 
 **Crear un producto con unidad de medida:**
 ```json
-POST /products
+POST /v1/products
 {
   "sku": "SPRITE-500",
   "name": "Sprite 500ml",
@@ -280,7 +281,7 @@ POST /products
 
 **Desactivar un producto sin eliminarlo:**
 ```json
-PATCH /products/5
+PATCH /v1/products/5
 {
   "isActive": false
 }
@@ -288,7 +289,7 @@ PATCH /products/5
 
 **Cambiar de categoría:**
 ```json
-PATCH /products/5
+PATCH /v1/products/5
 {
   "categoryId": 7
 }
@@ -308,6 +309,9 @@ PATCH /products/5
 | `PaginatedResponseDto` con `findAndCount` | ✅ |
 | Guards a nivel de clase (`ADMIN` + `SUPER_ADMIN`) | ✅ |
 | Swagger: `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiResponse` | ✅ |
+| Mensajes de error en español | ✅ |
+| Cache invalidation en mutations | ✅ |
+| `ConflictException` (409) en create y update para SKU duplicado | ✅ |
 | Unit tests (service + controller) | ✅ |
 | E2E tests con PostgreSQL real | ✅ |
 
@@ -440,6 +444,7 @@ class ProductImageEntity extends BaseEntity {
 | No se puede borrar un producto que tiene imágenes activas | `onDelete: 'RESTRICT'` en la FK de la entidad |
 | El orden se controla con `position` | El shop toma la imagen de menor posición como portada |
 | Soft delete: las imágenes eliminadas no se muestran | TypeORM filtra `WHERE deleted_at IS NULL` |
+| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ### Tests de imágenes
 

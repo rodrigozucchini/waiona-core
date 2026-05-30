@@ -8,12 +8,12 @@ El shop es la vista pública del catálogo de Waiona. Expone productos y combos 
 
 | Escenario | Ejemplo |
 |---|---|
-| Cliente navega el catálogo | GET /shop/items devuelve productos y combos activos con precio final |
-| Cliente busca por nombre | GET /shop/items?search=coca devuelve ítems cuyo nombre contiene "coca" |
-| Cliente filtra por categoría | GET /shop/items?categoryId=3 filtra por sección del catálogo |
-| Cliente filtra por rango de precio | GET /shop/items?minPrice=100&maxPrice=500 |
-| Cliente ve solo productos o solo combos | GET /shop/items?type=product o type=combo |
-| Cliente abre el detalle de un ítem | GET /shop/items/1?type=product devuelve precio desglosado, stock e imágenes |
+| Cliente navega el catálogo | GET /v1/shop/items devuelve productos y combos activos con precio final |
+| Cliente busca por nombre | GET /v1/shop/items?search=coca devuelve ítems cuyo nombre contiene "coca" |
+| Cliente filtra por categoría | GET /v1/shop/items?categoryId=3 filtra por sección del catálogo |
+| Cliente filtra por rango de precio | GET /v1/shop/items?minPrice=100&maxPrice=500 |
+| Cliente ve solo productos o solo combos | GET /v1/shop/items?type=product o type=combo |
+| Cliente abre el detalle de un ítem | GET /v1/shop/items/1?type=product devuelve precio desglosado, stock e imágenes |
 
 ## Tipos de datos
 
@@ -107,15 +107,15 @@ Para combos, el stock se calcula sumando el stock de cada producto componente po
 
 ## Endpoints
 
-### GET /shop/items
+### GET /v1/shop/items
 
 Devuelve productos y combos activos paginados con precio calculado y stock. No requiere autenticación.
 
 **Request:**
 ```
-GET /shop/items?page=1&limit=20
-GET /shop/items?search=coca&type=product
-GET /shop/items?categoryId=3&minPrice=100&maxPrice=500
+GET /v1/shop/items?page=1&limit=20
+GET /v1/shop/items?search=coca&type=product
+GET /v1/shop/items?categoryId=3&minPrice=100&maxPrice=500
 ```
 
 **Response 200:**
@@ -163,7 +163,7 @@ GET /shop/items?categoryId=3&minPrice=100&maxPrice=500
 
 ---
 
-### GET /shop/items/:id
+### GET /v1/shop/items/:id
 
 Devuelve el detalle completo de un producto o combo: precio desglosado, stock, imágenes y (si es combo) lista de productos que lo componen. No requiere autenticación.
 
@@ -171,8 +171,8 @@ El parámetro `type` es obligatorio para que el sistema sepa si buscar en `produ
 
 **Request:**
 ```
-GET /shop/items/1?type=product
-GET /shop/items/2?type=combo
+GET /v1/shop/items/1?type=product
+GET /v1/shop/items/2?type=combo
 ```
 
 **Response 200 (producto):**
@@ -248,7 +248,7 @@ unitPrice (precio base en pricing)
     ↓ aplicar descuento (discount-product-target / discount-combo-target)
 priceAfterDiscount
     ↓ aplicar margen (margins)
-    ↓ aplicar impuestos (product-taxes / combo-taxes)
+    ↓ aplicar impuestos (product-taxes — combos usan prorrateo lineal, sin combo-taxes)
 finalPrice  ←── lo que ve el cliente en el shop
 
 fullPrice = precio sin descuento (margen + impuestos sobre unitPrice) → se muestra tachado si hasDiscount
@@ -288,18 +288,18 @@ npx jest --config test/jest-e2e.json --testPathPattern="shop.e2e"
 
 | Caso | Status esperado |
 |---|---|
-| GET /shop/items sin filtros | 200 |
-| GET /shop/items?search=nombre | 200 |
-| GET /shop/items?type=product | 200 |
-| GET /shop/items?type=combo | 200 |
-| GET /shop/items?categoryId=N | 200 |
-| GET /shop/items?minPrice=X&maxPrice=Y | 200 |
-| GET /shop/items?minPrice mayor que maxPrice | 400 |
-| GET /shop/items/:id?type=product (existe y tiene precio) | 200 |
-| GET /shop/items/:id?type=combo (existe y tiene precio) | 200 |
-| GET /shop/items/:id sin type | 400 |
-| GET /shop/items/:id de ítem inexistente | 404 |
-| GET /shop/items/:id de ítem inactivo | 404 |
+| GET /v1/shop/items sin filtros | 200 |
+| GET /v1/shop/items?search=nombre | 200 |
+| GET /v1/shop/items?type=product | 200 |
+| GET /v1/shop/items?type=combo | 200 |
+| GET /v1/shop/items?categoryId=N | 200 |
+| GET /v1/shop/items?minPrice=X&maxPrice=Y | 200 |
+| GET /v1/shop/items?minPrice mayor que maxPrice | 400 |
+| GET /v1/shop/items/:id?type=product (existe y tiene precio) | 200 |
+| GET /v1/shop/items/:id?type=combo (existe y tiene precio) | 200 |
+| GET /v1/shop/items/:id sin type | 400 |
+| GET /v1/shop/items/:id de ítem inexistente | 404 |
+| GET /v1/shop/items/:id de ítem inactivo | 404 |
 
 ## Integración con otros módulos
 
@@ -311,7 +311,7 @@ ComboEntity ────────→  ShopService
                    CalculationService  StockItemsService  images (sorted by position)
                          ↓
                product-pricing / combo-pricing
-               margins / product-taxes / combo-taxes
+               margins / product-taxes (prorrateo en combos)
                discount-product-target / discount-combo-target
                          ↓
                    ShopPaginatedResponseDto / ShopDetailResponseDto

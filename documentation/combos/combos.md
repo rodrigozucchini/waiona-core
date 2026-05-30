@@ -126,13 +126,13 @@ Cuando se envía `items`, el servicio hace soft delete de todos los ítems actua
 
 ## Endpoints
 
-### GET /combos
+### GET /v1/combos
 
 Lista todos los combos no eliminados, paginados y ordenados por nombre A→Z. Incluye ítems y nombre de categoría.
 
 **Request:**
 ```
-GET /combos?page=1&limit=20
+GET /v1/combos?page=1&limit=20
 Authorization: Bearer <token>
 ```
 
@@ -166,13 +166,13 @@ Authorization: Bearer <token>
 
 ---
 
-### GET /combos/:id
+### GET /v1/combos/:id
 
 Devuelve un combo por ID incluyendo ítems y nombre de categoría.
 
 **Request:**
 ```
-GET /combos/1
+GET /v1/combos/1
 Authorization: Bearer <token>
 ```
 
@@ -184,7 +184,7 @@ Authorization: Bearer <token>
 
 ---
 
-### POST /combos
+### POST /v1/combos
 
 Crea un nuevo combo con sus ítems en una transacción atómica.
 
@@ -212,7 +212,7 @@ Crea un nuevo combo con sus ítems en una transacción atómica.
 
 ---
 
-### PATCH /combos/:id
+### PATCH /v1/combos/:id
 
 Actualización parcial. Solo se aplican los campos enviados. Si se envía `items`, reemplaza la lista completa.
 
@@ -239,13 +239,13 @@ Actualización parcial. Solo se aplican los campos enviados. Si se envía `items
 
 ---
 
-### DELETE /combos/:id
+### DELETE /v1/combos/:id
 
 Soft delete: el combo desaparece de todas las queries pero no se borra de la DB.
 
 **Request:**
 ```
-DELETE /combos/1
+DELETE /v1/combos/1
 Authorization: Bearer <token>
 ```
 
@@ -268,12 +268,13 @@ Authorization: Bearer <token>
 | Al reemplazar ítems, los anteriores se soft-deletean | `manager.softDelete(ComboItemEntity, { comboId })` dentro de la transacción |
 | Los combos eliminados no aparecen en ninguna query | TypeORM filtra `WHERE deleted_at IS NULL` automáticamente |
 | `isActive: false` no elimina el combo, solo lo oculta del shop | El campo existe independientemente del soft delete |
+| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ## Ejemplos de uso real
 
 **Crear un combo:**
 ```json
-POST /combos
+POST /v1/combos
 {
   "name": "Combo Asado",
   "description": "Gaseosas y agua para el asado familiar",
@@ -288,7 +289,7 @@ POST /combos
 
 **Desactivar un combo sin eliminarlo:**
 ```json
-PATCH /combos/3
+PATCH /v1/combos/3
 {
   "isActive": false
 }
@@ -296,7 +297,7 @@ PATCH /combos/3
 
 **Reemplazar todos los ítems del combo:**
 ```json
-PATCH /combos/3
+PATCH /v1/combos/3
 {
   "items": [
     { "productId": 1, "quantity": 2 },
@@ -320,6 +321,8 @@ PATCH /combos/3
 | Guards a nivel de clase (`ADMIN` + `SUPER_ADMIN`) | ✅ |
 | Swagger: `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiResponse` | ✅ |
 | Transacción atómica con `dataSource.transaction()` | ✅ |
+| Mensajes de error en español | ✅ |
+| Cache invalidation en mutations | ✅ |
 | Unit tests (service + controller) | ✅ |
 | E2E tests con PostgreSQL real | ✅ |
 
@@ -372,7 +375,7 @@ ProductEntity ──────────────────────
 
 combo-pricing/            → precio base + margen del combo
 discount-combo-target/    → descuentos asignados al combo
-combo-taxes/              → impuestos específicos del combo
+product-taxes/            → impuestos prorateados desde los productos componentes (no hay combo-taxes)
 calculation/              → motor de precio final
 shop/                     → endpoint público para el cliente
 orders/                   → combos dentro de pedidos
@@ -453,6 +456,7 @@ class ComboImageEntity extends BaseEntity {
 | No se puede borrar un combo que tiene imágenes activas | `onDelete: 'RESTRICT'` en la FK de la entidad |
 | El orden se controla con `position` | El shop toma la imagen de menor posición como portada |
 | Soft delete: las imágenes eliminadas no se muestran | TypeORM filtra `WHERE deleted_at IS NULL` |
+| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ### Tests de imágenes
 

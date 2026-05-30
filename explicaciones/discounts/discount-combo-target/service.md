@@ -99,8 +99,12 @@ export class DiscountComboTargetService {
     comboId: number,
   ): Promise<void> {
     // Unicidad dentro del mismo descuento: este combo ya está en este descuento.
+    // withDeleted: true + deletedAt: IsNull() porque el default de findOne
+    // excluye soft-deleted, pero aquí queremos buscar solo activos de forma explícita
+    // para que el error 409 no se dispare cuando el target fue previamente borrado.
     const existing = await this.repo.findOne({
-      where: { discountId, comboId },
+      where: { discountId, comboId, deletedAt: IsNull() },
+      withDeleted: true,
     });
 
     if (existing) {
@@ -115,9 +119,15 @@ export class DiscountComboTargetService {
   ): Promise<void> {
     // Unicidad global: busca solo por comboId sin importar el discountId.
     // Garantiza que un combo tenga como máximo un descuento activo en todo el sistema.
-    const existing = await this.repo.findOne({
-      where: { comboId },
-    });
+    // Usa QueryBuilder con innerJoin para también verificar que el descuento padre
+    // no esté borrado — evita bloquear reasignaciones cuando el descuento fue eliminado.
+    const existing = await this.repo
+      .createQueryBuilder('target')
+      .innerJoin('target.discount', 'discount')
+      .where('target.comboId = :comboId', { comboId })
+      .andWhere('target.deletedAt IS NULL')
+      .andWhere('discount.deletedAt IS NULL')
+      .getOne();
 
     if (existing) {
       throw new ConflictException(

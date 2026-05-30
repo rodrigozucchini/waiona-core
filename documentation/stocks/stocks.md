@@ -27,11 +27,11 @@ quantityAvailable = quantityCurrent - quantityReserved   (calculado como getter,
 | Escenario | Ejemplo |
 |---|---|
 | Alta de inventario en nueva ubicación | Admin crea un StockItem para el producto "Notebook X1" en "Depósito Norte" |
-| Carga de mercadería | Admin llama `POST /stock-items/add-stock` con 50 unidades recibidas |
+| Carga de mercadería | Admin llama `POST /v1/stock-items/add-stock` con 50 unidades recibidas |
 | Cliente hace un pedido | Sistema reserva stock con `reserveStock()` al crear la orden |
 | Admin despacha la orden | Sistema descuenta stock real con `dispatchStock()` al pasar a DISPATCHED |
 | Admin cancela la orden | Sistema libera la reserva con `releaseReservation()` al pasar a CANCELLED |
-| Baja por daño | Admin registra con `POST /stock-items/write-off-damage` y crea el write-off |
+| Baja por daño | Admin registra con `POST /v1/stock-items/write-off-damage` y crea el write-off |
 | Consulta de stock en el shop | `findByProduct()` devuelve la ubicación con mayor stock disponible |
 | Consulta de stock de combo | `findByCombo()` calcula cuántos combos se pueden armar con el stock de sus componentes |
 
@@ -285,7 +285,7 @@ Igual a `StockItemResponseDto` más:
 
 ## Endpoints
 
-### `POST /stock-locations` — Crear ubicación
+### `POST /v1/stock-locations` — Crear ubicación
 
 **Request:**
 ```json
@@ -299,7 +299,7 @@ Igual a `StockItemResponseDto` más:
 
 ---
 
-### `GET /stock-locations` — Listar ubicaciones
+### `GET /v1/stock-locations` — Listar ubicaciones
 
 Query: `page` (default 1), `limit` (default 20)
 
@@ -307,13 +307,13 @@ Query: `page` (default 1), `limit` (default 20)
 
 ---
 
-### `GET /stock-locations/:id` — Obtener ubicación
+### `GET /v1/stock-locations/:id` — Obtener ubicación
 
 **Response 200:** `StockLocationResponseDto` | **404** — no encontrada
 
 ---
 
-### `PATCH /stock-locations/:id` — Actualizar ubicación
+### `PATCH /v1/stock-locations/:id` — Actualizar ubicación
 
 Todos los campos del body son opcionales. Enviar `address: null` limpia la dirección.
 
@@ -321,7 +321,7 @@ Todos los campos del body son opcionales. Enviar `address: null` limpia la direc
 
 ---
 
-### `DELETE /stock-locations/:id` — Eliminar ubicación (soft)
+### `DELETE /v1/stock-locations/:id` — Eliminar ubicación (soft)
 
 **Response 204**
 
@@ -331,7 +331,7 @@ Todos los campos del body son opcionales. Enviar `address: null` limpia la direc
 
 ---
 
-### `POST /stock-items` — Crear stock item
+### `POST /v1/stock-items` — Crear stock item
 
 Crea el registro de stock (en 0 unidades). Luego usar `add-stock` para cargar unidades.
 
@@ -349,7 +349,7 @@ Crea el registro de stock (en 0 unidades). Luego usar `add-stock` para cargar un
 
 ---
 
-### `GET /stock-items` — Listar stock items
+### `GET /v1/stock-items` — Listar stock items
 
 Carga las relaciones `location` y `product` para incluir `locationName` y `productName`.
 
@@ -357,7 +357,7 @@ Carga las relaciones `location` y `product` para incluir `locationName` y `produ
 
 ---
 
-### `GET /stock-items/:id` — Obtener stock item con movimientos
+### `GET /v1/stock-items/:id` — Obtener stock item con movimientos
 
 Carga `location`, `product` y `movements` (ordenados por `createdAt DESC`).
 
@@ -365,7 +365,7 @@ Carga `location`, `product` y `movements` (ordenados por `createdAt DESC`).
 
 ---
 
-### `POST /stock-items/add-stock` — Agregar stock
+### `POST /v1/stock-items/add-stock` — Agregar stock
 
 Crea un movimiento `ENTRY / INBOUND / MANUAL` y suma `quantity` a `quantityCurrent`. Usa transacción con lock `pessimistic_write`.
 
@@ -380,7 +380,7 @@ Crea un movimiento `ENTRY / INBOUND / MANUAL` y suma `quantity` a `quantityCurre
 
 ---
 
-### `POST /stock-items/write-off` — Baja simple
+### `POST /v1/stock-items/write-off` — Baja simple
 
 Resta `quantity` de `quantityCurrent`. Crea movimiento `ADJUSTMENT / OUTBOUND / MANUAL`. Requiere que `quantityAvailable >= quantity`.
 
@@ -393,7 +393,7 @@ Resta `quantity` de `quantityCurrent`. Crea movimiento `ADJUSTMENT / OUTBOUND / 
 
 ---
 
-### `POST /stock-items/write-off-damage` — Baja por daño
+### `POST /v1/stock-items/write-off-damage` — Baja por daño
 
 Igual que write-off simple pero además crea un registro en `StockWriteOffEntity`. Crea movimiento `DAMAGE / OUTBOUND / MANUAL`.
 
@@ -410,7 +410,7 @@ Igual que write-off simple pero además crea un registro en `StockWriteOffEntity
 
 ---
 
-### `POST /stock-items/dispatch` — Despachar stock (interno — usado por OrdersModule)
+### `POST /v1/stock-items/dispatch` — Despachar stock (interno — usado por OrdersModule)
 
 Descuenta `quantityCurrent` y `quantityReserved`. Crea movimiento `EXIT / OUTBOUND / ORDER`. Requiere que `quantityReserved >= quantity` y `quantityCurrent >= quantity`.
 
@@ -418,7 +418,7 @@ Descuenta `quantityCurrent` y `quantityReserved`. Crea movimiento `EXIT / OUTBOU
 
 ---
 
-### `POST /stock-items/release` — Liberar reserva (interno — usado por OrdersModule)
+### `POST /v1/stock-items/release` — Liberar reserva (interno — usado por OrdersModule)
 
 Resta `quantityReserved` sin tocar `quantityCurrent`. Crea movimiento `RETURN / INBOUND / ORDER`.
 
@@ -426,7 +426,7 @@ Resta `quantityReserved` sin tocar `quantityCurrent`. Crea movimiento `RETURN / 
 
 ---
 
-### `PATCH /stock-items/:id/thresholds` — Actualizar umbrales
+### `PATCH /v1/stock-items/:id/thresholds` — Actualizar umbrales
 
 Todos los campos son opcionales. Valida reglas de umbrales sobre los valores resultantes.
 
@@ -439,33 +439,33 @@ Todos los campos son opcionales. Valida reglas de umbrales sobre los valores res
 
 ---
 
-### `GET /stock-movements` — Listar movimientos
+### `GET /v1/stock-movements` — Listar movimientos
 
 **Response 200:** `PaginatedResponseDto<StockMovementResponseDto>`
 
-### `GET /stock-movements/stock-item/:stockItemId` — Movimientos de un item
+### `GET /v1/stock-movements/stock-item/:stockItemId` — Movimientos de un item
 
 **Response 200:** `StockMovementResponseDto[]`
 
-### `GET /stock-movements/:id` — Obtener movimiento
+### `GET /v1/stock-movements/:id` — Obtener movimiento
 
 **Response 200:** `StockMovementResponseDto` | **404**
 
 ---
 
-### `GET /stock-write-offs` — Listar write-offs
+### `GET /v1/stock-write-offs` — Listar write-offs
 
 **Response 200:** `PaginatedResponseDto<StockWriteOffResponseDto>`
 
-### `GET /stock-write-offs/stock-item/:stockItemId` — Write-offs de un item
+### `GET /v1/stock-write-offs/stock-item/:stockItemId` — Write-offs de un item
 
 **Response 200:** `StockWriteOffResponseDto[]`
 
-### `GET /stock-write-offs/:id` — Obtener write-off
+### `GET /v1/stock-write-offs/:id` — Obtener write-off
 
 **Response 200:** `StockWriteOffResponseDto` | **404**
 
-### `PATCH /stock-write-offs/:id` — Actualizar write-off
+### `PATCH /v1/stock-write-offs/:id` — Actualizar write-off
 
 Solo permite modificar `reason`, `description` y `attachments`. No se puede cambiar `quantity`, `stockItemId` ni `movementId`.
 
@@ -496,20 +496,20 @@ Solo permite modificar `reason`, `description` y `attachments`. No se puede camb
 
 **Alta de mercadería en depósito:**
 ```json
-POST /stock-items/add-stock
+POST /v1/stock-items/add-stock
 { "productId": 5, "locationId": 2, "quantity": 200 }
 // → 201 StockItemWithMovementsResponseDto con movimiento ENTRY
 ```
 
 **Despacho de una orden (llamado interno desde OrdersModule):**
 ```json
-POST /stock-items/dispatch
+POST /v1/stock-items/dispatch
 { "productId": 5, "locationId": 2, "quantity": 3, "orderId": 88 }
 ```
 
 **Baja por vencimiento:**
 ```json
-POST /stock-items/write-off-damage
+POST /v1/stock-items/write-off-damage
 {
   "stockItemId": 7, "quantity": 12, "reason": "EXPIRED",
   "description": "Lote vencido 2026-04", "reportedBy": 3
@@ -518,7 +518,7 @@ POST /stock-items/write-off-damage
 
 **Ajustar umbral de alerta:**
 ```json
-PATCH /stock-items/4/thresholds
+PATCH /v1/stock-items/4/thresholds
 { "stockMin": 20, "stockCritical": 5 }
 ```
 

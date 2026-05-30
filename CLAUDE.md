@@ -36,42 +36,46 @@ src/
 │   ├── enums/role-type.enum.ts           → SUPER_ADMIN | ADMIN | CLIENT
 │   ├── guards/roles.guard.ts             → lee rol del JWT payload, sin DB query
 │   ├── guards/guards.module.ts
+│   ├── cache/shop-cache.service.ts       → Redis cache del shop (invalidado en toda mutation de catálogo)
+│   ├── interceptors/idempotency.interceptor.ts → previene POST duplicados (clave = hash del body)
 │   └── theme/email-theme.ts             → colores y logo para templates de email
 │
 ├── modules/
-│   ├── auth/                             → login, register, activate, forgot/reset password
+│   ├── auth/                             → login, register, activate, refresh, logout, change-password, forgot/reset password
+│   │   └── entities/refresh-token.entity.ts → refresh tokens (guardado como hash, rotation implementada)
 │   ├── users/                            → CRUD usuarios, búsqueda por email/nombre
 │   ├── seed/                             → crea roles base y superadmin al arrancar
-│   ├── mail/                             → servicio de email con Resend
+│   ├── mail/                             → cola BullMQ + Resend para envío asíncrono
 │   │   ├── entities/token.entity.ts      → tokens de activación y reset
 │   │   └── templates/                   → HTML templates de email
+│   ├── analytics/                        → dashboard admin: órdenes, top productos, stock crítico
+│   ├── storage/                          → upload/delete de imágenes en Cloudinary
 │   ├── products/
 │   │   ├── product/                      → CRUD productos (requiere categoryId)
 │   │   ├── combos/                       → CRUD combos (items + categoryId)
 │   │   ├── categories/                   → árbol de categorías padre/hijo
-│   │   ├── product-images/              → imágenes ordenadas por position
-│   │   ├── combo-images/                → imágenes de combos
-│   │   └── shop/                         → endpoints públicos para el cliente
+│   │   ├── product-images/              → imágenes ordenadas por position (Cloudinary)
+│   │   ├── combo-images/                → imágenes de combos (Cloudinary)
+│   │   └── shop/                         → endpoints públicos para el cliente (con Redis cache)
 │   ├── pricing/
-│   │   ├── (product|combo)-pricing/     → precio base, margen y moneda
-│   │   └── calculation/                 → motor de cálculo de precios
+│   │   ├── (product|combo)-pricing/     → precio base y margen
+│   │   └── calculation/                 → motor de cálculo (prorrateo de impuestos en combos)
 │   ├── taxation/
-│   │   ├── taxes/                        → impuestos globales
+│   │   ├── taxes/                        → impuestos globales (siempre porcentuales)
 │   │   ├── tax-types/                   → tipos de impuesto (IVA, IIBB, etc.)
-│   │   ├── product-taxes/               → impuestos específicos por producto
-│   │   └── combo-taxes/                 → impuestos específicos por combo
-│   ├── margins/                          → márgenes de ganancia
+│   │   └── product-taxes/               → impuestos específicos por producto (combos se prorratean)
+│   ├── margins/                          → márgenes de ganancia (siempre porcentuales)
 │   ├── discounts/
-│   │   ├── discount/                     → descuentos con fechas y valor
+│   │   ├── discount/                     → descuentos con fechas y valor (siempre porcentuales)
 │   │   ├── discount-product-target/     → descuento asignado a producto
 │   │   └── discount-combo-target/       → descuento asignado a combo
 │   ├── coupons/
-│   │   ├── coupon/                       → códigos de cupón con límite de uso
+│   │   ├── coupon/                       → códigos de cupón (siempre porcentuales — sin isPercentage/currency)
 │   │   ├── coupon-product-target/       → cupón para producto específico
 │   │   ├── coupon-combo-target/         → cupón para combo específico
 │   │   └── usage/                        → registro de usos con transacción
 │   ├── stocks/
-│   │   ├── stock-item/                  → stock por producto+ubicación
+│   │   ├── stock-item/                  → stock por producto+ubicación (sin stockMax)
 │   │   ├── stock-locations/             → depósitos/ubicaciones
 │   │   ├── stock-movement/             → log de movimientos (ENTRY/EXIT/etc.)
 │   │   └── stock-writeoff/             → bajas por daño o ajuste
@@ -132,11 +136,15 @@ CANCELLED → (ninguna)
 ## Flujo de Auth
 
 ```
-POST /auth/register     → crea usuario inactivo → envía email de activación
-GET  /auth/activate     → activa la cuenta con token
-POST /auth/login        → valida credenciales + isActive → devuelve JWT
-POST /auth/forgot-password → envía email de reset
-POST /auth/reset-password  → valida token y cambia password
+POST /v1/auth/register          → crea usuario inactivo → envía email de activación
+GET  /v1/auth/activate          → activa la cuenta con token
+POST /v1/auth/login             → valida credenciales + isActive → devuelve access_token + refresh_token
+POST /v1/auth/refresh           → rota refresh token → nuevos access_token + refresh_token
+POST /v1/auth/logout            → revoca refresh token (logout de un dispositivo)
+POST /v1/auth/logout-all        → revoca todos los refresh tokens del usuario (JWT requerido)
+PATCH /v1/auth/change-password  → cambia contraseña validando la actual (JWT requerido)
+POST /v1/auth/forgot-password   → envía email de reset
+POST /v1/auth/reset-password    → valida token y cambia password
 ```
 
 JWT payload: `{ sub: userId, role: RoleType }`

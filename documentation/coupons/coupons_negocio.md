@@ -37,12 +37,11 @@ Permite que los administradores **creen códigos de cupón, los configuren y con
 
 ---
 
-## Tipos de cupón
+## Tipo de cupón
 
-| Tipo | Cómo funciona | Ejemplo |
-|---|---|---|
-| **Porcentual** | Se descuenta un porcentaje del total | 10% off sobre $5.000 → paga $4.500 |
-| **Monto fijo** | Se descuenta un monto exacto del total | $500 off sobre $5.000 → paga $4.500 |
+Los cupones son **siempre porcentuales**. El sistema descuenta un porcentaje del total de la orden. Por ejemplo: un cupón de 10% sobre una orden de $5.000 aplica un descuento de $500, y el cliente paga $4.500.
+
+> Si necesitás descuentos de monto fijo a nivel producto, usá los **descuentos de producto** en su lugar.
 
 ---
 
@@ -127,9 +126,7 @@ Un cupón sin fechas ni límite de uso siempre está **activo**.
 
 - **Los cupones globales no pueden tener productos asignados** — si un cupón aplica a todo el catálogo, no tiene sentido asignarle productos específicos. El sistema bloquea esa combinación.
 
-- **El porcentaje no puede superar el 100%** — si el cupón es porcentual, el valor máximo es 100.
-
-- **Un cupón de monto fijo debe indicar la moneda** — hay que especificar en qué moneda está expresado el descuento (por ejemplo, pesos argentinos).
+- **El porcentaje no puede superar el 100%** — el valor máximo de un cupón es 100 (lo que equivale a descuento total). El mínimo es 0.01.
 
 - **Las fechas deben tener sentido** — si se define fecha de inicio y de fin, la de inicio debe ser anterior a la de fin. El sistema rechaza rangos inválidos.
 
@@ -147,13 +144,13 @@ Un cupón sin fechas ni límite de uso siempre está **activo**.
 > El administrador crea el cupón "BIENVENIDO10" con 10% de descuento, tipo porcentual, alcance global y sin fechas ni límite. Cualquier cliente puede usarlo una vez para cualquier pedido, indefinidamente.
 
 **Crear una promo relámpago limitada:**
-> El administrador crea el cupón "FLASH100" con $100 de descuento, moneda ARS, alcance global y límite de 50 usos. Una vez que 50 clientes lo usen, el sistema muestra el estado "Agotado" y no acepta nuevos usos.
+> El administrador crea el cupón "FLASH20" con 20% de descuento, alcance global y límite de 50 usos. Una vez que 50 clientes lo usen, el sistema muestra el estado "Agotado" y no acepta nuevos usos.
 
 **Crear un cupón dirigido a productos específicos:**
 > El administrador crea el cupón "LIQPIZZA" con 20% de descuento, alcance dirigido. Luego asigna al cupón los productos de pizza que quiere incluir. Solo los pedidos que contengan esos productos específicos pueden usar el código.
 
 **Quitar un producto del alcance de un cupón:**
-> El administrador quita "Hamburguesa XXL" del cupón "FLASH100". A partir de ese momento, el código ya no aplica a ese producto en nuevos pedidos.
+> El administrador quita "Hamburguesa XXL" del cupón "FLASH20". A partir de ese momento, el código ya no aplica a ese producto en nuevos pedidos.
 
 **Ver quién usó un cupón:**
 > El administrador consulta los usos del código "VERANO10" y ve la lista de órdenes en las que se aplicó, con fecha y usuario.

@@ -46,21 +46,21 @@ coupons/
 
 ```typescript
 {
-  id:           number;         // PK autoincremental
-  code:         string;         // código único, 3–100 chars, case-sensitive
-  value:        number;         // decimal(10,2) — viene como string de PG, convertido en DTO
-  isPercentage: boolean;        // true = %, false = monto fijo
-  currency?:    CurrencyCode;   // requerido si isPercentage = false, null si isPercentage = true
-  isGlobal:     boolean;        // true = aplica a todo, false = requiere targets asignados
-  usageLimit?:  number | null;  // int — null = sin límite
-  usageCount:   number;         // int — se incrementa en la transacción de uso
-  startsAt?:    Date | null;    // inicio de vigencia (opcional)
-  endsAt?:      Date | null;    // fin de vigencia (opcional)
-  deletedAt:    Date | null;    // soft delete vía @DeleteDateColumn
-  createdAt:    Date;
-  updatedAt:    Date;
+  id:          number;        // PK autoincremental
+  code:        string;        // código único, 3–100 chars — normalizado a MAYÚSCULAS + trim
+  value:       number;        // decimal(10,2) — siempre porcentaje (0.01–100)
+  isGlobal:    boolean;       // true = aplica a todo, false = requiere targets asignados
+  usageLimit?: number | null; // int — null = sin límite
+  usageCount:  number;        // int — se incrementa en la transacción de uso
+  startsAt?:   Date | null;   // inicio de vigencia (opcional)
+  endsAt?:     Date | null;   // fin de vigencia (opcional)
+  deletedAt:   Date | null;   // soft delete vía @DeleteDateColumn
+  createdAt:   Date;
+  updatedAt:   Date;
 }
 ```
+
+> Los campos `isPercentage` y `currency` fueron eliminados. Los cupones son **siempre porcentuales**. El motor de cálculo asume porcentaje en todos los casos.
 
 ### Enum `CouponStatus`
 
@@ -79,14 +79,12 @@ El status **no se persiste en la base de datos** — se calcula en tiempo real d
 
 ```typescript
 {
-  code:          string;        // requerido, 3–100 chars
-  value:         number;        // requerido, min 0.01, max 2 decimales
-  isPercentage:  boolean;       // requerido
-  currency?:     CurrencyCode;  // requerido si isPercentage = false
-  isGlobal:      boolean;       // requerido
-  usageLimit?:   number;        // opcional, int, min 1
-  startsAt?:     Date;          // opcional — ISO 8601
-  endsAt?:       Date;          // opcional — ISO 8601
+  code:        string;   // requerido, 3–100 chars — normalizado a MAYÚSCULAS + trim via @Transform
+  value:       number;   // requerido, 0.01–100, máx 2 decimales — siempre porcentaje
+  isGlobal:    boolean;  // requerido
+  usageLimit?: number;   // opcional, int, min 1
+  startsAt?:   Date;     // opcional — ISO 8601
+  endsAt?:     Date;     // opcional — ISO 8601
 }
 ```
 
@@ -96,14 +94,12 @@ Todos los campos son opcionales (`PartialType` de `CreateCouponDto`):
 
 ```typescript
 {
-  code?:          string;
-  value?:         number;
-  isPercentage?:  boolean;
-  currency?:      CurrencyCode;
-  isGlobal?:      boolean;
-  usageLimit?:    number;
-  startsAt?:      Date;
-  endsAt?:        Date;
+  code?:       string;
+  value?:      number;
+  isGlobal?:   boolean;
+  usageLimit?: number;
+  startsAt?:   Date;
+  endsAt?:     Date;
 }
 ```
 
@@ -111,19 +107,17 @@ Todos los campos son opcionales (`PartialType` de `CreateCouponDto`):
 
 ```typescript
 {
-  id:            number;
-  code:          string;
-  status:        CouponStatus;   // calculado en tiempo real
-  value:         number;         // Number(entity.value) — fix decimal PG
-  isPercentage:  boolean;
-  currency?:     CurrencyCode;   // undefined si isPercentage = true
-  isGlobal:      boolean;
-  usageLimit?:   number;         // undefined si null en DB
-  usageCount:    number;
-  startsAt?:     Date;
-  endsAt?:       Date;
-  createdAt:     Date;
-  updatedAt:     Date;
+  id:          number;
+  code:        string;
+  status:      CouponStatus;  // calculado en tiempo real
+  value:       number;        // Number(entity.value) — fix decimal PG; siempre porcentaje
+  isGlobal:    boolean;
+  usageLimit?: number;        // undefined si null en DB
+  usageCount:  number;
+  startsAt?:   Date;
+  endsAt?:     Date;
+  createdAt:   Date;
+  updatedAt:   Date;
 }
 ```
 
@@ -221,16 +215,15 @@ Todos los endpoints requieren JWT con rol `SUPER_ADMIN` o `ADMIN`.
 
 ---
 
-### `POST /coupons`
+### `POST /v1/coupons`
 
-Crea un nuevo cupón.
+Crea un nuevo cupón. El `code` es normalizado automáticamente a mayúsculas + trim.
 
 **Request:**
 ```json
 {
-  "code": "VERANO10",
+  "code": "verano10",
   "value": 10,
-  "isPercentage": true,
   "isGlobal": false,
   "usageLimit": 100,
   "startsAt": "2026-12-01T00:00:00.000Z",
@@ -245,7 +238,6 @@ Crea un nuevo cupón.
   "code": "VERANO10",
   "status": "scheduled",
   "value": 10,
-  "isPercentage": true,
   "isGlobal": false,
   "usageLimit": 100,
   "usageCount": 0,
@@ -258,14 +250,12 @@ Crea un nuevo cupón.
 
 **Errores posibles:**
 - `400` — `startsAt >= endsAt`
-- `400` — `isPercentage: true` con `value > 100`
-- `400` — `isPercentage: false` sin `currency`
-- `400` — `isPercentage: true` con `currency` enviada
+- `400` — `value` fuera de rango (debe ser 0.01–100)
 - `409` — el código ya existe
 
 ---
 
-### `GET /coupons?page=1&limit=20`
+### `GET /v1/coupons?page=1&limit=20`
 
 Lista paginada de cupones activos (no eliminados), orden descendente por `createdAt`.
 
@@ -284,7 +274,6 @@ limit → default: 20
       "code": "VERANO10",
       "status": "active",
       "value": 10,
-      "isPercentage": true,
       "isGlobal": false,
       "usageCount": 45,
       "usageLimit": 100,
@@ -302,7 +291,7 @@ limit → default: 20
 
 ---
 
-### `GET /coupons/:id`
+### `GET /v1/coupons/:id`
 
 Obtiene un cupón por ID.
 
@@ -313,7 +302,7 @@ Obtiene un cupón por ID.
 
 ---
 
-### `PATCH /coupons/:id`
+### `PATCH /v1/coupons/:id`
 
 Actualización parcial. Solo se actualiza lo que se envía.
 
@@ -331,7 +320,7 @@ Actualización parcial. Solo se actualiza lo que se envía.
 
 ---
 
-### `DELETE /coupons/:id`
+### `DELETE /v1/coupons/:id`
 
 Soft delete. El cupón queda marcado con `deletedAt` y deja de aparecer en listados.
 
@@ -342,7 +331,7 @@ Soft delete. El cupón queda marcado con `deletedAt` y deja de aparecer en lista
 
 ---
 
-### `POST /coupons/:couponId/targets/products`
+### `POST /v1/coupons/:couponId/targets/products`
 
 Asigna un producto a un cupón. Solo válido si el cupón no es global (`isGlobal: false`).
 
@@ -370,7 +359,7 @@ Asigna un producto a un cupón. Solo válido si el cupón no es global (`isGloba
 
 ---
 
-### `GET /coupons/:couponId/targets/products`
+### `GET /v1/coupons/:couponId/targets/products`
 
 Lista todos los productos asignados a un cupón.
 
@@ -381,7 +370,7 @@ Lista todos los productos asignados a un cupón.
 
 ---
 
-### `DELETE /coupons/:couponId/targets/products/:productId`
+### `DELETE /v1/coupons/:couponId/targets/products/:productId`
 
 Quita un producto de un cupón (soft delete del target).
 
@@ -393,7 +382,7 @@ Quita un producto de un cupón (soft delete del target).
 
 ---
 
-### `POST /coupons/:couponId/targets/combos`
+### `POST /v1/coupons/:couponId/targets/combos`
 
 Asigna un combo a un cupón. Solo válido si el cupón no es global.
 
@@ -421,7 +410,7 @@ Asigna un combo a un cupón. Solo válido si el cupón no es global.
 
 ---
 
-### `GET /coupons/:couponId/targets/combos`
+### `GET /v1/coupons/:couponId/targets/combos`
 
 Lista todos los combos asignados a un cupón.
 
@@ -432,7 +421,7 @@ Lista todos los combos asignados a un cupón.
 
 ---
 
-### `DELETE /coupons/:couponId/targets/combos/:comboId`
+### `DELETE /v1/coupons/:couponId/targets/combos/:comboId`
 
 Quita un combo de un cupón (soft delete del target).
 
@@ -444,7 +433,7 @@ Quita un combo de un cupón (soft delete del target).
 
 ---
 
-### `POST /coupon-usage`
+### `POST /v1/coupon-usage`
 
 Registra el uso de un cupón en una orden. El `userId` se extrae del JWT — no se acepta en el body.
 
@@ -480,7 +469,7 @@ Registra el uso de un cupón en una orden. El `userId` se extrae del JWT — no 
 
 ---
 
-### `GET /coupon-usage?page=1&limit=20`
+### `GET /v1/coupon-usage?page=1&limit=20`
 
 Lista paginada de todos los usos de cupones registrados.
 
@@ -488,7 +477,7 @@ Lista paginada de todos los usos de cupones registrados.
 
 ---
 
-### `GET /coupon-usage/coupon/:couponId`
+### `GET /v1/coupon-usage/coupon/:couponId`
 
 Lista todos los usos de un cupón específico.
 
@@ -496,7 +485,7 @@ Lista todos los usos de un cupón específico.
 
 ---
 
-### `GET /coupon-usage/user/:userId`
+### `GET /v1/coupon-usage/user/:userId`
 
 Lista todos los cupones usados por un usuario específico.
 
@@ -509,9 +498,8 @@ Lista todos los cupones usados por un usuario específico.
 | Regla | Dónde se aplica |
 |---|---|
 | `startsAt` debe ser estrictamente menor que `endsAt` | `create` y `update` — `validateDates()` |
-| Si `isPercentage: true` → `value ≤ 100` | `create` y `update` — `validateValue()` |
-| Si `isPercentage: false` → `currency` requerida | `create` y `update` — `validateValue()` |
-| Si `isPercentage: true` → `currency` se limpia automáticamente a `null` | `create` y `update` — `normalizeCoupon()` |
+| `value` siempre porcentaje: 0.01–100 | `@Min(0.01)` + `@Max(100)` en el DTO — sin `isPercentage` ni `currency` |
+| `code` normalizado a MAYÚSCULAS + trim automáticamente | `@Transform` en `CreateCouponDto.code` |
 | El `code` debe ser único en toda la tabla | `create` y `update` — `validateUniqueCode()` |
 | Cupones globales no pueden tener targets de producto o combo | `CouponProductTargetService` y `CouponComboTargetService` — `validateCouponNotGlobal()` |
 | Un cupón no puede tener el mismo producto asignado dos veces | `CouponProductTargetService` — `validateUniqueTarget()` + unique index DB |
@@ -521,6 +509,7 @@ Lista todos los cupones usados por un usuario específico.
 | `usageCount` se incrementa atómicamente dentro de la transacción | `CouponUsageService.create()` |
 | `userId` proviene del JWT — no del body del request | `CouponUsageController.create()` — `req.user.sub` |
 | `status` calculado en tiempo real — no persiste en DB | `CouponResponseDto.calculateStatus()` |
+| `findByCoupon` valida que el cupón exista antes de devolver usos | `CouponUsageService.findByCoupon()` — lanza `404` si el cupón no existe |
 | Soft delete — `deletedAt` — TypeORM filtra `IS NULL` automáticamente | `remove()` — `repo.softDelete()` |
 
 ### Lógica de `calculateStatus()`
@@ -538,7 +527,7 @@ Un cupón sin fechas ni límite de uso siempre devuelve `ACTIVE`.
 ### Flujo de uso con control de concurrencia
 
 ```
-POST /coupon-usage (o llamada interna desde Orders)
+POST /v1/coupon-usage (o llamada interna desde Orders)
   └── dataSource.transaction()
         ├── findOne(CouponEntity, { lock: 'pessimistic_write' })  ← bloquea la fila
         ├── validar fechas de vigencia
@@ -555,23 +544,20 @@ POST /coupon-usage (o llamada interna desde Orders)
 
 **Crear cupón global sin límite:**
 ```json
-POST /coupons
+POST /v1/coupons
 {
   "code": "WELCOME",
   "value": 5,
-  "isPercentage": true,
   "isGlobal": true
 }
 ```
 
 **Crear cupón dirigido con límite de usos:**
 ```json
-POST /coupons
+POST /v1/coupons
 {
-  "code": "FLASH100",
-  "value": 100,
-  "isPercentage": false,
-  "currency": "ARS",
+  "code": "FLASH20",
+  "value": 20,
   "isGlobal": false,
   "usageLimit": 50
 }
@@ -579,13 +565,13 @@ POST /coupons
 
 **Asignar producto al cupón:**
 ```json
-POST /coupons/2/targets/products
+POST /v1/coupons/2/targets/products
 { "productId": 7 }
 ```
 
 **Registrar uso al confirmar orden:**
 ```json
-POST /coupon-usage
+POST /v1/coupon-usage
 {
   "code": "FLASH100",
   "orderId": 99
@@ -595,17 +581,17 @@ POST /coupon-usage
 
 **Segundo intento del mismo usuario — 409:**
 ```json
-POST /coupon-usage
+POST /v1/coupon-usage
 {
   "code": "FLASH100",
   "orderId": 100
 }
-→ 409 Conflict: "User has already used this coupon"
+→ 409 Conflict: "El usuario ya utilizó este cupón"
 ```
 
 **Cupón global no acepta targets — 409:**
 ```json
-POST /coupons/1/targets/products
+POST /v1/coupons/1/targets/products
 { "productId": 3 }
 → 409 Conflict: "Cannot assign targets to a global coupon"
 ```
@@ -626,7 +612,8 @@ POST /coupons/1/targets/products
 | `Number(entity.value)` en `CouponResponseDto` — fix decimal de PG | ✅ |
 | `@HttpCode(204)` en todos los DELETE | ✅ |
 | `status` calculado en DTO, no persiste en DB | ✅ |
-| `normalizeCoupon()` limpia `currency` cuando `isPercentage = true` | ✅ |
+| Cupones son siempre porcentuales (`value` 0.01–100) — sin `isPercentage` ni `currency` | ✅ |
+| `@Transform` en `code` normaliza a mayúsculas + trim | ✅ |
 | `validateDates()` usa `>=` para bloquear rango vacío | ✅ |
 | `userId` extraído del JWT — no aceptado desde el body | ✅ |
 | Transacción con `pessimistic_write` en uso de cupón | ✅ |
@@ -671,9 +658,7 @@ npx jest --config test/jest-e2e.json --testPathPattern="coupons"
 | POST cupón porcentual | 201 — status: active |
 | POST cupón con usageLimit y fechas | 201 — status: active |
 | POST body vacío | 400 |
-| POST porcentaje > 100 | 400 |
-| POST cupón fijo sin currency | 400 |
-| POST porcentaje con currency | 400 |
+| POST value > 100 | 400 |
 | POST startsAt posterior a endsAt | 400 |
 | POST código duplicado | 409 |
 | GET paginado | 200 — data[], total, page |
