@@ -220,8 +220,7 @@ export class OrdersService {
           lock: { mode: 'pessimistic_write' },
         });
 
-        if (!lockedCoupon)
-          throw new NotFoundException('Cupón no encontrado');
+        if (!lockedCoupon) throw new NotFoundException('Cupón no encontrado');
 
         if (lockedCoupon.startsAt && now < lockedCoupon.startsAt)
           throw new BadRequestException('El cupón aún no está vigente');
