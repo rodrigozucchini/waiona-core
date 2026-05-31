@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
   ConflictException,
 } from '@nestjs/common';
 import { PG_UNIQUE_VIOLATION } from 'src/common/constants/postgres-error-codes';

@@ -40,7 +40,9 @@ export class CouponUsageService {
       });
 
       if (!coupon) {
-        throw new NotFoundException(`Cupón con código "${dto.code}" no encontrado`);
+        throw new NotFoundException(
+          `Cupón con código "${dto.code}" no encontrado`,
+        );
       }
 
       if (coupon.startsAt && now < coupon.startsAt) {
@@ -51,7 +53,9 @@ export class CouponUsageService {
       }
       if (coupon.usageLimit !== null && coupon.usageLimit !== undefined) {
         if (coupon.usageCount >= coupon.usageLimit) {
-          throw new BadRequestException('El cupón ha alcanzado su límite de uso');
+          throw new BadRequestException(
+            'El cupón ha alcanzado su límite de uso',
+          );
         }
       }
 

@@ -107,7 +107,8 @@ export class CalculationService {
       where: { productId: dto.productId },
       relations: ['margin'],
     });
-    if (!pricing) throw new NotFoundException('Pricing de producto no encontrado');
+    if (!pricing)
+      throw new NotFoundException('Pricing de producto no encontrado');
 
     const unitPrice = Number(pricing.unitPrice);
 
@@ -343,7 +344,13 @@ export class CalculationService {
 
     const totalRef = itemsWithRef.reduce((acc, i) => acc + i.refPrice, 0);
 
-    return { globalTaxes, globalTaxIds, itemsWithRef, taxesByProduct, totalRef };
+    return {
+      globalTaxes,
+      globalTaxIds,
+      itemsWithRef,
+      taxesByProduct,
+      totalRef,
+    };
   }
 
   // Computa el monto de impuestos prorrateados dado un comboPrice, usando

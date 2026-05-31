@@ -13,7 +13,10 @@ import { ComboItemEntity } from 'src/modules/products/combos/entities/combo-item
 describe('CalculationService', () => {
   let service: CalculationService;
 
-  const mockProductPricingRepo = () => ({ findOne: jest.fn(), find: jest.fn() });
+  const mockProductPricingRepo = () => ({
+    findOne: jest.fn(),
+    find: jest.fn(),
+  });
   const mockComboPricingRepo = () => ({ findOne: jest.fn() });
   const mockProductTaxRepo = () => ({ find: jest.fn() });
   const mockTaxRepo = () => ({ find: jest.fn() });

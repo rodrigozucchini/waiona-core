@@ -98,10 +98,9 @@ export class UsersService {
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.profile', 'profile')
         .leftJoinAndSelect('user.role', 'role')
-        .where(
-          '(profile.name ILIKE :name OR profile.last_name ILIKE :name)',
-          { name: `%${dto.name}%` },
-        );
+        .where('(profile.name ILIKE :name OR profile.last_name ILIKE :name)', {
+          name: `%${dto.name}%`,
+        });
 
       if (dto.email) {
         qb.andWhere('user.email ILIKE :email', { email: `%${dto.email}%` });
@@ -191,7 +190,8 @@ export class UsersService {
   ======================= */
   private async findEntity(id: number): Promise<UserEntity> {
     const user = await this.userRepo.findOne({ where: { id } });
-    if (!user) throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    if (!user)
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
     return user;
   }
 }

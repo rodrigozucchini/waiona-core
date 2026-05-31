@@ -108,7 +108,9 @@ export class CouponProductTargetService {
 
   private validateCouponNotGlobal(coupon: CouponEntity): void {
     if (coupon.isGlobal) {
-      throw new ConflictException('No se pueden asignar targets a un cupón global');
+      throw new ConflictException(
+        'No se pueden asignar targets a un cupón global',
+      );
     }
   }
 
