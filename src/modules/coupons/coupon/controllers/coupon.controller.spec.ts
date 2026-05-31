@@ -24,7 +24,6 @@ describe('CouponController', () => {
     id: 1,
     code: 'DESCUENTO10',
     value: 10,
-    isPercentage: true,
     isGlobal: true,
     usageLimit: 100,
     usageCount: 0,
@@ -60,7 +59,6 @@ describe('CouponController', () => {
     const dto = {
       code: 'DESCUENTO10',
       value: 10,
-      isPercentage: true,
       isGlobal: true,
     };
     service.create.mockResolvedValue(mockResponse() as any);

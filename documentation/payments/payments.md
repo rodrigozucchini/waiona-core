@@ -164,20 +164,20 @@ Crea un pago para una orden en estado `PENDING`. Requiere JWT. El cliente solo p
 
 Endpoint público (sin JWT). MercadoPago llama a este endpoint tras procesar un pago. Siempre retorna `200` — si retorna otro código, MP reintenta indefinidamente. Decorado con `@SkipThrottle()` para no ser limitado por el rate limiter global.
 
-**Verificación de firma:** si `MP_WEBHOOK_SECRET` está configurado, valida `x-signature` con HMAC-SHA256. Si el secret no está (entorno dev), se omite la verificación.
+**Verificación de firma:** si `MP_WEBHOOK_SECRET` está configurado, valida `x-signature` con HMAC-SHA256. Si el secret no está (entorno dev), se omite. Si la firma es inválida, la notificación se descarta silenciosamente y se retorna `200` de todas formas — nunca se devuelve 401 (MP reintentaría indefinidamente ante cualquier != 200).
 
 **Mapeo de estados MP → sistema**
 
 | `topic` | `order_status` / `status` de MP | `PaymentStatus` | `OrderStatus` |
 |---|---|---|---|
 | `merchant_order` | `paid` | `APPROVED` | `CONFIRMED` |
-| `merchant_order` | `reverted` / `charged_back` | `CANCELLED` | `CANCELLED` |
+| `merchant_order` | `refunded` | `CANCELLED` | `CANCELLED` |
 | `merchant_order` | `payment_required` / `payment_in_process` | `PENDING` | sin cambio |
-| `merchant_order` | `expired` / otros | `REJECTED` | `CANCELLED` |
+| `merchant_order` | otros | `REJECTED` | `CANCELLED` |
 | `payment` | `approved` | `APPROVED` | `CONFIRMED` |
-| `payment` | `refunded` / `charged_back` | `CANCELLED` | `CANCELLED` |
-| `payment` | `in_process` / `pending` | `PENDING` | sin cambio |
-| `payment` | otros | `REJECTED` | `CANCELLED` |
+| `payment` | `refunded` / `charged_back` → normalizado a `reverted` | `CANCELLED` | `CANCELLED` |
+| `payment` | `in_process` / `pending` → normalizado a `payment_in_process` | `PENDING` | sin cambio |
+| `payment` | otros → normalizado a `expired` | `REJECTED` | `CANCELLED` |
 
 Cuando la orden pasa a `CANCELLED`, se llama a `OrdersService.releaseStockForOrder()` dentro de la misma transacción.
 
@@ -192,11 +192,7 @@ Cuando la orden pasa a `CANCELLED`, se llama a `OrdersService.releaseStockForOrd
 { "received": true }
 ```
 
-**Errores posibles**
-
-| Código | Motivo |
-|---|---|
-| `401` | Firma `x-signature` inválida (solo si `MP_WEBHOOK_SECRET` está configurado) |
+**Este endpoint nunca devuelve error** — firma inválida, notificación desconocida o fallo interno siempre resultan en `200` con `{ "received": true }`. Los errores se descartan silenciosamente.
 
 ---
 
@@ -272,7 +268,7 @@ Obtiene un pago por su id. Requiere JWT. El cliente solo puede ver pagos de sus 
 | Lock pesimista en `create` — el segundo request concurrente verá el pago ya existente | `PaymentsService.create()` — `findOne(..., { lock: pessimistic_write })` |
 | El monto se guarda como entero en MP (`Math.round`) — MP no acepta decimales | `MercadoPagoProvider.createPreference()` |
 | Las URLs de MP siempre vienen de variables de entorno | `MercadoPagoProvider.createPreference()` |
-| El webhook siempre retorna 200 — los errores internos se swallow en `try/catch` | `PaymentsService.handleMercadoPagoWebhook()` |
+| El webhook siempre retorna 200 — firma inválida descartada en controller (try/catch), errores internos swallow en service | `PaymentsController` + `PaymentsService.handleMercadoPagoWebhook()` |
 | Lock pesimista en webhook — dos notificaciones simultáneas del mismo pago no generan race condition | `PaymentsService.handleMercadoPagoWebhook()` |
 | Al cancelar una orden desde el webhook, se libera el stock reservado | `OrdersService.releaseStockForOrder()` dentro de la transacción |
 | Si la orden ya está `CONFIRMED` y llega otro `paid`, no se vuelve a confirmar (idempotente) | Guarda `if (orderStatus === PENDING)` antes de setear CONFIRMED |
@@ -298,9 +294,10 @@ Obtiene un pago por su id. Requiere JWT. El cliente solo puede ver pagos de sus 
 | Regla | Estado |
 |---|---|
 | URLs desde env (`FRONTEND_URL`, `MP_NOTIFICATION_URL`) | ✅ |
-| Webhook siempre 200 (`@HttpCode(OK)` + swallow en service) | ✅ |
-| Verificación de firma HMAC-SHA256 | ✅ |
-| Manejo de todos los estados MP (`paid`, `reverted`, `charged_back`, `payment_in_process`, `expired`) | ✅ |
+| Webhook siempre 200 — firma inválida atrapada en controller, errores internos swallow en service | ✅ |
+| Verificación de firma HMAC-SHA256 — inválida retorna 200 y descarta la notificación sin llamar al service | ✅ |
+| Mapeo correcto de `merchant_order 'refunded'` a `CANCELLED` (no a `REJECTED`) | ✅ |
+| Mensajes de error en español | ✅ |
 | Monto como entero (`Math.round(Number(order.total))`) | ✅ |
 
 ### `nestjs-core` + `typeorm-standard`

@@ -1,6 +1,5 @@
 import {
   IsNumber,
-  IsBoolean,
   IsOptional,
   IsArray,
   Min,
@@ -62,9 +61,6 @@ export class CalculatePreviewDto {
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(100)
   couponValue?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  couponIsPercentage?: boolean;
 }

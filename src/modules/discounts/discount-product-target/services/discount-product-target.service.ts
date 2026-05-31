@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 
 import { DiscountProductTargetEntity } from '../entities/discount-product-target.entity';
 import { DiscountEntity } from '../../discount/entities/discounts.entity';
@@ -106,7 +106,8 @@ export class DiscountProductTargetService {
     productId: number,
   ): Promise<void> {
     const existing = await this.repo.findOne({
-      where: { discountId, productId },
+      where: { discountId, productId, deletedAt: IsNull() },
+      withDeleted: true,
     });
 
     if (existing) {
@@ -116,13 +117,17 @@ export class DiscountProductTargetService {
     }
   }
 
-  // 🔥 chequea que el producto no esté asociado a NINGÚN descuento activo
+  // 🔥 chequea que el producto no esté asociado a NINGÚN descuento activo (ni el target ni el descuento deben estar borrados)
   private async validateProductHasNoActiveDiscount(
     productId: number,
   ): Promise<void> {
-    const existing = await this.repo.findOne({
-      where: { productId },
-    });
+    const existing = await this.repo
+      .createQueryBuilder('target')
+      .innerJoin('target.discount', 'discount')
+      .where('target.productId = :productId', { productId })
+      .andWhere('target.deletedAt IS NULL')
+      .andWhere('discount.deletedAt IS NULL')
+      .getOne();
 
     if (existing) {
       throw new ConflictException(

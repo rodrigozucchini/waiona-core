@@ -16,7 +16,10 @@ describe('UsersService', () => {
     leftJoinAndSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
     getOne: jest.fn(),
+    getManyAndCount: jest.fn(),
   };
   const mockUserRepo = () => ({
     findOne: jest.fn(),
@@ -181,9 +184,10 @@ describe('UsersService', () => {
       expect(result.data).toHaveLength(1);
     });
 
-    it('should filter by name', async () => {
-      userRepo.findAndCount.mockResolvedValue([[mockUser()], 1]);
+    it('should filter by name using QueryBuilder', async () => {
+      mockQB.getManyAndCount.mockResolvedValue([[mockUser()], 1]);
       const result = await service.findAll({ name: 'Juan' });
+      expect(mockQB.getManyAndCount).toHaveBeenCalled();
       expect(result.data).toHaveLength(1);
     });
   });
@@ -254,9 +258,15 @@ describe('UsersService', () => {
 
   describe('activate', () => {
     it('should activate a user', async () => {
+      userRepo.findOne.mockResolvedValue(mockUser());
       userRepo.update.mockResolvedValue({ affected: 1 });
       await service.activate(1);
       expect(userRepo.update).toHaveBeenCalledWith(1, { isActive: true });
+    });
+
+    it('should throw NotFoundException if user not found', async () => {
+      userRepo.findOne.mockResolvedValue(null);
+      await expect(service.activate(999)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -266,6 +276,7 @@ describe('UsersService', () => {
 
   describe('updatePassword', () => {
     it('should hash and update password', async () => {
+      userRepo.findOne.mockResolvedValue(mockUser());
       userRepo.update.mockResolvedValue({ affected: 1 });
       await service.updatePassword(1, 'newPassword123');
       expect(userRepo.update).toHaveBeenCalledWith(
@@ -274,6 +285,13 @@ describe('UsersService', () => {
       );
       const call = userRepo.update.mock.calls[0][1];
       expect(call.password).not.toBe('newPassword123');
+    });
+
+    it('should throw NotFoundException if user not found', async () => {
+      userRepo.findOne.mockResolvedValue(null);
+      await expect(service.updatePassword(999, 'pass')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

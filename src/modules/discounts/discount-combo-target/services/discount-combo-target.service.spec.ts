@@ -10,6 +10,7 @@ describe('DiscountComboTargetService', () => {
   let service: DiscountComboTargetService;
   let repo: any;
   let discountRepo: any;
+  let qb: any;
 
   const mockRepo = () => ({
     find: jest.fn(),
@@ -17,6 +18,7 @@ describe('DiscountComboTargetService', () => {
     create: jest.fn(),
     save: jest.fn(),
     softDelete: jest.fn(),
+    createQueryBuilder: jest.fn(),
   });
   const mockDiscountRepo = () => ({ findOne: jest.fn() });
   const mockShopCacheService = { invalidate: jest.fn() };
@@ -34,6 +36,13 @@ describe('DiscountComboTargetService', () => {
     }) as unknown as DiscountComboTargetEntity;
 
   beforeEach(async () => {
+    qb = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DiscountComboTargetService,
@@ -61,9 +70,9 @@ describe('DiscountComboTargetService', () => {
     it('should create a combo target', async () => {
       const target = mockTarget();
       discountRepo.findOne.mockResolvedValue(mockDiscount());
-      repo.findOne
-        .mockResolvedValueOnce(null) // validateUniqueTarget
-        .mockResolvedValueOnce(null); // validateComboHasNoActiveDiscount
+      repo.findOne.mockResolvedValueOnce(null); // validateUniqueTarget
+      repo.createQueryBuilder.mockReturnValue(qb);
+      qb.getOne.mockResolvedValue(null); // validateComboHasNoActiveDiscount
       repo.create.mockReturnValue(target);
       repo.save.mockResolvedValue(target);
       const result = await service.create(1, { comboId: 1 });
@@ -88,9 +97,9 @@ describe('DiscountComboTargetService', () => {
 
     it('should throw ConflictException if combo already has another active discount', async () => {
       discountRepo.findOne.mockResolvedValue(mockDiscount());
-      repo.findOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(mockTarget());
+      repo.findOne.mockResolvedValueOnce(null); // validateUniqueTarget
+      repo.createQueryBuilder.mockReturnValue(qb);
+      qb.getOne.mockResolvedValue(mockTarget()); // validateComboHasNoActiveDiscount
       await expect(service.create(1, { comboId: 1 } as any)).rejects.toThrow(
         ConflictException,
       );

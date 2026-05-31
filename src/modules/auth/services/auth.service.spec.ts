@@ -222,6 +222,21 @@ describe('AuthService', () => {
       expect(result.refresh_token).toBeDefined();
     });
 
+    it('should not revoke old token if issueRefreshToken fails', async () => {
+      // Verifica que el bug de rotation order está corregido:
+      // si falla la emisión del nuevo token, el viejo NO queda revocado
+      // y el cliente puede reintentar.
+      const rt = mockRefreshToken();
+      refreshTokenRepo.findOne.mockResolvedValue(rt);
+      usersService.findOne.mockResolvedValue(mockUser());
+      refreshTokenRepo.create.mockReturnValue(mockRefreshToken());
+      // primera llamada a save = nuevo token → falla
+      refreshTokenRepo.save.mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(service.refresh('raw_token')).rejects.toThrow('DB error');
+      expect(rt.revokedAt).toBeNull(); // token viejo NO fue revocado
+    });
+
     it('should throw 401 if refresh token not found', async () => {
       refreshTokenRepo.findOne.mockResolvedValue(null);
       await expect(service.refresh('bad_token')).rejects.toThrow(

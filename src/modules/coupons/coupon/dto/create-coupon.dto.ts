@@ -6,15 +6,12 @@ import {
   IsNumber,
   Min,
   Max,
-  IsEnum,
   IsDate,
   IsInt,
   IsBoolean,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-
-import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 export class CreateCouponDto {
   @ApiProperty({ example: 'PROMO10' })
@@ -24,26 +21,17 @@ export class CreateCouponDto {
   @MaxLength(100)
   code: string;
 
-  @ApiProperty({ example: 10 })
+  @ApiProperty({
+    example: 10,
+    minimum: 0.01,
+    maximum: 100,
+    description: 'Porcentaje de descuento. Mín 0.01, máx 100.',
+  })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
-  @Max(99999999)
+  @Max(100)
   value: number;
-
-  @ApiProperty({ example: true })
-  @IsBoolean()
-  isPercentage: boolean;
-
-  @ApiProperty({
-    enum: CurrencyCode,
-    required: false,
-    nullable: true,
-    example: 'ARS',
-  })
-  @IsOptional()
-  @IsEnum(CurrencyCode)
-  currency?: CurrencyCode;
 
   @ApiProperty({ example: false })
   @IsBoolean()

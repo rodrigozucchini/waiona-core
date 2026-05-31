@@ -105,9 +105,20 @@ describe('Users (e2e)', () => {
     expect(res.body.page).toBe(1);
   });
 
-  it('GET /users?email=test@waiona.com -> filtra por email', async () => {
+  it('GET /users?email=test@waiona.com -> filtra por email completo', async () => {
     const res = await request(app.getHttpServer())
       .get('/v1/users?email=test@waiona.com')
+      .expect(200);
+
+    expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    expect(res.body.data[0].email).toContain('test');
+  });
+
+  it('GET /users?email=test -> búsqueda parcial de email retorna 200', async () => {
+    // Antes del fix, @IsEmail() rechazaba fragmentos parciales con 400.
+    // Ahora @IsString() permite cualquier fragmento y el service usa ILIKE.
+    const res = await request(app.getHttpServer())
+      .get('/v1/users?email=test')
       .expect(200);
 
     expect(res.body.data.length).toBeGreaterThanOrEqual(1);

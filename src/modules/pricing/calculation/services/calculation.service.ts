@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { ProductPricingEntity } from '../../entities/product-pricing.entity';
 import { ComboPricingEntity } from '../../entities/combo-pricing.entity';
@@ -73,12 +73,8 @@ export class CalculationService {
     }, 0);
     const fullPrice = priceAfterMarginFull + taxesFull;
 
-    // 5. Cupón sobre finalPrice (nivel orden)
-    const coupon = this.applyValue(
-      finalPrice,
-      dto.couponValue,
-      dto.couponIsPercentage,
-    );
+    // 5. Cupón sobre finalPrice (nivel orden, siempre porcentaje)
+    const coupon = this.applyValue(finalPrice, dto.couponValue, true);
     const orderTotal = finalPrice - coupon;
 
     return this.buildBreakdown(
@@ -111,7 +107,8 @@ export class CalculationService {
       where: { productId: dto.productId },
       relations: ['margin'],
     });
-    if (!pricing) throw new NotFoundException('Product pricing not found');
+    if (!pricing)
+      throw new NotFoundException('Pricing de producto no encontrado');
 
     const unitPrice = Number(pricing.unitPrice);
 
@@ -185,7 +182,7 @@ export class CalculationService {
       where: { comboId: dto.comboId },
       relations: ['margin'],
     });
-    if (!pricing) throw new NotFoundException('Combo pricing not found');
+    if (!pricing) throw new NotFoundException('Pricing de combo no encontrado');
 
     const unitPrice = Number(pricing.unitPrice);
 
@@ -216,11 +213,9 @@ export class CalculationService {
       : 0;
     const priceAfterMargin = priceAfterDiscount + margin;
 
-    // 4. Impuestos via prorrateo (globales + específicos de cada producto)
-    const taxes = await this.sumTaxesWithProration(
-      dto.comboId,
-      priceAfterMargin,
-    );
+    // 4. Impuestos via prorrateo — se fetcha la data una sola vez y se computa dos veces
+    const taxData = await this.fetchTaxDataForCombo(dto.comboId);
+    const taxes = this.computeTaxesFromData(taxData, priceAfterMargin);
     const finalPrice = priceAfterMargin + taxes;
 
     // 4b. fullPrice — precio sin descuento (margen e impuestos sobre unitPrice)
@@ -228,10 +223,7 @@ export class CalculationService {
       ? this.applyValue(unitPrice, Number(pricing.margin.value), true)
       : 0;
     const priceAfterMarginFull = unitPrice + marginFull;
-    const taxesFull = await this.sumTaxesWithProration(
-      dto.comboId,
-      priceAfterMarginFull,
-    );
+    const taxesFull = this.computeTaxesFromData(taxData, priceAfterMarginFull);
     const fullPrice = priceAfterMarginFull + taxesFull;
 
     return this.buildBreakdown(
@@ -295,48 +287,95 @@ export class CalculationService {
     return allTaxes;
   }
 
-  private async sumTaxesWithProration(
-    comboId: number,
-    comboPrice: number,
-  ): Promise<number> {
-    // 1. Taxes globales sobre el precio total del combo
-    const globalTaxes = await this.taxRepo.find({ where: { isGlobal: true } });
+  // Fetcha todos los datos necesarios para el prorrateo de impuestos en queries batched.
+  // Se separa del cómputo para poder reusar la data en finalPrice y fullPrice sin
+  // repetir las queries a la DB.
+  private async fetchTaxDataForCombo(comboId: number): Promise<{
+    globalTaxes: TaxEntity[];
+    globalTaxIds: Set<number>;
+    itemsWithRef: { productId: number; refPrice: number }[];
+    taxesByProduct: Map<number, { tax: TaxEntity }[]>;
+    totalRef: number;
+  }> {
+    const [globalTaxes, items] = await Promise.all([
+      this.taxRepo.find({ where: { isGlobal: true } }),
+      this.comboItemRepo.find({ where: { comboId } }),
+    ]);
+
     const globalTaxIds = new Set(globalTaxes.map((t) => t.id));
-    const globalAmount = this.sumTaxes(globalTaxes, comboPrice);
 
-    // 2. Items del combo con su pricing de referencia
-    const items = await this.comboItemRepo.find({ where: { comboId } });
-    if (!items.length) return globalAmount;
+    if (!items.length) {
+      return {
+        globalTaxes,
+        globalTaxIds,
+        itemsWithRef: [],
+        taxesByProduct: new Map(),
+        totalRef: 0,
+      };
+    }
 
-    const itemsWithRef = await Promise.all(
-      items.map(async (item) => {
-        const pricing = await this.productPricingRepo.findOne({
-          where: { productId: item.productId },
-        });
-        return {
-          productId: item.productId,
-          refPrice: pricing ? Number(pricing.unitPrice) * item.quantity : 0,
-        };
-      }),
+    const productIds = items.map((i) => i.productId);
+
+    // Una sola query para todos los pricings de referencia
+    const pricings = await this.productPricingRepo.find({
+      where: { productId: In(productIds) },
+    });
+    const pricingMap = new Map(
+      pricings.map((p) => [p.productId, Number(p.unitPrice)]),
     );
 
+    // Una sola query para todos los taxes específicos de los productos del combo
+    const allProductTaxes = await this.productTaxRepo.find({
+      where: { productId: In(productIds) },
+      relations: ['tax'],
+    });
+
+    const taxesByProduct = new Map<number, { tax: TaxEntity }[]>();
+    for (const pt of allProductTaxes) {
+      if (!taxesByProduct.has(pt.productId))
+        taxesByProduct.set(pt.productId, []);
+      taxesByProduct.get(pt.productId)!.push(pt);
+    }
+
+    const itemsWithRef = items.map((item) => ({
+      productId: item.productId,
+      refPrice: (pricingMap.get(item.productId) ?? 0) * item.quantity,
+    }));
+
     const totalRef = itemsWithRef.reduce((acc, i) => acc + i.refPrice, 0);
-    if (!totalRef) return globalAmount;
 
-    // 3. Taxes específicos de cada producto aplicados sobre su base prorrateada
+    return {
+      globalTaxes,
+      globalTaxIds,
+      itemsWithRef,
+      taxesByProduct,
+      totalRef,
+    };
+  }
+
+  // Computa el monto de impuestos prorrateados dado un comboPrice, usando
+  // la data ya fetchada. Puede llamarse N veces sin tocar la DB.
+  private computeTaxesFromData(
+    data: {
+      globalTaxes: TaxEntity[];
+      globalTaxIds: Set<number>;
+      itemsWithRef: { productId: number; refPrice: number }[];
+      taxesByProduct: Map<number, { tax: TaxEntity }[]>;
+      totalRef: number;
+    },
+    comboPrice: number,
+  ): number {
+    const globalAmount = this.sumTaxes(data.globalTaxes, comboPrice);
+
+    if (!data.totalRef || !data.itemsWithRef.length) return globalAmount;
+
     let specificAmount = 0;
-    for (const item of itemsWithRef) {
+    for (const item of data.itemsWithRef) {
       if (!item.refPrice) continue;
-
-      const proratedBase = comboPrice * (item.refPrice / totalRef);
-
-      const productTaxes = await this.productTaxRepo.find({
-        where: { productId: item.productId },
-        relations: ['tax'],
-      });
-
+      const proratedBase = comboPrice * (item.refPrice / data.totalRef);
+      const productTaxes = data.taxesByProduct.get(item.productId) ?? [];
       for (const pt of productTaxes) {
-        if (!globalTaxIds.has(pt.tax.id)) {
+        if (!data.globalTaxIds.has(pt.tax.id)) {
           specificAmount += this.applyValue(
             proratedBase,
             Number(pt.tax.value),

@@ -1,6 +1,5 @@
 import { Entity, Column, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/entities/base.entity';
-import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 @Entity('coupons')
 @Index(['startsAt'])
@@ -15,7 +14,7 @@ export class CouponEntity extends BaseEntity {
   code: string;
 
   // ==========================
-  // VALOR
+  // VALOR (siempre porcentaje)
   // ==========================
 
   @Column('decimal', {
@@ -28,21 +27,6 @@ export class CouponEntity extends BaseEntity {
     },
   })
   value: number;
-
-  @Column({
-    type: 'boolean',
-    nullable: false,
-    default: false,
-  })
-  isPercentage: boolean;
-
-  @Column({
-    type: 'enum',
-    enum: CurrencyCode,
-    nullable: true,
-    default: null,
-  })
-  currency?: CurrencyCode | null;
 
   // ==========================
   // ALCANCE

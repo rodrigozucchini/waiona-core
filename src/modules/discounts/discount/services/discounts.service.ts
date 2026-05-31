@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { DiscountEntity } from '../entities/discounts.entity';
+import { DiscountProductTargetEntity } from '../../discount-product-target/entities/discount-product-target.entity';
+import { DiscountComboTargetEntity } from '../../discount-combo-target/entities/discount-combo-target.entity';
 import { CreateDiscountDto } from '../dto/create-discount.dto';
 import { UpdateDiscountDto } from '../dto/update-discount.dto';
 import { DiscountResponseDto } from '../dto/response-discount.dto';
@@ -19,6 +21,12 @@ export class DiscountsService {
   constructor(
     @InjectRepository(DiscountEntity)
     private readonly discountRepository: Repository<DiscountEntity>,
+
+    @InjectRepository(DiscountProductTargetEntity)
+    private readonly productTargetRepo: Repository<DiscountProductTargetEntity>,
+
+    @InjectRepository(DiscountComboTargetEntity)
+    private readonly comboTargetRepo: Repository<DiscountComboTargetEntity>,
 
     private readonly shopCacheService: ShopCacheService,
   ) {}
@@ -107,6 +115,8 @@ export class DiscountsService {
   async remove(id: number): Promise<void> {
     const discount = await this.findEntity(id);
     await this.discountRepository.softDelete(discount.id);
+    await this.productTargetRepo.softDelete({ discountId: discount.id });
+    await this.comboTargetRepo.softDelete({ discountId: discount.id });
     void this.shopCacheService.invalidate();
   }
 

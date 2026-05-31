@@ -53,7 +53,7 @@ POST /v1/auth/reset-password   → valida token de reset → actualiza password
   id:        number;
   userId:    number;          // FK → users.id — CASCADE al eliminar el usuario
   tokenHash: string;          // SHA-256 del refresh token — no se guarda el token en claro; unique index
-  expiresAt: Date;            // timestamptz — +7 días desde emisión
+  expiresAt: Date;            // timestamptz — +30 días desde emisión
   revokedAt: Date | null;     // timestamptz — null = activo; != null = revocado
   // computed getters:
   isExpired: boolean;         // new Date() > expiresAt
@@ -381,8 +381,8 @@ Revoca todos los refresh tokens activos del usuario. Requiere JWT. Cierra sesió
 | Login rechazado si `isActive === false` | `validateUser` → `401 UnauthorizedException` |
 | `password` jamás expuesto en respuestas | `@Exclude()` en `UserEntity` + `ClassSerializerInterceptor` global en `main.ts` |
 | JWT (access token) expira en 6 días | `JwtModule` con `signOptions: { expiresIn: '6d' }` |
-| Refresh token expira en 7 días | `issueRefreshToken()` — se guarda el hash (SHA-256), no el token en claro |
-| Refresh token rotation — un refresh token es de un solo uso | `refresh()` revoca el anterior y emite uno nuevo en la misma operación |
+| Refresh token expira en 30 días | `issueRefreshToken()` — se guarda el hash (SHA-256), no el token en claro |
+| Refresh token rotation — un refresh token es de un solo uso | `refresh()` emite el nuevo token PRIMERO, luego revoca el viejo — si falla la emisión, el cliente conserva el token anterior y puede reintentar |
 | `logout` revoca el refresh token del body sin JWT | `findValidRefreshToken()` valida que exista, no esté revocado ni expirado; luego `revokedAt = new Date()` |
 | `logout-all` revoca todos los refresh tokens activos del usuario | `refreshTokenRepo.update({ userId, revokedAt: IsNull() }, { revokedAt: new Date() })` |
 | `change-password` valida contraseña actual antes de actualizar | `usersService.findEntityWithPassword()` + `bcrypt.compare()` → `400` si no coincide |
@@ -451,7 +451,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | Swagger — `@ApiTags`, `@ApiOperation`, `@ApiResponse` en los 9 endpoints | ✅ |
 | Tipo de retorno explícito en `login` | ✅ `{ user: UserEntity; access_token: string; refresh_token: string }` |
 | URI versioning `/v1/` en el controller | ✅ `@Controller({ version: '1', path: 'auth' })` |
-| Unit tests | ✅ 40 casos — service (30) + controller (10) |
+| Unit tests | ✅ 41 casos — service (31) + controller (10) |
 | E2E tests — PostgreSQL real, `dropSchema: true`, 29 casos | ✅ |
 
 ---
@@ -466,7 +466,7 @@ npx jest --testPathPattern="src/modules/auth" --no-coverage
 
 | Suite | Tests | Cobertura |
 |---|---|---|
-| `auth.service.spec.ts` | 30 | validateUser (4), generateToken (1), login (1), refresh (4), logout (2), register (1), activateAccount (5), forgotPassword (3), resetPassword (2), changePassword (3), logoutAll (2), defined (1) |
+| `auth.service.spec.ts` | 31 | validateUser (4), generateToken (1), login (1), refresh (5 — incluye test de rotation order), logout (2), register (1), activateAccount (5), forgotPassword (3), resetPassword (2), changePassword (3), logoutAll (2), defined (1) |
 | `auth.controller.spec.ts` | 10 | register, activate, login, refresh, logout, forgotPassword, resetPassword, changePassword, logoutAll + defined |
 
 ### E2E tests (`test/auth/auth.e2e-spec.ts`)

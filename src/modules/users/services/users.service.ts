@@ -36,7 +36,7 @@ export class UsersService {
     const existing = await this.userRepo.findOne({
       where: { email: dto.email },
     });
-    if (existing) throw new ConflictException('Email already in use');
+    if (existing) throw new ConflictException('El email ya está en uso');
 
     const clientRole = await this.roleRepo.findOne({
       where: { type: RoleType.CLIENT },
@@ -61,7 +61,7 @@ export class UsersService {
         return await manager.save(UserEntity, user);
       } catch (err: any) {
         if (err.code === '23505')
-          throw new ConflictException('Email already in use');
+          throw new ConflictException('El email ya está en uso');
         throw err;
       }
     });
@@ -91,22 +91,23 @@ export class UsersService {
   ): Promise<PaginatedResponseDto<UserResponseDto>> {
     const skip = (page - 1) * limit;
 
+    // Búsqueda por nombre/apellido — usa QueryBuilder para evitar
+    // problemas de count incorrecto con findAndCount + relaciones anidadas
     if (dto?.name) {
-      const where = [
-        {
-          ...(dto.email && { email: ILike(`%${dto.email}%`) }),
-          profile: { name: ILike(`%${dto.name}%`) },
-        },
-        {
-          ...(dto.email && { email: ILike(`%${dto.email}%`) }),
-          profile: { lastName: ILike(`%${dto.name}%`) },
-        },
-      ];
-      const [users, total] = await this.userRepo.findAndCount({
-        where,
-        skip,
-        take: limit,
-      });
+      const qb = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.profile', 'profile')
+        .leftJoinAndSelect('user.role', 'role')
+        .where('(profile.name ILIKE :name OR profile.last_name ILIKE :name)', {
+          name: `%${dto.name}%`,
+        });
+
+      if (dto.email) {
+        qb.andWhere('user.email ILIKE :email', { email: `%${dto.email}%` });
+      }
+
+      const [users, total] = await qb.skip(skip).take(limit).getManyAndCount();
+
       return new PaginatedResponseDto(
         users.map((u) => new UserResponseDto(u)),
         total,
@@ -163,6 +164,7 @@ export class UsersService {
       ACTIVATE
   ======================= */
   async activate(id: number): Promise<void> {
+    await this.findEntity(id);
     await this.userRepo.update(id, { isActive: true });
   }
 
@@ -170,6 +172,7 @@ export class UsersService {
       UPDATE PASSWORD
   ======================= */
   async updatePassword(id: number, newPassword: string): Promise<void> {
+    await this.findEntity(id);
     const hashed = await bcrypt.hash(newPassword, 10);
     await this.userRepo.update(id, { password: hashed });
   }
@@ -187,7 +190,8 @@ export class UsersService {
   ======================= */
   private async findEntity(id: number): Promise<UserEntity> {
     const user = await this.userRepo.findOne({ where: { id } });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user)
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
     return user;
   }
 }

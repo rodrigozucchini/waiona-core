@@ -12,7 +12,6 @@ import { CouponEntity } from '../entities/coupon.entity';
 import { CreateCouponDto } from '../dto/create-coupon.dto';
 import { UpdateCouponDto } from '../dto/update-coupon.dto';
 import { CouponResponseDto } from '../dto/coupon-response.dto';
-import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
 
 @Injectable()
@@ -28,20 +27,6 @@ export class CouponService {
 
   async create(dto: CreateCouponDto): Promise<CouponResponseDto> {
     this.validateDates(dto.startsAt, dto.endsAt);
-
-    const normalized = this.normalizeCoupon({
-      value: dto.value,
-      isPercentage: dto.isPercentage,
-      currency: dto.currency,
-    });
-
-    this.validateValue(
-      normalized.value,
-      normalized.isPercentage,
-      normalized.currency,
-      dto.currency,
-    );
-
     await this.validateUniqueCode(dto.code);
 
     const coupon = this.couponRepository.create({
@@ -51,9 +36,7 @@ export class CouponService {
       endsAt: dto.endsAt,
       usageLimit: dto.usageLimit ?? null,
       usageCount: 0,
-      value: normalized.value,
-      isPercentage: normalized.isPercentage,
-      currency: normalized.currency ?? null,
+      value: dto.value,
     });
 
     const saved = await this.couponRepository.save(coupon);
@@ -103,29 +86,14 @@ export class CouponService {
       await this.validateUniqueCode(dto.code);
     }
 
-    const value = Number(dto.value ?? coupon.value);
-    const isPercentage = dto.isPercentage ?? coupon.isPercentage;
-    const currency = dto.currency ?? coupon.currency;
-
     const startsAt = dto.startsAt ?? coupon.startsAt;
     const endsAt = dto.endsAt ?? coupon.endsAt;
 
     this.validateDates(startsAt, endsAt);
 
-    const normalized = this.normalizeCoupon({ value, isPercentage, currency });
-
-    this.validateValue(
-      normalized.value,
-      normalized.isPercentage,
-      normalized.currency,
-      dto.currency,
-    );
-
     coupon.code = dto.code ?? coupon.code;
     coupon.isGlobal = dto.isGlobal ?? coupon.isGlobal;
-    coupon.value = normalized.value;
-    coupon.isPercentage = normalized.isPercentage;
-    coupon.currency = normalized.currency ?? null;
+    coupon.value = Number(dto.value ?? coupon.value);
     coupon.usageLimit = dto.usageLimit ?? coupon.usageLimit;
     coupon.startsAt = startsAt ?? null;
     coupon.endsAt = endsAt ?? null;
@@ -154,7 +122,7 @@ export class CouponService {
     });
 
     if (!coupon) {
-      throw new NotFoundException(`Coupon with id ${id} not found`);
+      throw new NotFoundException(`Cupón con id ${id} no encontrado`);
     }
 
     return coupon;
@@ -166,55 +134,17 @@ export class CouponService {
     });
 
     if (existing) {
-      throw new ConflictException(`Coupon with code "${code}" already exists`);
+      throw new ConflictException(`Ya existe un cupón con el código "${code}"`);
     }
   }
 
   private validateDates(startsAt?: Date | null, endsAt?: Date | null): void {
     if (startsAt && endsAt) {
       if (new Date(startsAt) >= new Date(endsAt)) {
-        throw new BadRequestException('startsAt must be before endsAt');
-      }
-    }
-  }
-
-  private validateValue(
-    value: number,
-    isPercentage: boolean,
-    currency?: CurrencyCode | null,
-    rawCurrency?: CurrencyCode | null,
-  ): void {
-    if (isPercentage) {
-      if (value > 100) {
-        throw new BadRequestException('Percentage coupon cannot exceed 100');
-      }
-      if (rawCurrency) {
         throw new BadRequestException(
-          'currency must not be present when isPercentage is true',
-        );
-      }
-    } else {
-      if (!currency) {
-        throw new BadRequestException(
-          'Fixed amount coupon requires a currency',
+          'La fecha de inicio debe ser anterior a la fecha de fin',
         );
       }
     }
-  }
-
-  private normalizeCoupon({
-    value,
-    isPercentage,
-    currency,
-  }: {
-    value: number;
-    isPercentage: boolean;
-    currency?: CurrencyCode | null;
-  }) {
-    return {
-      value,
-      isPercentage,
-      currency: isPercentage ? null : currency,
-    };
   }
 }

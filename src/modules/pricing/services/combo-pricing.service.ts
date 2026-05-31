@@ -1,7 +1,7 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PG_UNIQUE_VIOLATION } from 'src/common/constants/postgres-error-codes';
 
@@ -38,7 +38,7 @@ export class ComboPricingService {
     });
 
     if (existing) {
-      throw new BadRequestException('Combo already has pricing');
+      throw new ConflictException('El combo ya tiene un pricing asignado');
     }
 
     const margin = dto.marginId ? await this.resolveMargin(dto.marginId) : null;
@@ -56,7 +56,7 @@ export class ComboPricingService {
       return new ComboPricingResponseDto(saved);
     } catch (err: any) {
       if (err.code === PG_UNIQUE_VIOLATION)
-        throw new BadRequestException('Combo already has pricing');
+        throw new ConflictException('El combo ya tiene un pricing asignado');
       throw err;
     }
   }
@@ -128,7 +128,7 @@ export class ComboPricingService {
     });
 
     if (!entity) {
-      throw new NotFoundException('Combo pricing not found');
+      throw new NotFoundException('Pricing de combo no encontrado');
     }
 
     return new ComboPricingResponseDto(entity);
@@ -155,7 +155,7 @@ export class ComboPricingService {
     });
 
     if (!entity) {
-      throw new NotFoundException('Combo pricing not found');
+      throw new NotFoundException('Pricing de combo no encontrado');
     }
 
     return entity;
@@ -167,7 +167,7 @@ export class ComboPricingService {
     });
 
     if (!margin) {
-      throw new NotFoundException(`Margin with id ${marginId} not found`);
+      throw new NotFoundException(`Margen con id ${marginId} no encontrado`);
     }
 
     return margin;

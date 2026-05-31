@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 
 import { DiscountComboTargetEntity } from '../entities/discount-combo-target.entity';
 import { DiscountEntity } from '../../discount/entities/discounts.entity';
@@ -104,7 +104,8 @@ export class DiscountComboTargetService {
     comboId: number,
   ): Promise<void> {
     const existing = await this.repo.findOne({
-      where: { discountId, comboId },
+      where: { discountId, comboId, deletedAt: IsNull() },
+      withDeleted: true,
     });
 
     if (existing) {
@@ -114,13 +115,17 @@ export class DiscountComboTargetService {
     }
   }
 
-  // 🔥 chequea que el combo no esté asociado a NINGÚN descuento activo
+  // 🔥 chequea que el combo no esté asociado a NINGÚN descuento activo (ni el target ni el descuento deben estar borrados)
   private async validateComboHasNoActiveDiscount(
     comboId: number,
   ): Promise<void> {
-    const existing = await this.repo.findOne({
-      where: { comboId },
-    });
+    const existing = await this.repo
+      .createQueryBuilder('target')
+      .innerJoin('target.discount', 'discount')
+      .where('target.comboId = :comboId', { comboId })
+      .andWhere('target.deletedAt IS NULL')
+      .andWhere('discount.deletedAt IS NULL')
+      .getOne();
 
     if (existing) {
       throw new ConflictException(

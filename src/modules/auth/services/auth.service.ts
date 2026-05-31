@@ -45,15 +45,14 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<UserEntity> {
     const user = await this.usersService.findByEmail(email);
 
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user) throw new UnauthorizedException('Credenciales inválidas');
 
     const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
+    if (!passwordMatch)
+      throw new UnauthorizedException('Credenciales inválidas');
 
     if (!user.isActive) {
-      throw new UnauthorizedException(
-        'Account not activated — check your email',
-      );
+      throw new UnauthorizedException('La cuenta no está activada');
     }
 
     return user;
@@ -80,13 +79,15 @@ export class AuthService {
   ): Promise<{ access_token: string; refresh_token: string }> {
     const tokenEntity = await this.findValidRefreshToken(rawToken);
 
-    tokenEntity.revokedAt = new Date();
-    await this.refreshTokenRepo.save(tokenEntity);
-
+    // Emitir nuevos tokens ANTES de revocar el viejo — si algo falla al emitir,
+    // el cliente conserva el token anterior y puede reintentar.
     const user = await this.usersService.findOne(tokenEntity.userId);
     const payload: Payload = { sub: user.id, role: user.role };
     const access_token = this.jwtService.sign(payload);
     const refresh_token = await this.issueRefreshToken(user.id);
+
+    tokenEntity.revokedAt = new Date();
+    await this.refreshTokenRepo.save(tokenEntity);
 
     return { access_token, refresh_token };
   }
@@ -145,7 +146,7 @@ export class AuthService {
 
     const user = await this.usersService.findOne(tokenEntity.userId);
     if (user.isActive)
-      throw new BadRequestException('Account already activated');
+      throw new BadRequestException('La cuenta ya fue activada');
 
     await this.usersService.activate(tokenEntity.userId);
 
@@ -203,14 +204,14 @@ export class AuthService {
   async changePassword(userId: number, dto: ChangePasswordDto): Promise<void> {
     const user = await this.usersService.findEntityWithPassword(userId);
 
-    if (!user) throw new BadRequestException('User not found');
+    if (!user) throw new BadRequestException('Usuario no encontrado');
 
     const passwordMatch = await bcrypt.compare(
       dto.currentPassword,
       user.password,
     );
     if (!passwordMatch)
-      throw new BadRequestException('Current password is incorrect');
+      throw new BadRequestException('La contraseña actual es incorrecta');
 
     await this.usersService.updatePassword(userId, dto.newPassword);
   }
@@ -260,11 +261,11 @@ export class AuthService {
       where: { tokenHash },
     });
 
-    if (!entity) throw new UnauthorizedException('Invalid refresh token');
+    if (!entity) throw new UnauthorizedException('Token de refresco inválido');
     if (entity.isRevoked)
-      throw new UnauthorizedException('Refresh token revoked');
+      throw new UnauthorizedException('El token de refresco fue revocado');
     if (entity.isExpired)
-      throw new UnauthorizedException('Refresh token expired');
+      throw new UnauthorizedException('El token de refresco ha expirado');
 
     return entity;
   }
@@ -305,10 +306,12 @@ export class AuthService {
       where: { token: raw, type },
     });
 
-    if (!tokenEntity) throw new BadRequestException('Invalid or expired token');
-    if (tokenEntity.isUsed) throw new BadRequestException('Token already used');
+    if (!tokenEntity)
+      throw new BadRequestException('Token inválido o expirado');
+    if (tokenEntity.isUsed)
+      throw new BadRequestException('El token ya fue utilizado');
     if (tokenEntity.isExpired)
-      throw new BadRequestException('Token has expired');
+      throw new BadRequestException('El token ha expirado');
 
     return tokenEntity;
   }

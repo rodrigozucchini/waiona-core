@@ -3,11 +3,15 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { DiscountsService } from '../../discount/services/discounts.service';
 import { DiscountEntity } from '../../discount/entities/discounts.entity';
+import { DiscountProductTargetEntity } from '../../discount-product-target/entities/discount-product-target.entity';
+import { DiscountComboTargetEntity } from '../../discount-combo-target/entities/discount-combo-target.entity';
 import { ShopCacheService } from 'src/common/cache/shop-cache.service';
 
 describe('DiscountsService', () => {
   let service: DiscountsService;
   let repo: any;
+  let productTargetRepo: any;
+  let comboTargetRepo: any;
 
   const mockRepo = () => ({
     findAndCount: jest.fn(),
@@ -16,6 +20,7 @@ describe('DiscountsService', () => {
     save: jest.fn(),
     softDelete: jest.fn(),
   });
+  const mockTargetRepo = () => ({ softDelete: jest.fn() });
 
   const mockDiscount = (overrides = {}): DiscountEntity => ({
     id: 1,
@@ -41,11 +46,23 @@ describe('DiscountsService', () => {
       providers: [
         DiscountsService,
         { provide: getRepositoryToken(DiscountEntity), useFactory: mockRepo },
+        {
+          provide: getRepositoryToken(DiscountProductTargetEntity),
+          useFactory: mockTargetRepo,
+        },
+        {
+          provide: getRepositoryToken(DiscountComboTargetEntity),
+          useFactory: mockTargetRepo,
+        },
         { provide: ShopCacheService, useValue: mockShopCacheService },
       ],
     }).compile();
     service = module.get<DiscountsService>(DiscountsService);
     repo = module.get(getRepositoryToken(DiscountEntity));
+    productTargetRepo = module.get(
+      getRepositoryToken(DiscountProductTargetEntity),
+    );
+    comboTargetRepo = module.get(getRepositoryToken(DiscountComboTargetEntity));
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -121,12 +138,20 @@ describe('DiscountsService', () => {
   });
 
   describe('remove', () => {
-    it('should soft delete', async () => {
+    it('should soft delete discount and cascade to targets', async () => {
       const entity = mockDiscount();
       repo.findOne.mockResolvedValue(entity);
       repo.softDelete.mockResolvedValue(undefined);
+      productTargetRepo.softDelete.mockResolvedValue(undefined);
+      comboTargetRepo.softDelete.mockResolvedValue(undefined);
       await service.remove(1);
       expect(repo.softDelete).toHaveBeenCalledWith(entity.id);
+      expect(productTargetRepo.softDelete).toHaveBeenCalledWith({
+        discountId: entity.id,
+      });
+      expect(comboTargetRepo.softDelete).toHaveBeenCalledWith({
+        discountId: entity.id,
+      });
     });
 
     it('should throw NotFoundException', async () => {
