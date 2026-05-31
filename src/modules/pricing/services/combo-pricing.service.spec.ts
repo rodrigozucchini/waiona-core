@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { ComboPricingService } from './../services/combo-pricing.service';
 import { ComboPricingEntity } from './../entities/combo-pricing.entity';
 import { MarginEntity } from 'src/modules/margins/entities/margin.entity';
