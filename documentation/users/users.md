@@ -320,8 +320,8 @@ Authorization: Bearer <jwt-con-sub=1>
 | Swagger — `@ApiTags`, `@ApiBearerAuth` en controller | ✅ |
 | Swagger — `@ApiOperation`, `@ApiResponse`, `@ApiParam` por endpoint | ✅ |
 | Swagger — `@ApiProperty` en `CreateUserDto`, `SearchUsersDto`, `UserResponseDto` | ✅ |
-| Unit tests — 26 tests, service + controller | ✅ |
-| E2E tests — PostgreSQL real, `dropSchema: true`, 12 casos | ✅ |
+| Unit tests — 28 tests, service + controller | ✅ |
+| E2E tests — PostgreSQL real, `dropSchema: true`, 13 casos (incluye búsqueda parcial de email) | ✅ |
 
 ---
 
