@@ -73,7 +73,7 @@ export class CouponComboTargetService {
 
     if (!entity) {
       throw new NotFoundException(
-        `Combo target ${comboId} not found for coupon ${couponId}`,
+        `El combo ${comboId} no está asignado al cupón ${couponId}`,
       );
     }
 
@@ -90,7 +90,7 @@ export class CouponComboTargetService {
     });
 
     if (!coupon) {
-      throw new NotFoundException(`Coupon with id ${couponId} not found`);
+      throw new NotFoundException(`Cupón con id ${couponId} no encontrado`);
     }
 
     return coupon;
@@ -102,13 +102,13 @@ export class CouponComboTargetService {
     });
 
     if (!combo) {
-      throw new NotFoundException(`Combo with id ${comboId} not found`);
+      throw new NotFoundException(`Combo con id ${comboId} no encontrado`);
     }
   }
 
   private validateCouponNotGlobal(coupon: CouponEntity): void {
     if (coupon.isGlobal) {
-      throw new ConflictException('Cannot assign targets to a global coupon');
+      throw new ConflictException('No se pueden asignar targets a un cupón global');
     }
   }
 
@@ -122,7 +122,7 @@ export class CouponComboTargetService {
 
     if (existing) {
       throw new ConflictException(
-        `Combo ${comboId} is already a target of coupon ${couponId}`,
+        `El combo ${comboId} ya es un target del cupón ${couponId}`,
       );
     }
   }

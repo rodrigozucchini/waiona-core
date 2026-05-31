@@ -18,6 +18,9 @@ export class CouponUsageService {
     @InjectRepository(CouponUsageEntity)
     private readonly repo: Repository<CouponUsageEntity>,
 
+    @InjectRepository(CouponEntity)
+    private readonly couponRepository: Repository<CouponEntity>,
+
     private readonly dataSource: DataSource,
   ) {}
 
@@ -37,18 +40,18 @@ export class CouponUsageService {
       });
 
       if (!coupon) {
-        throw new NotFoundException(`Coupon with code "${dto.code}" not found`);
+        throw new NotFoundException(`Cupón con código "${dto.code}" no encontrado`);
       }
 
       if (coupon.startsAt && now < coupon.startsAt) {
-        throw new BadRequestException('Coupon is not active yet');
+        throw new BadRequestException('El cupón aún no está activo');
       }
       if (coupon.endsAt && now > coupon.endsAt) {
-        throw new BadRequestException('Coupon has expired');
+        throw new BadRequestException('El cupón ha expirado');
       }
       if (coupon.usageLimit !== null && coupon.usageLimit !== undefined) {
         if (coupon.usageCount >= coupon.usageLimit) {
-          throw new BadRequestException('Coupon usage limit reached');
+          throw new BadRequestException('El cupón ha alcanzado su límite de uso');
         }
       }
 
@@ -56,7 +59,7 @@ export class CouponUsageService {
         where: { couponId: coupon.id, userId: dto.userId },
       });
       if (alreadyUsed) {
-        throw new ConflictException('User has already used this coupon');
+        throw new ConflictException('El usuario ya utilizó este cupón');
       }
 
       const newUsage = manager.create(CouponUsageEntity, {
@@ -102,6 +105,13 @@ export class CouponUsageService {
   // ==========================
 
   async findByCoupon(couponId: number): Promise<CouponUsageResponseDto[]> {
+    const coupon = await this.couponRepository.findOne({
+      where: { id: couponId },
+    });
+    if (!coupon) {
+      throw new NotFoundException(`Cupón con id ${couponId} no encontrado`);
+    }
+
     const usages = await this.repo.find({
       where: { couponId },
       order: { createdAt: 'DESC' },

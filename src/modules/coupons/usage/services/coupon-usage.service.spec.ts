@@ -13,12 +13,14 @@ import { CouponEntity } from '../../../coupons/coupon/entities/coupon.entity';
 describe('CouponUsageService', () => {
   let service: CouponUsageService;
   let usageRepo: any;
+  let couponRepo: any;
 
   const mockUsageRepo = () => ({
     find: jest.fn(),
     findOne: jest.fn(),
     findAndCount: jest.fn(),
   });
+  const mockCouponRepo = () => ({ findOne: jest.fn() });
 
   const mockEntityManager = {
     findOne: jest.fn(),
@@ -60,12 +62,17 @@ describe('CouponUsageService', () => {
           provide: getRepositoryToken(CouponUsageEntity),
           useFactory: mockUsageRepo,
         },
+        {
+          provide: getRepositoryToken(CouponEntity),
+          useFactory: mockCouponRepo,
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
     service = module.get<CouponUsageService>(CouponUsageService);
     usageRepo = module.get(getRepositoryToken(CouponUsageEntity));
+    couponRepo = module.get(getRepositoryToken(CouponEntity));
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -143,9 +150,15 @@ describe('CouponUsageService', () => {
 
   describe('findByCoupon', () => {
     it('should return usages by couponId', async () => {
+      couponRepo.findOne.mockResolvedValue(mockCoupon());
       usageRepo.find.mockResolvedValue([mockUsage()]);
       const result = await service.findByCoupon(1);
       expect(result).toHaveLength(1);
+    });
+
+    it('should throw NotFoundException if coupon not found', async () => {
+      couponRepo.findOne.mockResolvedValue(null);
+      await expect(service.findByCoupon(999)).rejects.toThrow(NotFoundException);
     });
   });
 

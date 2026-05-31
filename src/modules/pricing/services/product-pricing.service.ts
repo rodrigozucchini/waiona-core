@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PG_UNIQUE_VIOLATION } from 'src/common/constants/postgres-error-codes';
 
@@ -40,7 +41,7 @@ export class ProductPricingService {
     });
 
     if (existing) {
-      throw new BadRequestException('Product already has pricing');
+      throw new ConflictException('El producto ya tiene un pricing asignado');
     }
 
     const margin = dto.marginId ? await this.resolveMargin(dto.marginId) : null;
@@ -58,7 +59,7 @@ export class ProductPricingService {
       return new ProductPricingResponseDto(saved);
     } catch (err: any) {
       if (err.code === PG_UNIQUE_VIOLATION)
-        throw new BadRequestException('Product already has pricing');
+        throw new ConflictException('El producto ya tiene un pricing asignado');
       throw err;
     }
   }
@@ -130,7 +131,7 @@ export class ProductPricingService {
     });
 
     if (!entity) {
-      throw new NotFoundException('Product pricing not found');
+      throw new NotFoundException('Pricing de producto no encontrado');
     }
 
     return new ProductPricingResponseDto(entity);
@@ -157,7 +158,7 @@ export class ProductPricingService {
     });
 
     if (!entity) {
-      throw new NotFoundException('Product pricing not found');
+      throw new NotFoundException('Pricing de producto no encontrado');
     }
 
     return entity;
@@ -169,7 +170,7 @@ export class ProductPricingService {
     });
 
     if (!margin) {
-      throw new NotFoundException(`Margin with id ${marginId} not found`);
+      throw new NotFoundException(`Margen con id ${marginId} no encontrado`);
     }
 
     return margin;

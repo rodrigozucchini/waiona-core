@@ -73,7 +73,7 @@ export class CouponProductTargetService {
 
     if (!entity) {
       throw new NotFoundException(
-        `Product target ${productId} not found for coupon ${couponId}`,
+        `El producto ${productId} no está asignado al cupón ${couponId}`,
       );
     }
 
@@ -90,7 +90,7 @@ export class CouponProductTargetService {
     });
 
     if (!coupon) {
-      throw new NotFoundException(`Coupon with id ${couponId} not found`);
+      throw new NotFoundException(`Cupón con id ${couponId} no encontrado`);
     }
 
     return coupon;
@@ -102,13 +102,13 @@ export class CouponProductTargetService {
     });
 
     if (!product) {
-      throw new NotFoundException(`Product with id ${productId} not found`);
+      throw new NotFoundException(`Producto con id ${productId} no encontrado`);
     }
   }
 
   private validateCouponNotGlobal(coupon: CouponEntity): void {
     if (coupon.isGlobal) {
-      throw new ConflictException('Cannot assign targets to a global coupon');
+      throw new ConflictException('No se pueden asignar targets a un cupón global');
     }
   }
 
@@ -122,7 +122,7 @@ export class CouponProductTargetService {
 
     if (existing) {
       throw new ConflictException(
-        `Product ${productId} is already a target of coupon ${couponId}`,
+        `El producto ${productId} ya es un target del cupón ${couponId}`,
       );
     }
   }

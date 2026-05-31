@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { ComboPricingService } from './../services/combo-pricing.service';
 import { ComboPricingEntity } from './../entities/combo-pricing.entity';
 import { MarginEntity } from 'src/modules/margins/entities/margin.entity';
@@ -85,10 +85,10 @@ describe('ComboPricingService', () => {
       expect(result.marginId).toBe(1);
     });
 
-    it('should throw BadRequestException if combo already has pricing', async () => {
+    it('should throw ConflictException if combo already has pricing', async () => {
       repo.findOne.mockResolvedValue(mockPricing());
       await expect(service.create(dto as any)).rejects.toThrow(
-        BadRequestException,
+        ConflictException,
       );
     });
 
@@ -100,13 +100,13 @@ describe('ComboPricingService', () => {
       );
     });
 
-    it('should throw BadRequestException on unique constraint race condition', async () => {
+    it('should throw ConflictException on unique constraint race condition', async () => {
       repo.findOne.mockResolvedValue(null);
       marginRepo.findOne.mockResolvedValue(mockMargin);
       repo.create.mockReturnValue(mockPricing());
       repo.save.mockRejectedValue({ code: '23505' });
       await expect(service.create(dto as any)).rejects.toThrow(
-        BadRequestException,
+        ConflictException,
       );
     });
   });

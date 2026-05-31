@@ -2,7 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { CouponEntity } from '../entities/coupon.entity';
 import { CouponStatus } from '../enums/coupon-status.enum';
-import { CurrencyCode } from 'src/common/enums/currency-code.enum';
 
 export class CouponResponseDto {
   @ApiProperty({ example: 1 })
@@ -14,19 +13,8 @@ export class CouponResponseDto {
   @ApiProperty({ enum: CouponStatus, example: CouponStatus.ACTIVE })
   status: CouponStatus;
 
-  @ApiProperty({ example: 10 })
+  @ApiProperty({ example: 10, description: 'Porcentaje de descuento' })
   value: number;
-
-  @ApiProperty({ example: true })
-  isPercentage: boolean;
-
-  @ApiProperty({
-    enum: CurrencyCode,
-    required: false,
-    nullable: true,
-    example: 'ARS',
-  })
-  currency?: CurrencyCode;
 
   @ApiProperty({ example: false })
   isGlobal: boolean;
@@ -54,8 +42,6 @@ export class CouponResponseDto {
     this.code = entity.code;
 
     this.value = Number(entity.value);
-    this.isPercentage = entity.isPercentage;
-    this.currency = entity.currency ?? undefined;
 
     this.isGlobal = entity.isGlobal;
 

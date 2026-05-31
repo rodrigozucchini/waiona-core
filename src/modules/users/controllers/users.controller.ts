@@ -63,7 +63,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'No encontrado' })
   findOne(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const payload = req.user as { sub: number };
-    if (payload.sub !== id) throw new ForbiddenException('Access denied');
+    if (payload.sub !== id) throw new ForbiddenException('Acceso denegado');
     return this.usersService.findOne(id);
   }
 
@@ -84,7 +84,7 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
   ) {
     const payload = req.user as { sub: number };
-    if (payload.sub !== id) throw new ForbiddenException('Access denied');
+    if (payload.sub !== id) throw new ForbiddenException('Acceso denegado');
     return this.usersService.update(id, dto);
   }
 
@@ -102,7 +102,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'No encontrado' })
   remove(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const payload = req.user as { sub: number };
-    if (payload.sub !== id) throw new ForbiddenException('Access denied');
+    if (payload.sub !== id) throw new ForbiddenException('Acceso denegado');
     return this.usersService.remove(id);
   }
 }
