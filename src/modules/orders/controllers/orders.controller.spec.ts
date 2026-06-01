@@ -131,10 +131,7 @@ describe('OrdersController', () => {
 
     it('should allow admin to access any user orders', async () => {
       service.findByUser.mockResolvedValue([mockOrder()]);
-      const result = await controller.findByUser(
-        5,
-        mockJwt(1, RoleType.ADMIN),
-      );
+      const result = await controller.findByUser(5, mockJwt(1, RoleType.ADMIN));
       expect(service.findByUser).toHaveBeenCalledWith(5);
       expect(result).toHaveLength(1);
     });
@@ -147,20 +144,14 @@ describe('OrdersController', () => {
   describe('findOne', () => {
     it('should return an order by id for admin', async () => {
       service.findOne.mockResolvedValue(mockOrder());
-      const result = await controller.findOne(
-        1,
-        mockJwt(1, RoleType.ADMIN),
-      );
+      const result = await controller.findOne(1, mockJwt(1, RoleType.ADMIN));
       expect(service.findOne).toHaveBeenCalledWith(1);
       expect(result.id).toBe(1);
     });
 
     it('should return own order for client', async () => {
       service.findOne.mockResolvedValue(mockOrder({ userId: 1 }));
-      const result = await controller.findOne(
-        1,
-        mockJwt(1, RoleType.CLIENT),
-      );
+      const result = await controller.findOne(1, mockJwt(1, RoleType.CLIENT));
       expect(result.id).toBe(1);
     });
 

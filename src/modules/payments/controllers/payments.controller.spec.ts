@@ -65,7 +65,10 @@ describe('PaymentsController', () => {
     it('should create a payment', async () => {
       service.create.mockResolvedValue(mockResponse());
       const dto = { orderId: 1, provider: PaymentProvider.MERCADOPAGO };
-      const result = await controller.create({ sub: 99, role: RoleType.CLIENT }, dto);
+      const result = await controller.create(
+        { sub: 99, role: RoleType.CLIENT },
+        dto,
+      );
       expect(service.create).toHaveBeenCalledWith(99, RoleType.CLIENT, dto);
       expect(result.checkoutUrl).toBe('https://mp.com/checkout');
     });
@@ -128,7 +131,10 @@ describe('PaymentsController', () => {
   describe('findByOrder', () => {
     it('should return payments by orderId', async () => {
       service.findByOrder.mockResolvedValue([mockResponse()]);
-      const result = await controller.findByOrder(1, { sub: 99, role: RoleType.ADMIN });
+      const result = await controller.findByOrder(1, {
+        sub: 99,
+        role: RoleType.ADMIN,
+      });
       expect(service.findByOrder).toHaveBeenCalledWith(1, 99, RoleType.ADMIN);
       expect(result).toHaveLength(1);
     });
@@ -141,7 +147,10 @@ describe('PaymentsController', () => {
   describe('findOne', () => {
     it('should return a payment by id', async () => {
       service.findOne.mockResolvedValue(mockResponse());
-      const result = await controller.findOne(1, { sub: 99, role: RoleType.ADMIN });
+      const result = await controller.findOne(1, {
+        sub: 99,
+        role: RoleType.ADMIN,
+      });
       expect(service.findOne).toHaveBeenCalledWith(1, 99, RoleType.ADMIN);
       expect(result.id).toBe(1);
     });

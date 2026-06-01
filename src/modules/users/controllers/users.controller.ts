@@ -61,7 +61,10 @@ export class UsersController {
   @ApiResponse({ status: 200, type: UserResponseDto })
   @ApiResponse({ status: 403, description: 'Acceso denegado' })
   @ApiResponse({ status: 404, description: 'No encontrado' })
-  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: JwtPayload) {
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayload,
+  ) {
     if (user.sub !== id) throw new ForbiddenException('Acceso denegado');
     return this.usersService.findOne(id);
   }
@@ -98,7 +101,10 @@ export class UsersController {
   @ApiResponse({ status: 204, description: 'Eliminado' })
   @ApiResponse({ status: 403, description: 'Acceso denegado' })
   @ApiResponse({ status: 404, description: 'No encontrado' })
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: JwtPayload) {
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayload,
+  ) {
     if (user.sub !== id) throw new ForbiddenException('Acceso denegado');
     return this.usersService.remove(id);
   }
