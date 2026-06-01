@@ -6,11 +6,11 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 import { OrdersController } from './orders.controller';
 import { OrdersService } from '../services/orders.service';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { IdempotencyInterceptor } from 'src/common/interceptors/idempotency.interceptor';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { IdempotencyInterceptor } from '../../../common/interceptors/idempotency.interceptor';
 import { OrderStatus } from '../enums/order-status.enum';
 import { DeliveryType } from '../enums/delivery-type.enum';
-import { RoleType } from 'src/common/enums/role-type.enum';
+import { RoleType } from '../../../common/enums/role-type.enum';
 
 describe('OrdersController', () => {
   let controller: OrdersController;

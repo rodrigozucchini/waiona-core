@@ -3,8 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { CouponUsageController } from '../../../coupons/usage/controllers/coupon-usage.controller';
 import { CouponUsageService } from '../../../coupons/usage/services/coupon-usage.service';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { RoleType } from 'src/common/enums/role-type.enum';
+import { RolesGuard } from '../../../../common/guards/roles.guard';
+import { RoleType } from '../../../../common/enums/role-type.enum';
 
 describe('CouponUsageController', () => {
   let controller: CouponUsageController;

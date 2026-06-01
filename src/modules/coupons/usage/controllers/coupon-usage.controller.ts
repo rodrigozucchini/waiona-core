@@ -20,13 +20,13 @@ import { AuthGuard } from '@nestjs/passport';
 import { CouponUsageService } from '../services/coupon-usage.service';
 import { CouponUsageResponseDto } from '../dto/coupon-usage-response.dto';
 import { CreateCouponUsageDto } from '../dto/create-coupon-usage.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
-import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RoleType } from 'src/common/enums/role-type.enum';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import type { JwtPayload } from 'src/common/decorators/current-user.decorator';
+import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
+import { PaginatedResponseDto } from '../../../../common/dto/paginated-response.dto';
+import { Roles } from '../../../../common/decorators/roles.decorator';
+import { RoleType } from '../../../../common/enums/role-type.enum';
+import { RolesGuard } from '../../../../common/guards/roles.guard';
+import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../../../../common/decorators/current-user.decorator';
 
 @ApiTags('Coupon Usage')
 @ApiBearerAuth()

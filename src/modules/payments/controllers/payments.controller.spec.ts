@@ -7,7 +7,7 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from '../services/payments.service';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentProvider } from '../enums/payment-provider.enum';
-import { RoleType } from 'src/common/enums/role-type.enum';
+import { RoleType } from '../../../common/enums/role-type.enum';
 
 describe('PaymentsController', () => {
   let controller: PaymentsController;

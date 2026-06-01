@@ -5,7 +5,7 @@ import { Reflector } from '@nestjs/core';
 
 import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
-import { RolesGuard } from 'src/common/guards/roles.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
 
 describe('UsersController', () => {
   let controller: UsersController;

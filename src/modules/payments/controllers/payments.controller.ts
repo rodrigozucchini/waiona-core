@@ -25,12 +25,12 @@ import {
 import { createHmac } from 'crypto';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request } from 'express';
-import { Env } from 'src/env.model';
+import { Env } from '../../../env.model';
 
 import { PaymentsService } from '../services/payments.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { PaymentResponseDto } from '../dto/payment-response.dto';
-import { RoleType } from 'src/common/enums/role-type.enum';
+import { RoleType } from '../../../common/enums/role-type.enum';
 import type { MercadoPagoWebhookBody } from '../dto/mercadopago-webhook.dto';
 
 @ApiTags('Payments')

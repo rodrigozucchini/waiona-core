@@ -26,13 +26,13 @@ import type { Request } from 'express';
 
 import { OrdersService } from '../services/orders.service';
 import { OrderResponseDto } from '../dto/order-response.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RoleType } from 'src/common/enums/role-type.enum';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { IdempotencyInterceptor } from 'src/common/interceptors/idempotency.interceptor';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { RoleType } from '../../../common/enums/role-type.enum';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { IdempotencyInterceptor } from '../../../common/interceptors/idempotency.interceptor';
 
 @ApiTags('Orders')
 @ApiBearerAuth()

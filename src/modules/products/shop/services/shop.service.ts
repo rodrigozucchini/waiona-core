@@ -18,11 +18,11 @@ import {
   ComboItemShopDto,
 } from '../dto/shop-detail-response.dto';
 
-import { CalculationService } from 'src/modules/pricing/calculation/services/calculation.service';
-import { StockItemsService } from 'src/modules/stocks/stock-item/services/stock-item.service';
-import { ShopCacheService } from 'src/common/cache/shop-cache.service';
-import { PriceBreakdownDto } from 'src/modules/pricing/calculation/dto/price-breakdown.dto';
-import { StockItemEntity } from 'src/modules/stocks/stock-item/entities/stock-item.entity';
+import { CalculationService } from '../../../pricing/calculation/services/calculation.service';
+import { StockItemsService } from '../../../stocks/stock-item/services/stock-item.service';
+import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
+import { PriceBreakdownDto } from '../../../pricing/calculation/dto/price-breakdown.dto';
+import { StockItemEntity } from '../../../stocks/stock-item/entities/stock-item.entity';
 
 const PRICE_FILTER_SCAN_LIMIT = 500;
 
