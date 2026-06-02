@@ -8,8 +8,6 @@ import {
 import { ProductTaxesService } from './product-taxes.service';
 import { ProductTaxEntity } from '../entities/product-taxes.entity';
 import { TaxEntity } from '../../taxes/entities/tax.entity';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
-
 describe('ProductTaxesService', () => {
   let service: ProductTaxesService;
   let productTaxRepo: any;
@@ -24,7 +22,6 @@ describe('ProductTaxesService', () => {
     softDelete: jest.fn(),
   });
   const mockTaxRepo = () => ({ findOne: jest.fn() });
-  const mockShopCacheService = { invalidate: jest.fn() };
 
   const mockTax = (overrides = {}) => ({
     id: 1,
@@ -53,7 +50,6 @@ describe('ProductTaxesService', () => {
           useFactory: mockProductTaxRepo,
         },
         { provide: getRepositoryToken(TaxEntity), useFactory: mockTaxRepo },
-        { provide: ShopCacheService, useValue: mockShopCacheService },
       ],
     }).compile();
 
@@ -74,7 +70,6 @@ describe('ProductTaxesService', () => {
       const result = await service.create({ productId: 1, taxId: 1 });
       expect(result.productId).toBe(1);
       expect(result.taxId).toBe(1);
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if tax not found', async () => {
@@ -127,7 +122,6 @@ describe('ProductTaxesService', () => {
       productTaxRepo.merge.mockReturnValue(updated);
       productTaxRepo.save.mockResolvedValue(updated);
       expect((await service.update(1, { taxId: 2 } as any)).taxId).toBe(2);
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException', async () => {
@@ -145,7 +139,6 @@ describe('ProductTaxesService', () => {
       productTaxRepo.softDelete.mockResolvedValue({ affected: 1 });
       await service.remove(1);
       expect(productTaxRepo.softDelete).toHaveBeenCalledWith(pt.id);
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException', async () => {

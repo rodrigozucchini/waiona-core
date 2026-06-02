@@ -392,7 +392,6 @@ Quita un combo de un descuento (soft delete del target).
 | Eliminar un descuento también soft-deletes sus targets | `DiscountsService.remove()` llama `softDelete({ discountId })` en `productTargetRepo` y `comboTargetRepo` antes de invalidar la caché |
 | `status` calculado en tiempo real — no persiste en DB | `DiscountResponseDto.calculateStatus()` |
 | Soft delete — `deletedAt` — TypeORM filtra `IS NULL` automáticamente | `remove` y `findDiscount` — `repo.softDelete()` |
-| Mutations invalidan la caché del shop | `DiscountsService`, `DiscountProductTargetService` y `DiscountComboTargetService` llaman `shopCacheService.invalidate()` (fire-and-forget) en `create` y `remove` |
 
 ### Lógica de `calculateStatus()`
 
@@ -458,7 +457,6 @@ POST /v1/discounts/2/targets/products
 | `status` calculado en DTO, no persiste en DB | ✅ |
 | `validateDates()` usa `>=` para bloquear rango vacío | ✅ |
 | Validación cross-discount: un producto/combo solo tiene un descuento activo | ✅ |
-| Cache invalidation en mutations de discount y targets | ✅ |
 | Unit tests — service y controller, 6 suites | ✅ |
 | E2E tests — PostgreSQL real, `dropSchema: true`, 46 tests | ✅ |
 | Swagger — `@ApiTags`, `@ApiOperation`, `@ApiResponse` en los 3 controllers | ✅ |

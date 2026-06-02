@@ -14,7 +14,6 @@ import { MarginEntity } from '../../margins/entities/margin.entity';
 import { CreateProductPricingDto } from '../dto/create-product-pricing.dto';
 import { UpdateProductPricingDto } from '../dto/update-product-pricing.dto';
 import { ProductPricingResponseDto } from '../dto/product-pricing-response.dto';
-import { ShopCacheService } from '../../../common/cache/shop-cache.service';
 
 @Injectable()
 export class ProductPricingService {
@@ -25,7 +24,6 @@ export class ProductPricingService {
     @InjectRepository(MarginEntity)
     private marginRepo: Repository<MarginEntity>,
 
-    private readonly shopCacheService: ShopCacheService,
   ) {}
 
   // ==========================
@@ -54,7 +52,7 @@ export class ProductPricingService {
 
     try {
       const saved = await this.repo.save(entity);
-      void this.shopCacheService.invalidate();
+  
       return new ProductPricingResponseDto(saved);
     } catch (err: any) {
       if (err.code === PG_UNIQUE_VIOLATION)
@@ -85,7 +83,7 @@ export class ProductPricingService {
     });
 
     const saved = await this.repo.save(entity);
-    void this.shopCacheService.invalidate();
+
     return new ProductPricingResponseDto(saved);
   }
 
@@ -143,7 +141,7 @@ export class ProductPricingService {
   async remove(id: number): Promise<void> {
     const entity = await this.findOneEntity(id);
     await this.repo.softDelete(entity.id);
-    void this.shopCacheService.invalidate();
+
   }
 
   // ==========================

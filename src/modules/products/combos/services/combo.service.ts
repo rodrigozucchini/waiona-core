@@ -34,7 +34,6 @@ export class ComboService {
     private readonly categoryRepository: Repository<CategoryEntity>,
 
     private readonly dataSource: DataSource,
-
     private readonly shopCacheService: ShopCacheService,
   ) {}
 
@@ -108,7 +107,7 @@ export class ComboService {
       return new ComboResponseDto(fullCombo!);
     });
 
-    void this.shopCacheService.invalidate();
+
     return result;
   }
 
@@ -162,6 +161,7 @@ export class ComboService {
 
       return new ComboResponseDto(fullCombo!);
     });
+
 
     void this.shopCacheService.invalidate();
     return result;

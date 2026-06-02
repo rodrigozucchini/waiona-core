@@ -10,7 +10,6 @@ import { DiscountProductTargetEntity } from '../entities/discount-product-target
 import { DiscountEntity } from '../../discount/entities/discounts.entity';
 import { CreateDiscountProductTargetDto } from '../dto/create-discount-product-target.dto';
 import { DiscountProductTargetResponseDto } from '../dto/discount-target-response.dto';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
 
 @Injectable()
 export class DiscountProductTargetService {
@@ -19,7 +18,6 @@ export class DiscountProductTargetService {
     private readonly repo: Repository<DiscountProductTargetEntity>,
     @InjectRepository(DiscountEntity)
     private readonly discountRepository: Repository<DiscountEntity>,
-    private readonly shopCacheService: ShopCacheService,
   ) {}
 
   // ==========================
@@ -42,7 +40,7 @@ export class DiscountProductTargetService {
     });
 
     const saved = await this.repo.save(entity);
-    void this.shopCacheService.invalidate();
+
     return new DiscountProductTargetResponseDto(saved);
   }
 
@@ -80,7 +78,7 @@ export class DiscountProductTargetService {
     }
 
     await this.repo.softDelete(entity.id);
-    void this.shopCacheService.invalidate();
+
   }
 
   // ==========================

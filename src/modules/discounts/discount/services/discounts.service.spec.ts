@@ -5,8 +5,6 @@ import { DiscountsService } from '../../discount/services/discounts.service';
 import { DiscountEntity } from '../../discount/entities/discounts.entity';
 import { DiscountProductTargetEntity } from '../../discount-product-target/entities/discount-product-target.entity';
 import { DiscountComboTargetEntity } from '../../discount-combo-target/entities/discount-combo-target.entity';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
-
 describe('DiscountsService', () => {
   let service: DiscountsService;
   let repo: any;
@@ -35,12 +33,6 @@ describe('DiscountsService', () => {
     ...overrides,
   });
 
-  const mockShopCacheService = {
-    get: jest.fn(),
-    set: jest.fn(),
-    invalidate: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -54,7 +46,6 @@ describe('DiscountsService', () => {
           provide: getRepositoryToken(DiscountComboTargetEntity),
           useFactory: mockTargetRepo,
         },
-        { provide: ShopCacheService, useValue: mockShopCacheService },
       ],
     }).compile();
     service = module.get<DiscountsService>(DiscountsService);

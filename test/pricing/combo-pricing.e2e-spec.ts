@@ -13,7 +13,6 @@ import { RolesGuard } from '../../src/common/guards/roles.guard';
 
 import { ComboPricingController } from '../../src/modules/pricing/controllers/combo-pricing.controller';
 import { ComboPricingService } from '../../src/modules/pricing/services/combo-pricing.service';
-import { ShopCacheService } from '../../src/common/cache/shop-cache.service';
 import { ComboPricingEntity } from '../../src/modules/pricing/entities/combo-pricing.entity';
 import { MarginEntity } from '../../src/modules/margins/entities/margin.entity';
 import { ComboEntity } from '../../src/modules/products/combos/entities/combo.entity';
@@ -63,10 +62,6 @@ describe('ComboPricing (e2e)', () => {
       controllers: [ComboPricingController],
       providers: [
         ComboPricingService,
-        {
-          provide: ShopCacheService,
-          useValue: { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() },
-        },
       ],
     })
       .overrideGuard(AuthGuard('jwt'))

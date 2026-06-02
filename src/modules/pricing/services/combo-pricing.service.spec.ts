@@ -5,8 +5,6 @@ import { ComboPricingService } from './../services/combo-pricing.service';
 import { ComboPricingEntity } from './../entities/combo-pricing.entity';
 import { MarginEntity } from '../../margins/entities/margin.entity';
 import { CurrencyCode } from '../../../common/enums/currency-code.enum';
-import { ShopCacheService } from '../../../common/cache/shop-cache.service';
-
 describe('ComboPricingService', () => {
   let service: ComboPricingService;
 
@@ -36,12 +34,6 @@ describe('ComboPricingService', () => {
   let repo: any;
   let marginRepo: any;
 
-  const mockShopCacheService = {
-    get: jest.fn(),
-    set: jest.fn(),
-    invalidate: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -54,7 +46,6 @@ describe('ComboPricingService', () => {
           provide: getRepositoryToken(MarginEntity),
           useFactory: mockMarginRepo,
         },
-        { provide: ShopCacheService, useValue: mockShopCacheService },
       ],
     }).compile();
 

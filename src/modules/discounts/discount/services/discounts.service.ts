@@ -14,7 +14,6 @@ import { CreateDiscountDto } from '../dto/create-discount.dto';
 import { UpdateDiscountDto } from '../dto/update-discount.dto';
 import { DiscountResponseDto } from '../dto/response-discount.dto';
 import { PaginatedResponseDto } from '../../../../common/dto/paginated-response.dto';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
 
 @Injectable()
 export class DiscountsService {
@@ -28,7 +27,6 @@ export class DiscountsService {
     @InjectRepository(DiscountComboTargetEntity)
     private readonly comboTargetRepo: Repository<DiscountComboTargetEntity>,
 
-    private readonly shopCacheService: ShopCacheService,
   ) {}
 
   // ==========================
@@ -47,7 +45,7 @@ export class DiscountsService {
     });
 
     const saved = await this.discountRepository.save(discount);
-    void this.shopCacheService.invalidate();
+
     return new DiscountResponseDto(saved);
   }
 
@@ -104,7 +102,7 @@ export class DiscountsService {
     discount.endsAt = endsAt ?? null;
 
     const updated = await this.discountRepository.save(discount);
-    void this.shopCacheService.invalidate();
+
     return new DiscountResponseDto(updated);
   }
 
@@ -117,7 +115,7 @@ export class DiscountsService {
     await this.discountRepository.softDelete(discount.id);
     await this.productTargetRepo.softDelete({ discountId: discount.id });
     await this.comboTargetRepo.softDelete({ discountId: discount.id });
-    void this.shopCacheService.invalidate();
+
   }
 
   // ==========================

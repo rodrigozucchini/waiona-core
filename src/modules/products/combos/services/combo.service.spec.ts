@@ -152,7 +152,6 @@ describe('ComboService', () => {
 
       expect(result.name).toBe('Combo Coca x3');
       expect(result.categoryName).toBe('Combos');
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for duplicate productId', async () => {

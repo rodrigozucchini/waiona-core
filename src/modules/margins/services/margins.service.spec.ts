@@ -5,8 +5,6 @@ import { MarginEntity } from '../entities/margin.entity';
 import { ProductPricingEntity } from '../../pricing/entities/product-pricing.entity';
 import { ComboPricingEntity } from '../../pricing/entities/combo-pricing.entity';
 import { NotFoundException, ConflictException } from '@nestjs/common';
-import { ShopCacheService } from '../../../common/cache/shop-cache.service';
-
 describe('MarginsService', () => {
   let service: MarginsService;
   let marginRepository: any;
@@ -33,12 +31,6 @@ describe('MarginsService', () => {
     ...overrides,
   });
 
-  const mockShopCacheService = {
-    get: jest.fn(),
-    set: jest.fn(),
-    invalidate: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -52,7 +44,6 @@ describe('MarginsService', () => {
           provide: getRepositoryToken(ComboPricingEntity),
           useFactory: mockRepo,
         },
-        { provide: ShopCacheService, useValue: mockShopCacheService },
       ],
     }).compile();
 

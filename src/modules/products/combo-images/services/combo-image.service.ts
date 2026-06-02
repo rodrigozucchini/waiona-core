@@ -10,7 +10,6 @@ import { UpdateComboImageDto } from '../dto/update-combo-image.dto';
 import { UploadComboImageDto } from '../dto/upload-combo-image.dto';
 import { ComboImageResponseDto } from '../dto/combo-image-response.dto';
 import { StorageService } from '../../../storage/storage.service';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
 
 @Injectable()
 export class ComboImageService {
@@ -23,7 +22,6 @@ export class ComboImageService {
 
     private readonly storageService: StorageService,
 
-    private readonly shopCacheService: ShopCacheService,
   ) {}
 
   // ==========================
@@ -42,7 +40,7 @@ export class ComboImageService {
     const image = this.comboImageRepository.create(dto);
 
     const saved = await this.comboImageRepository.save(image);
-    void this.shopCacheService.invalidate();
+
     return new ComboImageResponseDto(saved);
   }
 
@@ -78,7 +76,7 @@ export class ComboImageService {
     const image = await this.findEntity(id);
     const merged = this.comboImageRepository.merge(image, dto);
     const updated = await this.comboImageRepository.save(merged);
-    void this.shopCacheService.invalidate();
+
     return new ComboImageResponseDto(updated);
   }
 
@@ -109,7 +107,7 @@ export class ComboImageService {
       publicId,
     });
     const saved = await this.comboImageRepository.save(image);
-    void this.shopCacheService.invalidate();
+
     return new ComboImageResponseDto(saved);
   }
 
@@ -123,7 +121,7 @@ export class ComboImageService {
       await this.storageService.delete(image.publicId);
     }
     await this.comboImageRepository.softDelete(image.id);
-    void this.shopCacheService.invalidate();
+
   }
 
   // ==========================

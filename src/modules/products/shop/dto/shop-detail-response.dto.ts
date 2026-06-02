@@ -12,6 +12,7 @@ export class ShopDetailResponseDto {
   inStock: boolean;
   quantityAvailable: number;
   stockStatus: 'available' | 'low' | 'critical' | 'out_of_stock';
+  category?: string;
   images: string[];
   items?: ComboItemShopDto[];
 }
