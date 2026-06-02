@@ -4,8 +4,6 @@ import { NotFoundException } from '@nestjs/common';
 import { TaxesService } from './taxes.service';
 import { TaxEntity } from '../entities/tax.entity';
 import { TaxTypeEntity } from '../../tax-types/entities/tax-types.entity';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
-
 describe('TaxesService', () => {
   let service: TaxesService;
   let taxRepo: any;
@@ -40,12 +38,6 @@ describe('TaxesService', () => {
       ...overrides,
     }) as unknown as TaxEntity;
 
-  const mockShopCacheService = {
-    get: jest.fn(),
-    set: jest.fn(),
-    invalidate: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,7 +47,6 @@ describe('TaxesService', () => {
           provide: getRepositoryToken(TaxTypeEntity),
           useFactory: mockTaxTypeRepo,
         },
-        { provide: ShopCacheService, useValue: mockShopCacheService },
       ],
     }).compile();
 

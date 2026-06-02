@@ -19,6 +19,7 @@ Antes de generar código, la IA debe cargar la skill relevante. Cada skill tiene
 - Trabajar con pagos → `mercadopago-payments`
 - Crear templates de email o nuevos flujos de mail → `email-templates` (patrón BullMQ, no Resend directo)
 - Trabajar con Redis, cache o idempotencia → `nestjs-core` + `testing-standard` (mocks de `ShopCacheService` / `CACHE_MANAGER`)
+  - `ShopCacheService` solo lo usan `products`, `combos` y `shop` — el cache está limitado a metadata estática (`name`, `description`, `type`) del shop público
 - Upload de imágenes → `nestjs-core` (StorageModule ya existe: `src/modules/storage/`)
 - Endpoints de agregación/analytics → `postgres-standard` + `testing-standard` (buildMockQB)
 - Operaciones SQL directas → `postgres-standard`

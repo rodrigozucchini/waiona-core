@@ -293,7 +293,6 @@ Total impuestos = $210 + $20 + $16.67 = $246.67
 | `taxTypeId` debe existir al crear un tax (→ 404 si no existe) | `create` de taxes |
 | Un impuesto global no puede asignarse a un producto (→ 400) | `create` de product-taxes |
 | Soft delete en todas las entidades | `softDelete(id)` — `deletedAt IS NULL` filtrado automáticamente |
-| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` de todos los sub-servicios (fire-and-forget) |
 
 ---
 
@@ -337,7 +336,6 @@ src/modules/taxation/
 | Helper `findEntity` privado en cada service | ✅ |
 | `tax_type_id` como `name` en `@Column` y `@JoinColumn` | ✅ |
 | Mensajes de error en español | ✅ |
-| Cache invalidation en mutations (taxes, tax-types, product-taxes) | ✅ |
 | Unit tests — mocks con `softDelete`, `findAndCount`, `deletedAt: null` | ✅ |
 | E2E tests — PostgreSQL real, `dropSchema: true` | ✅ |
 | Swagger — `@ApiTags`, `@ApiOperation`, `@ApiResponse`, `@ApiParam` | ✅ |

@@ -13,7 +13,6 @@ import { RolesGuard } from '../../src/common/guards/roles.guard';
 
 import { TaxesController } from '../../src/modules/taxation/taxes/controllers/taxes.controller';
 import { TaxesService } from '../../src/modules/taxation/taxes/services/taxes.service';
-import { ShopCacheService } from '../../src/common/cache/shop-cache.service';
 import { TaxEntity } from '../../src/modules/taxation/taxes/entities/tax.entity';
 import { TaxTypeEntity } from '../../src/modules/taxation/tax-types/entities/tax-types.entity';
 import { TaxTypesController } from '../../src/modules/taxation/tax-types/controllers/tax-types.controller';
@@ -45,14 +44,7 @@ describe('Taxes (e2e)', () => {
         TypeOrmModule.forFeature([TaxEntity, TaxTypeEntity]),
       ],
       controllers: [TaxesController, TaxTypesController],
-      providers: [
-        TaxesService,
-        TaxTypesService,
-        {
-          provide: ShopCacheService,
-          useValue: { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() },
-        },
-      ],
+      providers: [TaxesService, TaxTypesService],
     })
       .overrideGuard(AuthGuard('jwt'))
       .useValue({ canActivate: () => true })

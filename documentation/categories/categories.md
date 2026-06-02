@@ -274,7 +274,6 @@ Authorization: Bearer <token>
 | No se puede eliminar una categoría con combos activos | `delete()` cuenta combos → `ConflictException` si > 0 |
 | Los deletedAt no aparecen en ninguna query | TypeORM filtra `WHERE deleted_at IS NULL` automáticamente |
 | `isActive: false` no elimina la categoría | El campo existe independientemente del soft delete |
-| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ### Detección de ciclos
 
@@ -339,7 +338,6 @@ PATCH /v1/categories/2
 | Ruta específica `/tree` declarada antes que `/:id` | ✅ |
 | Swagger: `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiResponse` | ✅ |
 | Mensajes de error en español | ✅ |
-| Cache invalidation en mutations | ✅ |
 | Unit tests (service + controller) | ✅ |
 | E2E tests con PostgreSQL real | ✅ |
 

@@ -16,7 +16,6 @@ import { UpdateCategoryDto } from '../dto/update-category.dto';
 import { CategoryResponseDto } from '../dto/category-response.dto';
 import { PaginatedResponseDto } from '../../../../common/dto/paginated-response.dto';
 import { CategoryTreeResponseDto } from '../dto/category-tree-response.dto';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
 
 @Injectable()
 export class CategoryService {
@@ -29,8 +28,6 @@ export class CategoryService {
 
     @InjectRepository(ComboEntity)
     private readonly comboRepository: Repository<ComboEntity>,
-
-    private readonly shopCacheService: ShopCacheService,
   ) {}
 
   // ==========================
@@ -91,7 +88,7 @@ export class CategoryService {
     });
 
     const saved = await this.categoryRepository.save(entity);
-    void this.shopCacheService.invalidate();
+
     return new CategoryResponseDto(saved);
   }
 
@@ -126,7 +123,7 @@ export class CategoryService {
     const merged = this.categoryRepository.merge(entity, changes);
 
     const saved = await this.categoryRepository.save(merged);
-    void this.shopCacheService.invalidate();
+
     return new CategoryResponseDto(saved);
   }
 
@@ -156,7 +153,6 @@ export class CategoryService {
     }
 
     await this.categoryRepository.softDelete(entity.id);
-    void this.shopCacheService.invalidate();
   }
 
   // ==========================

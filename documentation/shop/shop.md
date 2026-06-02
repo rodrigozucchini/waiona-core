@@ -49,6 +49,7 @@ Todos los parámetros son opcionales y se pasan como query params.
   inStock: boolean;
   quantityAvailable: number;
   image?: string;             // URL de la primera imagen (menor posición), undefined si no tiene
+  category?: string;          // nombre de la categoría del ítem
 }
 ```
 
@@ -82,6 +83,7 @@ Todos los parámetros son opcionales y se pasan como query params.
   inStock: boolean;
   quantityAvailable: number;
   stockStatus: 'available' | 'low' | 'critical' | 'out_of_stock';
+  category?: string;               // nombre de la categoría del ítem
   images: string[];                // URLs ordenadas por position ASC
   items?: ComboItemShopDto[];      // solo para type=combo
 }
@@ -137,7 +139,8 @@ GET /v1/shop/items?categoryId=3&minPrice=100&maxPrice=500
       "hasDiscount": true,
       "inStock": true,
       "quantityAvailable": 48,
-      "image": "https://cdn.example.com/coca.jpg"
+      "image": "https://cdn.example.com/coca.jpg",
+      "category": "Bebidas"
     },
     {
       "id": 2,
@@ -149,7 +152,8 @@ GET /v1/shop/items?categoryId=3&minPrice=100&maxPrice=500
       "hasDiscount": true,
       "inStock": true,
       "quantityAvailable": 12,
-      "image": "https://cdn.example.com/combo.jpg"
+      "image": "https://cdn.example.com/combo.jpg",
+      "category": "Combos"
     }
   ]
 }
@@ -191,6 +195,7 @@ GET /v1/shop/items/2?type=combo
   "inStock": true,
   "quantityAvailable": 48,
   "stockStatus": "available",
+  "category": "Bebidas",
   "images": [
     "https://cdn.example.com/coca-1.jpg",
     "https://cdn.example.com/coca-2.jpg"
@@ -214,6 +219,7 @@ GET /v1/shop/items/2?type=combo
   "inStock": true,
   "quantityAvailable": 12,
   "stockStatus": "available",
+  "category": "Combos",
   "images": ["https://cdn.example.com/combo.jpg"],
   "items": [
     { "productId": 1, "productName": "Coca Cola 500ml", "quantity": 2 },
@@ -301,15 +307,32 @@ npx jest --config test/jest-e2e.json --testPathPattern="shop.e2e"
 | GET /v1/shop/items/:id de ítem inexistente | 404 |
 | GET /v1/shop/items/:id de ítem inactivo | 404 |
 
+## Cache
+
+El shop implementa cache parcial para datos estáticos usando `ShopCacheService` (Redis).
+
+| Dato | Cache | Motivo |
+|---|---|---|
+| `name`, `description`, `type` | **Sí** — `product:meta:{id}` / `combo:meta:{id}` | No cambian frecuentemente, sin consecuencia económica si están desactualizados |
+| `finalPrice`, `originalPrice`, `taxes` | **No** — siempre en vivo | Dato con consecuencia económica: precio cobrado ≠ precio mostrado |
+| `inStock`, `quantityAvailable` | **No** — siempre en vivo | Cambia con cada orden despachada |
+| `images`, `category` | **No** — siempre en vivo | Vienen del `findOne()` que se necesita de todos modos para las imágenes |
+
+**Flujo en el listado (`search`):** al construir cada item, se escribe la metadata al cache como side effect (`void` — no bloquea el response). Sirve de warm-up para el detalle.
+
+**Flujo en el detalle (`findById`):** se lee cache y se hace `findOne()` en paralelo. Si hay hit se usan los valores cacheados; si hay miss se escriben al cache.
+
+**Invalidación:** `product.service` y `combo.service` llaman `invalidate()` en `update()` y `delete()`. No en `create()` — un producto nuevo no tiene entry en cache.
+
 ## Integración con otros módulos
 
 ```
 ProductEntity ──────┐
                     ↓
 ComboEntity ────────→  ShopService
-                         ↓           ↓           ↓
-                   CalculationService  StockItemsService  images (sorted by position)
-                         ↓
+                         ↓           ↓           ↓           ↓
+                   CalculationService  StockItemsService  images  ShopCacheService
+                         ↓                                           (metadata estática)
                product-pricing / combo-pricing
                margins / product-taxes (prorrateo en combos)
                discount-product-target / discount-combo-target

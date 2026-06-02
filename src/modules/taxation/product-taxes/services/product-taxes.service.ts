@@ -13,7 +13,6 @@ import { TaxEntity } from '../../taxes/entities/tax.entity';
 import { CreateProductTaxDto } from '../dto/create-product-tax.dto';
 import { UpdateProductTaxDto } from '../dto/update-product-tax.dto';
 import { ProductTaxResponseDto } from '../dto/product-tax-response.dto';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
 
 @Injectable()
 export class ProductTaxesService {
@@ -23,8 +22,6 @@ export class ProductTaxesService {
 
     @InjectRepository(TaxEntity)
     private readonly taxRepository: Repository<TaxEntity>,
-
-    private readonly shopCacheService: ShopCacheService,
   ) {}
 
   // ==========================
@@ -63,7 +60,7 @@ export class ProductTaxesService {
     });
 
     const saved = await this.productTaxRepository.save(productTax);
-    void this.shopCacheService.invalidate();
+
     return new ProductTaxResponseDto(saved);
   }
 
@@ -99,7 +96,7 @@ export class ProductTaxesService {
     const productTax = await this.findEntity(id);
     const merged = this.productTaxRepository.merge(productTax, dto);
     const updated = await this.productTaxRepository.save(merged);
-    void this.shopCacheService.invalidate();
+
     return new ProductTaxResponseDto(updated);
   }
 
@@ -110,7 +107,6 @@ export class ProductTaxesService {
   async remove(id: number): Promise<void> {
     const productTax = await this.findEntity(id);
     await this.productTaxRepository.softDelete(productTax.id);
-    void this.shopCacheService.invalidate();
   }
 
   // ==========================

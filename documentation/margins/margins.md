@@ -203,7 +203,6 @@ Soft delete. **Bloqueado** si el margen está asignado a algún `ProductPricing`
 | `value` entre 0.01 y 1000 (siempre porcentaje) | `@Min` / `@Max` en el DTO |
 | No eliminar si está en uso | `remove` — verifica `productPricing` y `comboPricing` en paralelo |
 | Soft delete — `deletedAt` nunca `null` en registros eliminados | `remove` vía `softDelete()` |
-| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
 
 ---
 
@@ -251,7 +250,6 @@ DELETE /v1/margins/1
 | Swagger — `@ApiProperty` en todos los DTOs | ✅ |
 | `@Transform` en campos `name` del CreateDto — normalización a mayúsculas | ✅ |
 | Mensajes de error en español | ✅ |
-| Cache invalidation en mutations | ✅ |
 
 ---
 

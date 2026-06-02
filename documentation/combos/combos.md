@@ -268,7 +268,7 @@ Authorization: Bearer <token>
 | Al reemplazar ítems, los anteriores se soft-deletean | `manager.softDelete(ComboItemEntity, { comboId })` dentro de la transacción |
 | Los combos eliminados no aparecen en ninguna query | TypeORM filtra `WHERE deleted_at IS NULL` automáticamente |
 | `isActive: false` no elimina el combo, solo lo oculta del shop | El campo existe independientemente del soft delete |
-| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
+| Solo update y delete invalidan la caché del shop | `shopCacheService.invalidate()` en `update` y `delete` (NO en `create` — un combo nuevo no tiene entry en cache) |
 
 ## Ejemplos de uso real
 
@@ -322,7 +322,7 @@ PATCH /v1/combos/3
 | Swagger: `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiResponse` | ✅ |
 | Transacción atómica con `dataSource.transaction()` | ✅ |
 | Mensajes de error en español | ✅ |
-| Cache invalidation en mutations | ✅ |
+| Solo update y delete invalidan la caché del shop | ✅ |
 | Unit tests (service + controller) | ✅ |
 | E2E tests con PostgreSQL real | ✅ |
 
@@ -456,7 +456,7 @@ class ComboImageEntity extends BaseEntity {
 | No se puede borrar un combo que tiene imágenes activas | `onDelete: 'RESTRICT'` en la FK de la entidad |
 | El orden se controla con `position` | El shop toma la imagen de menor posición como portada |
 | Soft delete: las imágenes eliminadas no se muestran | TypeORM filtra `WHERE deleted_at IS NULL` |
-| Mutations invalidan la caché del shop | `shopCacheService.invalidate()` en `create`, `update` y `remove` (fire-and-forget) |
+| Solo update y delete invalidan la caché del shop | `shopCacheService.invalidate()` en `update` y `delete` (NO en `create` — un combo nuevo no tiene entry en cache) |
 
 ### Tests de imágenes
 

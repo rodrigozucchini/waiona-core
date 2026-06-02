@@ -89,7 +89,7 @@ export class ProductService {
     });
 
     const saved = await this.productRepository.save(product);
-    void this.shopCacheService.invalidate();
+
     return new ProductResponseDto(await this.findOne(saved.id));
   }
 

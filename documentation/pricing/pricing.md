@@ -275,7 +275,6 @@ Requiere: `SUPER_ADMIN` o `ADMIN`. Calcula el desglose completo con valores manu
 | Los impuestos globales y específicos no se duplican | `Set<number>` de IDs en `fetchTaxesForProduct` descarta globales ya incluidos como específicos |
 | Impuestos de combo por prorrateo — no hay `combo-taxes` | `fetchTaxDataForCombo()` fetcha globales + items + pricings de referencia + taxes de productos en queries batched; `computeTaxesFromData()` aplica el prorrateo (precio_combo × refPrice/totalRef) sin queries adicionales |
 | `calculateProduct` y `calculateCombo` son públicos | El shop los llama sin autenticación; `preview` requiere admin |
-| Mutations de pricing invalidan la caché del shop | `ProductPricingService` y `ComboPricingService` llaman `shopCacheService.invalidate()` (fire-and-forget) en `create`, `update` y `remove` |
 | Race condition en `create` cubierta con `PG_UNIQUE_VIOLATION` | Si dos requests concurrentes pasan el check previo, la segunda falla en `repo.save()` con error `23505` → `409` |
 
 ---
@@ -327,7 +326,6 @@ POST /v1/pricing/calculate/preview
 | `ConflictException` para recursos ya existentes | ✅ | `create()` lanza 409 en lugar de 400 |
 | Mensajes de error en español | ✅ | Todos los servicios del módulo |
 | Prorrateo de impuestos en combos sin N+1 | ✅ | `fetchTaxDataForCombo()` (queries batched con `In([...])`) + `computeTaxesFromData()` (cómputo puro, sin DB) |
-| Cache invalidation en mutations | ✅ | `shopCacheService.invalidate()` en create/update/remove de product y combo pricing |
 | `PartialType` + `OmitType` para UpdateDto | ✅ | |
 | Unit tests con factory functions | ✅ | |
 

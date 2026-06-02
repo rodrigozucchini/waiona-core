@@ -3,8 +3,6 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { TaxTypesService } from './tax-types.service';
 import { TaxTypeEntity } from '../entities/tax-types.entity';
-import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
-
 describe('TaxTypesService', () => {
   let service: TaxTypesService;
   let repo: any;
@@ -17,8 +15,6 @@ describe('TaxTypesService', () => {
     merge: jest.fn(),
     softDelete: jest.fn(),
   });
-
-  const mockShopCacheService = { invalidate: jest.fn() };
 
   const mockTaxType = (overrides = {}): TaxTypeEntity => ({
     id: 1,
@@ -35,7 +31,6 @@ describe('TaxTypesService', () => {
       providers: [
         TaxTypesService,
         { provide: getRepositoryToken(TaxTypeEntity), useFactory: mockRepo },
-        { provide: ShopCacheService, useValue: mockShopCacheService },
       ],
     }).compile();
 
@@ -80,7 +75,6 @@ describe('TaxTypesService', () => {
       repo.save.mockResolvedValue(entity);
       const result = await service.create({ code: 'IVA', name: 'IVA' });
       expect(result.code).toBe('IVA');
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if code already exists', async () => {
@@ -101,7 +95,6 @@ describe('TaxTypesService', () => {
       expect(
         (await service.update(1, { name: 'IVA Actualizado' } as any)).name,
       ).toBe('IVA Actualizado');
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if new code already exists', async () => {
@@ -128,7 +121,6 @@ describe('TaxTypesService', () => {
       repo.softDelete.mockResolvedValue({ affected: 1 });
       await service.delete(1);
       expect(repo.softDelete).toHaveBeenCalledWith(entity.id);
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException', async () => {

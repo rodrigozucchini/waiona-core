@@ -24,6 +24,12 @@ import { ShopCacheService } from '../../../../common/cache/shop-cache.service';
 import { PriceBreakdownDto } from '../../../pricing/calculation/dto/price-breakdown.dto';
 import { StockItemEntity } from '../../../stocks/stock-item/entities/stock-item.entity';
 
+interface StaticMeta {
+  name: string;
+  description: string;
+  type: 'product' | 'combo';
+}
+
 const PRICE_FILTER_SCAN_LIMIT = 500;
 
 @Injectable()
@@ -45,11 +51,6 @@ export class ShopService {
   // ==========================
 
   async search(dto: SearchShopDto): Promise<ShopPaginatedResponseDto> {
-    const cacheKey = `search:${JSON.stringify(dto)}`;
-    const cached =
-      await this.shopCacheService.get<ShopPaginatedResponseDto>(cacheKey);
-    if (cached) return cached;
-
     const {
       search,
       type,
@@ -83,7 +84,7 @@ export class ShopService {
       if (categoryId) where.categoryId = categoryId;
       const products = await this.productRepository.find({
         where,
-        relations: ['images'],
+        relations: ['images', 'category'],
         order: { name: 'ASC' },
       });
       candidates.push(
@@ -97,7 +98,7 @@ export class ShopService {
       if (categoryId) where.categoryId = categoryId;
       const combos = await this.comboRepository.find({
         where,
-        relations: ['images'],
+        relations: ['images', 'category'],
         order: { name: 'ASC' },
       });
       candidates.push(
@@ -161,7 +162,6 @@ export class ShopService {
       };
     }
 
-    await this.shopCacheService.set(cacheKey, result);
     return result;
   }
 
@@ -179,17 +179,11 @@ export class ShopService {
       );
     }
 
-    const cacheKey = `detail:${type}:${id}`;
-    const cached =
-      await this.shopCacheService.get<ShopDetailResponseDto>(cacheKey);
-    if (cached) return cached;
-
     let result: ShopDetailResponseDto;
     if (type === 'product') result = await this.buildProductDetail(id);
     else if (type === 'combo') result = await this.buildComboDetail(id);
     else throw new BadRequestException('Tipo inválido');
 
-    await this.shopCacheService.set(cacheKey, result);
     return result;
   }
 
@@ -214,6 +208,12 @@ export class ShopService {
     const image = product.images?.sort((a, b) => a.position - b.position)[0]
       ?.url;
 
+    void this.shopCacheService.set(`product:meta:${product.id}`, {
+      name: product.name,
+      description: product.description,
+      type: 'product',
+    } satisfies StaticMeta);
+
     return {
       id: product.id,
       name: product.name,
@@ -225,6 +225,7 @@ export class ShopService {
       inStock: stock ? stock.quantityAvailable > 0 : false,
       quantityAvailable: stock?.quantityAvailable ?? 0,
       image,
+      category: product.category?.name,
     };
   }
 
@@ -247,6 +248,12 @@ export class ShopService {
     if (maxPrice !== undefined && priceData.finalPrice > maxPrice) return null;
     const image = combo.images?.sort((a, b) => a.position - b.position)[0]?.url;
 
+    void this.shopCacheService.set(`combo:meta:${combo.id}`, {
+      name: combo.name,
+      description: combo.description,
+      type: 'combo',
+    } satisfies StaticMeta);
+
     return {
       id: combo.id,
       name: combo.name,
@@ -258,6 +265,7 @@ export class ShopService {
       inStock: comboStock?.inStock ?? false,
       quantityAvailable: comboStock?.quantityAvailable ?? 0,
       image,
+      category: combo.category?.name,
     };
   }
 
@@ -266,12 +274,23 @@ export class ShopService {
   // ==========================
 
   private async buildProductDetail(id: number): Promise<ShopDetailResponseDto> {
-    const product = await this.productRepository.findOne({
-      where: { id, isActive: true },
-      relations: ['images'],
-    });
+    const [meta, product] = await Promise.all([
+      this.shopCacheService.get<StaticMeta>(`product:meta:${id}`),
+      this.productRepository.findOne({
+        where: { id, isActive: true },
+        relations: ['images', 'category'],
+      }),
+    ]);
 
     if (!product) throw new NotFoundException('Producto no encontrado');
+
+    if (!meta) {
+      void this.shopCacheService.set(`product:meta:${id}`, {
+        name: product.name,
+        description: product.description,
+        type: 'product',
+      } satisfies StaticMeta);
+    }
 
     const priceData = await this.safeCalculateProduct(id);
     if (!priceData)
@@ -286,8 +305,8 @@ export class ShopService {
 
     return {
       id: product.id,
-      name: product.name,
-      description: product.description,
+      name: meta?.name ?? product.name,
+      description: meta?.description ?? product.description,
       type: 'product',
       originalPrice: priceData.fullPrice,
       finalPrice: priceData.finalPrice,
@@ -298,6 +317,7 @@ export class ShopService {
       inStock: stock ? stock.quantityAvailable > 0 : false,
       quantityAvailable: stock?.quantityAvailable ?? 0,
       stockStatus: this.resolveStockStatus(stock),
+      category: product.category?.name,
       images,
     };
   }
@@ -307,12 +327,23 @@ export class ShopService {
   // ==========================
 
   private async buildComboDetail(id: number): Promise<ShopDetailResponseDto> {
-    const combo = await this.comboRepository.findOne({
-      where: { id, isActive: true },
-      relations: ['images', 'items', 'items.product'],
-    });
+    const [meta, combo] = await Promise.all([
+      this.shopCacheService.get<StaticMeta>(`combo:meta:${id}`),
+      this.comboRepository.findOne({
+        where: { id, isActive: true },
+        relations: ['images', 'items', 'items.product', 'category'],
+      }),
+    ]);
 
     if (!combo) throw new NotFoundException('Combo no encontrado');
+
+    if (!meta) {
+      void this.shopCacheService.set(`combo:meta:${id}`, {
+        name: combo.name,
+        description: combo.description,
+        type: 'combo',
+      } satisfies StaticMeta);
+    }
 
     const priceData = await this.safeCalculateCombo(id);
     if (!priceData)
@@ -333,8 +364,8 @@ export class ShopService {
 
     return {
       id: combo.id,
-      name: combo.name,
-      description: combo.description,
+      name: meta?.name ?? combo.name,
+      description: meta?.description ?? combo.description,
       type: 'combo',
       originalPrice: priceData.fullPrice,
       finalPrice: priceData.finalPrice,
@@ -345,6 +376,7 @@ export class ShopService {
       inStock: comboStock?.inStock ?? false,
       quantityAvailable: comboStock?.quantityAvailable ?? 0,
       stockStatus: comboStock?.inStock ? 'available' : 'out_of_stock',
+      category: combo.category?.name,
       images,
       items,
     };

@@ -383,9 +383,9 @@ describe('Nombre (e2e)', () => {
 Cuando el módulo bajo prueba tiene dependencias de servicios globales o externos, agregarlos como mocks en el array `providers`. Los más comunes:
 
 ```typescript
-// Módulos que usan ShopCacheService (margins, taxes, tax-types, product-taxes, pricing, discounts, discount-product-target, discount-combo-target, categories, products, combos, product-images, combo-images, shop):
+// Módulos que usan ShopCacheService (products, combos, shop):
 import { ShopCacheService } from 'src/common/cache/shop-cache.service';
-{ provide: ShopCacheService, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } }
+{ provide: ShopCacheService, useValue: { get: jest.fn().mockResolvedValue(undefined), set: jest.fn().mockResolvedValue(undefined), invalidate: jest.fn().mockResolvedValue(undefined) } }
 
 // Controladores con IdempotencyInterceptor (orders) — requiere CACHE_MANAGER:
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -458,3 +458,4 @@ npx jest --config test/jest-e2e.json
 - **Olvidar `overrideGuard`**: Tests e2e fallan con 401/403 sin esto.
 - **Sin `app.enableVersioning({ type: VersioningType.URI })`**: Todos los tests retornan 404 — las rutas están bajo `/v1/`.
 - **Sin mock de `ShopCacheService` o `CACHE_MANAGER`**: NestJS falla al inicializar si el módulo depende de ellos — agregar siempre como providers mock en el test module.
+- **ShopCacheService solo en products, combos y shop**: desde el refactor de cache, los módulos de margins, taxes, pricing, discounts, categories e images ya NO inyectan ShopCacheService — no agregar el mock si no es necesario.

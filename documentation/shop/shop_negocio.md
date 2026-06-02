@@ -29,7 +29,7 @@ Es la ventana del negocio hacia los clientes. Todo lo que el admin configura —
 |---|---|
 | El cliente navega el catálogo | Ve todos los productos y combos activos con precio final |
 | El cliente busca un artículo | Escribe "coca" y el sistema muestra todo lo que coincide |
-| El cliente filtra por sección | Selecciona "Bebidas" y ve solo los artículos de esa categoría |
+| El cliente filtra por sección | Selecciona "Bebidas" y ve solo los artículos de esa categoría — cada artículo muestra a qué categoría pertenece |
 | El cliente filtra por precio | Pone "hasta $500" y el shop muestra solo lo que entra en ese presupuesto |
 | El cliente quiere ver solo productos o solo combos | Usa el filtro de tipo para ver una sola categoría de artículos |
 | El cliente abre el detalle de un artículo | Ve imágenes, descripción, precio desglosado y cuántas unidades quedan |

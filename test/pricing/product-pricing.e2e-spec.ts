@@ -13,7 +13,6 @@ import { RolesGuard } from '../../src/common/guards/roles.guard';
 
 import { ProductPricingController } from '../../src/modules/pricing/controllers/product-pricing.controller';
 import { ProductPricingService } from '../../src/modules/pricing/services/product-pricing.service';
-import { ShopCacheService } from '../../src/common/cache/shop-cache.service';
 import { ProductPricingEntity } from '../../src/modules/pricing/entities/product-pricing.entity';
 import { MarginEntity } from '../../src/modules/margins/entities/margin.entity';
 import { ProductEntity } from '../../src/modules/products/product/entities/product.entity';
@@ -62,13 +61,7 @@ describe('ProductPricing (e2e)', () => {
         TypeOrmModule.forFeature([ProductPricingEntity, MarginEntity]),
       ],
       controllers: [ProductPricingController],
-      providers: [
-        ProductPricingService,
-        {
-          provide: ShopCacheService,
-          useValue: { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() },
-        },
-      ],
+      providers: [ProductPricingService],
     })
       .overrideGuard(AuthGuard('jwt'))
       .useValue({ canActivate: () => true })

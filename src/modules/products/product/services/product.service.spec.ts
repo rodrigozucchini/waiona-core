@@ -167,7 +167,6 @@ describe('ProductService', () => {
       });
       expect(result.sku).toBe('SPRITE-500');
       expect(result.categoryName).toBe('Bebidas');
-      expect(mockShopCacheService.invalidate).toHaveBeenCalled();
     });
 
     it('should throw ConflictException if SKU already exists', async () => {
