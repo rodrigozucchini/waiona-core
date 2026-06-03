@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  Query,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -21,6 +22,8 @@ import {
 import { DiscountProductTargetService } from '../services/discount-product-target.service';
 import { CreateDiscountProductTargetDto } from '../dto/create-discount-product-target.dto';
 import { DiscountProductTargetResponseDto } from '../dto/discount-target-response.dto';
+import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
+import { PaginatedResponseDto } from '../../../../common/dto/paginated-response.dto';
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { RoleType } from '../../../../common/enums/role-type.enum';
 import { AuthGuard } from '@nestjs/passport';
@@ -61,16 +64,13 @@ export class DiscountProductTargetController {
   @Get()
   @ApiOperation({ summary: 'Listar productos asignados a un descuento' })
   @ApiParam({ name: 'discountId', type: Number })
-  @ApiResponse({
-    status: 200,
-    type: DiscountProductTargetResponseDto,
-    isArray: true,
-  })
+  @ApiResponse({ status: 200, type: DiscountProductTargetResponseDto, isArray: true })
   @ApiResponse({ status: 404, description: 'Descuento no encontrado' })
   async findAll(
     @Param('discountId', ParseIntPipe) discountId: number,
-  ): Promise<DiscountProductTargetResponseDto[]> {
-    return this.service.findAll(discountId);
+    @Query() { page, limit }: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<DiscountProductTargetResponseDto>> {
+    return this.service.findAll(discountId, page, limit);
   }
 
   // ==========================

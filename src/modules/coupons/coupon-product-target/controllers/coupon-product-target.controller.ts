@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  Query,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -22,6 +23,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { CouponProductTargetService } from '../services/coupon-product-target.service';
 import { CreateCouponProductTargetDto } from '../dto/create-coupon-product-target.dto';
 import { CouponProductTargetResponseDto } from '../dto/coupon-product-target-response.dto';
+import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
+import { PaginatedResponseDto } from '../../../../common/dto/paginated-response.dto';
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { RoleType } from '../../../../common/enums/role-type.enum';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
@@ -55,16 +58,13 @@ export class CouponProductTargetController {
   @Get()
   @ApiOperation({ summary: 'Listar productos asignados a un cupón' })
   @ApiParam({ name: 'couponId', type: Number })
-  @ApiResponse({
-    status: 200,
-    type: CouponProductTargetResponseDto,
-    isArray: true,
-  })
+  @ApiResponse({ status: 200, type: CouponProductTargetResponseDto, isArray: true })
   @ApiResponse({ status: 404, description: 'Cupón no encontrado' })
   async findAll(
     @Param('couponId', ParseIntPipe) couponId: number,
-  ): Promise<CouponProductTargetResponseDto[]> {
-    return this.couponProductTargetService.findAll(couponId);
+    @Query() { page, limit }: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<CouponProductTargetResponseDto>> {
+    return this.couponProductTargetService.findAll(couponId, page, limit);
   }
 
   @Delete(':productId')
