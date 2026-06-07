@@ -140,7 +140,9 @@ describe('DiscountsService', () => {
     });
 
     it('should throw BadRequestException if updating only startsAt on a discount with no endsAt', async () => {
-      repo.findOne.mockResolvedValue(mockDiscount({ startsAt: null, endsAt: null }));
+      repo.findOne.mockResolvedValue(
+        mockDiscount({ startsAt: null, endsAt: null }),
+      );
       await expect(
         service.update(1, { startsAt: new Date() } as any),
       ).rejects.toThrow(BadRequestException);

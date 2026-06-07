@@ -142,7 +142,7 @@ export class DiscountsService {
       );
     }
 
-    if (hasStart && new Date(startsAt!) >= new Date(endsAt!)) {
+    if (hasStart && new Date(startsAt as Date) >= new Date(endsAt as Date)) {
       throw new BadRequestException(
         'La fecha de inicio debe ser anterior a la fecha de fin',
       );
