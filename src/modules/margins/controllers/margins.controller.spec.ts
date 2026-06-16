@@ -88,8 +88,15 @@ describe('MarginsController', () => {
     });
 
     it('should return empty paginated response if no margins', async () => {
-      const empty = { data: [], total: 0, page: 1, limit: 20, totalPages: 0, hasNextPage: false };
-      service.findAll.mockResolvedValue(empty as any);
+      const empty = {
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+        hasNextPage: false,
+      };
+      service.findAll.mockResolvedValue(empty);
 
       const result = await controller.findAll({ page: 1, limit: 20 });
 

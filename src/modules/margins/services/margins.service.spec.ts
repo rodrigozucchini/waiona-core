@@ -94,7 +94,10 @@ describe('MarginsService', () => {
       marginRepository.create.mockReturnValue(entity);
       marginRepository.save.mockResolvedValue(entity);
 
-      const result = await service.create({ name: 'MARGEN ESTÁNDAR', value: 20 });
+      const result = await service.create({
+        name: 'MARGEN ESTÁNDAR',
+        value: 20,
+      });
 
       expect(result.name).toBe('Margen estándar');
       expect(marginRepository.save).toHaveBeenCalled();

@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class MarginsPartialUniqueIndex1781700000000
-  implements MigrationInterface
-{
+export class MarginsPartialUniqueIndex1781700000000 implements MigrationInterface {
   name = 'MarginsPartialUniqueIndex1781700000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -29,9 +27,7 @@ export class MarginsPartialUniqueIndex1781700000000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "IDX_margins_name_active"`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_margins_name_active"`);
 
     await queryRunner.query(
       `CREATE UNIQUE INDEX "IDX_margins_name_unique" ON "margins" ("name")`,
