@@ -66,6 +66,8 @@ export class CategoryService {
   // ==========================
 
   async create(dto: CreateCategoryDto): Promise<CategoryResponseDto> {
+    await this.validateUniqueName(dto.name);
+
     let parent: CategoryEntity | null = null;
 
     if (dto.parentId) {
@@ -102,6 +104,10 @@ export class CategoryService {
   ): Promise<CategoryResponseDto> {
     const entity = await this.findOne(id);
 
+    if (changes.name && changes.name !== entity.name) {
+      await this.validateUniqueName(changes.name);
+    }
+
     if (changes.parentId) {
       const parent = await this.categoryRepository.findOne({
         where: { id: changes.parentId },
@@ -133,6 +139,15 @@ export class CategoryService {
 
   async delete(id: number): Promise<void> {
     const entity = await this.findOne(id);
+
+    const childrenCount = await this.categoryRepository.count({
+      where: { parentId: id },
+    });
+    if (childrenCount > 0) {
+      throw new ConflictException(
+        `No se puede eliminar: la categoría tiene ${childrenCount} subcategoría(s) asignada(s)`,
+      );
+    }
 
     const productCount = await this.productRepository.count({
       where: { categoryId: id },
@@ -211,5 +226,16 @@ export class CategoryService {
     }
 
     return entity;
+  }
+
+  private async validateUniqueName(name: string): Promise<void> {
+    const existing = await this.categoryRepository.findOne({
+      where: { name },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `Ya existe una categoría con el nombre "${name}"`,
+      );
+    }
   }
 }

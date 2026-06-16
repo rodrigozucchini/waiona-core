@@ -17,7 +17,7 @@ export class CategoryEntity extends BaseEntity {
   // Datos básicos
   // ==========================
 
-  @Column({ length: 100, unique: true })
+  @Column({ length: 100 })
   name: string;
 
   @Column({ length: 255, nullable: true })

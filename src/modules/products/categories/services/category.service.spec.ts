@@ -21,6 +21,7 @@ describe('CategoryService', () => {
     findAndCount: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    count: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     merge: jest.fn(),
@@ -137,6 +138,26 @@ describe('CategoryService', () => {
         service.create({ name: 'Sub', parentId: 99 } as any),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should throw ConflictException if name already exists', async () => {
+      categoryRepository.findOne.mockResolvedValue(mockCategory());
+
+      await expect(service.create({ name: 'Bebidas' } as any)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('should allow creating a category with the same name as a soft-deleted one', async () => {
+      // TypeORM agrega deletedAt IS NULL automáticamente — el soft-deleted no aparece
+      categoryRepository.findOne.mockResolvedValue(null);
+      const entity = mockCategory();
+      categoryRepository.create.mockReturnValue(entity);
+      categoryRepository.save.mockResolvedValue(entity);
+
+      const result = await service.create({ name: 'Bebidas' });
+
+      expect(result.name).toBe('Bebidas');
+    });
   });
 
   // ==========================
@@ -148,13 +169,28 @@ describe('CategoryService', () => {
       const entity = mockCategory();
       const updated = mockCategory({ name: 'Gaseosas' });
 
-      categoryRepository.findOne.mockResolvedValue(entity);
+      categoryRepository.findOne
+        .mockResolvedValueOnce(entity) // this.findOne(id)
+        .mockResolvedValueOnce(null); // validateUniqueName
       categoryRepository.merge.mockReturnValue(updated);
       categoryRepository.save.mockResolvedValue(updated);
 
       const result = await service.update(1, { name: 'Gaseosas' });
 
       expect(result.name).toBe('Gaseosas');
+    });
+
+    it('should throw ConflictException if new name already taken', async () => {
+      const entity = mockCategory({ name: 'Viejo' });
+      const existing = mockCategory({ id: 2, name: 'Nuevo' });
+
+      categoryRepository.findOne
+        .mockResolvedValueOnce(entity)
+        .mockResolvedValueOnce(existing);
+
+      await expect(service.update(1, { name: 'Nuevo' } as any)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should throw BadRequestException if category is its own parent', async () => {
@@ -179,8 +215,9 @@ describe('CategoryService', () => {
   // ==========================
 
   describe('delete', () => {
-    it('should soft delete a category with no products or combos', async () => {
+    it('should soft delete a category with no children, products or combos', async () => {
       categoryRepository.findOne.mockResolvedValue(mockCategory());
+      categoryRepository.count.mockResolvedValue(0);
       productRepository.count.mockResolvedValue(0);
       comboRepository.count.mockResolvedValue(0);
       categoryRepository.softDelete.mockResolvedValue({} as any);
@@ -190,8 +227,16 @@ describe('CategoryService', () => {
       expect(categoryRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
+    it('should throw ConflictException if category has active children', async () => {
+      categoryRepository.findOne.mockResolvedValue(mockCategory());
+      categoryRepository.count.mockResolvedValue(2);
+
+      await expect(service.delete(1)).rejects.toThrow(ConflictException);
+    });
+
     it('should throw ConflictException if category has active products', async () => {
       categoryRepository.findOne.mockResolvedValue(mockCategory());
+      categoryRepository.count.mockResolvedValue(0);
       productRepository.count.mockResolvedValue(3);
 
       await expect(service.delete(1)).rejects.toThrow(ConflictException);
@@ -199,6 +244,7 @@ describe('CategoryService', () => {
 
     it('should throw ConflictException if category has active combos', async () => {
       categoryRepository.findOne.mockResolvedValue(mockCategory());
+      categoryRepository.count.mockResolvedValue(0);
       productRepository.count.mockResolvedValue(0);
       comboRepository.count.mockResolvedValue(2);
 

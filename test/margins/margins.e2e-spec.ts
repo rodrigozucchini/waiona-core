@@ -16,6 +16,8 @@ import { MarginsService } from '../../src/modules/margins/services/margins.servi
 import { MarginEntity } from '../../src/modules/margins/entities/margin.entity';
 import { ProductPricingEntity } from '../../src/modules/pricing/entities/product-pricing.entity';
 import { ComboPricingEntity } from '../../src/modules/pricing/entities/combo-pricing.entity';
+import { InitialSchema1780281702444 } from '../../src/database/migrations/1780281702444-InitialSchema';
+import { MarginsPartialUniqueIndex1781700000000 } from '../../src/database/migrations/1781700000000-MarginsPartialUniqueIndex';
 
 // ProductPricingEntity y ComboPricingEntity tienen relaciones a ProductEntity/ComboEntity
 // que arrastran muchas dependencias. Los mockeamos para mantener el e2e aislado.
@@ -40,8 +42,12 @@ describe('Margins (e2e)', () => {
             password: config.get('POSTGRES_PASSWORD'),
             database: config.get('POSTGRES_TEST_DB'),
             entities: [MarginEntity],
-            synchronize: true,
+            synchronize: false,
             dropSchema: true,
+            migrations: [
+              InitialSchema1780281702444,
+              MarginsPartialUniqueIndex1781700000000,
+            ],
           }),
         }),
         TypeOrmModule.forFeature([MarginEntity]),
@@ -77,6 +83,7 @@ describe('Margins (e2e)', () => {
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
     dataSource = moduleFixture.get(DataSource);
+    await dataSource.runMigrations();
   }, 30000);
 
   afterAll(async () => {

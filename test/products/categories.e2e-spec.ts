@@ -16,6 +16,8 @@ import { CategoryService } from '../../src/modules/products/categories/services/
 import { CategoryEntity } from '../../src/modules/products/categories/entities/category.entity';
 import { ProductEntity } from '../../src/modules/products/product/entities/product.entity';
 import { ComboEntity } from '../../src/modules/products/combos/entities/combo.entity';
+import { InitialSchema1780281702444 } from '../../src/database/migrations/1780281702444-InitialSchema';
+import { CategoriesPartialUniqueIndex1781800000000 } from '../../src/database/migrations/1781800000000-CategoriesPartialUniqueIndex';
 
 // ProductEntity y ComboEntity solo se usan en CategoryService para .count() en delete.
 // Los mockeamos para evitar arrastrar toda su cadena de dependencias.
@@ -40,8 +42,12 @@ describe('Categories (e2e)', () => {
             password: config.get('POSTGRES_PASSWORD'),
             database: config.get('POSTGRES_TEST_DB'),
             entities: [CategoryEntity],
-            synchronize: true,
+            synchronize: false,
             dropSchema: true,
+            migrations: [
+              InitialSchema1780281702444,
+              CategoriesPartialUniqueIndex1781800000000,
+            ],
           }),
         }),
         TypeOrmModule.forFeature([CategoryEntity]),
@@ -74,6 +80,7 @@ describe('Categories (e2e)', () => {
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
     dataSource = moduleFixture.get(DataSource);
+    await dataSource.runMigrations();
   }, 30000);
 
   afterAll(async () => {
@@ -211,6 +218,20 @@ describe('Categories (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/v1/categories/${created.body.id}`)
       .expect(404);
+  });
+
+  it('DELETE /categories/:id → 409 si tiene subcategorías activas', async () => {
+    const parent = await request(app.getHttpServer())
+      .post('/v1/categories')
+      .send({ name: 'Con hijos' });
+
+    await request(app.getHttpServer())
+      .post('/v1/categories')
+      .send({ name: 'Hijo de con hijos', parentId: parent.body.id });
+
+    await request(app.getHttpServer())
+      .delete(`/v1/categories/${parent.body.id}`)
+      .expect(409);
   });
 
   it('DELETE /categories/:id → 404 si no existe', async () => {

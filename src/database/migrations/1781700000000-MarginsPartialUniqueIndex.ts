@@ -22,7 +22,7 @@ export class MarginsPartialUniqueIndex1781700000000 implements MigrationInterfac
     `);
 
     await queryRunner.query(
-      `CREATE UNIQUE INDEX "IDX_margins_name_active" ON "margins" ("name") WHERE "deleted_at" IS NULL`,
+      `CREATE UNIQUE INDEX "IDX_margins_name_active" ON "margins" ("name") WHERE "deletedAt" IS NULL`,
     );
   }
 
