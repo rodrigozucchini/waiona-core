@@ -9,28 +9,39 @@ import {
   IsNotEmpty,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCategoryDto {
+  @ApiProperty({ example: 'BEBIDAS', minLength: 2, maxLength: 100 })
   @Transform(({ value }) => value?.toUpperCase().trim())
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(100)
+  @IsString({ message: 'El nombre debe ser texto' })
+  @IsNotEmpty({ message: 'El nombre es obligatorio' })
+  @MinLength(2, { message: 'El nombre debe tener al menos 2 caracteres' })
+  @MaxLength(100, { message: 'El nombre no puede superar los 100 caracteres' })
   name: string;
 
+  @ApiPropertyOptional({
+    example: 'Bebidas en general',
+    minLength: 5,
+    maxLength: 255,
+  })
   @IsOptional()
   @Transform(({ value }) => value?.trim())
-  @IsString()
-  @MinLength(5)
-  @MaxLength(255)
+  @IsString({ message: 'La descripción debe ser texto' })
+  @MinLength(5, { message: 'La descripción debe tener al menos 5 caracteres' })
+  @MaxLength(255, {
+    message: 'La descripción no puede superar los 255 caracteres',
+  })
   description?: string;
 
+  @ApiPropertyOptional({ example: true, default: true })
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'isActive debe ser un valor booleano' })
   isActive?: boolean;
 
+  @ApiPropertyOptional({ example: 1, minimum: 1 })
   @IsOptional()
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'El id de la categoría padre debe ser un número entero' })
+  @Min(1, { message: 'El id de la categoría padre debe ser mayor a 0' })
   parentId?: number;
 }

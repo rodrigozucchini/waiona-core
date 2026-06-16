@@ -145,7 +145,8 @@ export class CategoryController {
   @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
   @ApiResponse({
     status: 409,
-    description: 'Categoría tiene productos o combos activos asignados',
+    description:
+      'Categoría tiene subcategorías, productos o combos activos asignados',
   })
   async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.categoryService.delete(id);
