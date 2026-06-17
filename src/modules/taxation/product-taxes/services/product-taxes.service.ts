@@ -114,7 +114,9 @@ export class ProductTaxesService {
       });
 
       if (!tax) {
-        throw new NotFoundException(`Impuesto con id ${dto.taxId} no encontrado`);
+        throw new NotFoundException(
+          `Impuesto con id ${dto.taxId} no encontrado`,
+        );
       }
 
       if (tax.isGlobal) {

@@ -72,7 +72,7 @@ describe('ProductTaxesService', () => {
       taxRepo.findOne.mockResolvedValue(mockTax());
       productTaxRepo.findOne
         .mockResolvedValueOnce(null) // duplicate check
-        .mockResolvedValueOnce(pt);  // findEntity after save
+        .mockResolvedValueOnce(pt); // findEntity after save
       productTaxRepo.create.mockReturnValue(pt);
       productTaxRepo.save.mockResolvedValue(pt);
       const result = await service.create({ productId: 1, taxId: 1 });
@@ -140,13 +140,13 @@ describe('ProductTaxesService', () => {
       const pt = mockProductTax();
       const updated = mockProductTax({ taxId: 2, tax: mockTax({ id: 2 }) });
       productTaxRepo.findOne
-        .mockResolvedValueOnce(pt)      // findEntity (inicial)
-        .mockResolvedValueOnce(null)    // duplicate check
+        .mockResolvedValueOnce(pt) // findEntity (inicial)
+        .mockResolvedValueOnce(null) // duplicate check
         .mockResolvedValueOnce(updated); // findEntity después de save
       taxRepo.findOne.mockResolvedValue(mockTax({ id: 2 }));
       productTaxRepo.merge.mockReturnValue(updated);
       productTaxRepo.save.mockResolvedValue(updated);
-      const result = await service.update(1, { taxId: 2 } as any);
+      const result = await service.update(1, { taxId: 2 });
       expect(result.taxId).toBe(2);
       expect(result.tax).toBeDefined();
     });
@@ -154,11 +154,11 @@ describe('ProductTaxesService', () => {
     it('should skip validations when taxId is unchanged', async () => {
       const pt = mockProductTax({ taxId: 1 });
       productTaxRepo.findOne
-        .mockResolvedValueOnce(pt)  // findEntity (inicial)
+        .mockResolvedValueOnce(pt) // findEntity (inicial)
         .mockResolvedValueOnce(pt); // findEntity después de save
       productTaxRepo.merge.mockReturnValue(pt);
       productTaxRepo.save.mockResolvedValue(pt);
-      await service.update(1, { taxId: 1 } as any);
+      await service.update(1, { taxId: 1 });
       expect(taxRepo.findOne).not.toHaveBeenCalled();
     });
 
@@ -187,7 +187,7 @@ describe('ProductTaxesService', () => {
 
     it('should throw ConflictException if new tax already assigned to product', async () => {
       productTaxRepo.findOne
-        .mockResolvedValueOnce(mockProductTax())  // findEntity
+        .mockResolvedValueOnce(mockProductTax()) // findEntity
         .mockResolvedValueOnce(mockProductTax({ taxId: 2 })); // duplicate check
       taxRepo.findOne.mockResolvedValue(mockTax({ id: 2 }));
       await expect(service.update(1, { taxId: 2 } as any)).rejects.toThrow(
