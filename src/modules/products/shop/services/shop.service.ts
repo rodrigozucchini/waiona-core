@@ -25,7 +25,6 @@ import { StockItemsService } from '../../../stocks/stock-item/services/stock-ite
 import { PriceBreakdownDto } from '../../../pricing/calculation/dto/price-breakdown.dto';
 import { StockItemEntity } from '../../../stocks/stock-item/entities/stock-item.entity';
 
-
 @Injectable()
 export class ShopService {
   constructor(

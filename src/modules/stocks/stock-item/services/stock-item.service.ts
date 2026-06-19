@@ -123,7 +123,12 @@ export class StockItemsService {
     });
 
     if (!items.length) {
-      return { quantityAvailable: 0, inStock: false, stockMin: 0, stockCritical: 0 };
+      return {
+        quantityAvailable: 0,
+        inStock: false,
+        stockMin: 0,
+        stockCritical: 0,
+      };
     }
 
     let minAvailable = Infinity;
@@ -153,9 +158,12 @@ export class StockItemsService {
       // Convertir umbrales a combo-units usando la misma ubicación
       if (bestStockItem) {
         const thresholdMin = Math.floor(bestStockItem.stockMin / item.quantity);
-        const thresholdCritical = Math.floor(bestStockItem.stockCritical / item.quantity);
+        const thresholdCritical = Math.floor(
+          bestStockItem.stockCritical / item.quantity,
+        );
         if (thresholdMin > maxThresholdMin) maxThresholdMin = thresholdMin;
-        if (thresholdCritical > maxThresholdCritical) maxThresholdCritical = thresholdCritical;
+        if (thresholdCritical > maxThresholdCritical)
+          maxThresholdCritical = thresholdCritical;
       }
     }
 

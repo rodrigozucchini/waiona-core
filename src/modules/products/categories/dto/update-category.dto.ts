@@ -17,12 +17,18 @@ export class UpdateCategoryDto {
   @MaxLength(100, { message: 'El nombre no puede superar los 100 caracteres' })
   name?: string;
 
-  @ApiPropertyOptional({ example: 'Bebidas en general', minLength: 5, maxLength: 255 })
+  @ApiPropertyOptional({
+    example: 'Bebidas en general',
+    minLength: 5,
+    maxLength: 255,
+  })
   @IsOptional()
   @Transform(({ value }) => value?.trim())
   @IsString({ message: 'La descripción debe ser texto' })
   @MinLength(5, { message: 'La descripción debe tener al menos 5 caracteres' })
-  @MaxLength(255, { message: 'La descripción no puede superar los 255 caracteres' })
+  @MaxLength(255, {
+    message: 'La descripción no puede superar los 255 caracteres',
+  })
   description?: string;
 
   @ApiPropertyOptional({ example: true })

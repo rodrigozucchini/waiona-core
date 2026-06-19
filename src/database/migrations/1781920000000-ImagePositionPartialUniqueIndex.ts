@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class ImagePositionPartialUniqueIndex1781920000000
-  implements MigrationInterface
-{
+export class ImagePositionPartialUniqueIndex1781920000000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       DO $$

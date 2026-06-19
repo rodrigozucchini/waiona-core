@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class ProductSkuPartialUniqueIndex1781930000000
-  implements MigrationInterface
-{
+export class ProductSkuPartialUniqueIndex1781930000000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
     // Drop unique constraint/index en products.sku (no excluye soft-deleted)
     await queryRunner.query(`
