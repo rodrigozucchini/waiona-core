@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
@@ -100,8 +104,6 @@ export class CalculationService {
    * Busca pricing, margen, impuestos y descuento vigente en la DB.
    */
   async calculateProduct(dto: CalculateProductDto): Promise<PriceBreakdownDto> {
-    const now = new Date();
-
     // 1. Obtener pricing del producto
     const pricing = await this.productPricingRepo.findOne({
       where: { productId: dto.productId },
@@ -112,21 +114,13 @@ export class CalculationService {
 
     const unitPrice = Number(pricing.unitPrice);
 
-    // 2. Descuento vigente del producto
+    // 2. Descuento asignado al producto (si existe = activo)
     const discountTarget = await this.discountProductRepo.findOne({
       where: { productId: dto.productId },
       relations: ['discount'],
     });
 
-    const activeDiscount =
-      discountTarget?.discount &&
-      this.isActive(
-        discountTarget.discount.startsAt,
-        discountTarget.discount.endsAt,
-        now,
-      )
-        ? discountTarget.discount
-        : null;
+    const activeDiscount = discountTarget?.discount ?? null;
 
     const discount = activeDiscount
       ? this.applyValue(unitPrice, activeDiscount.value, true)
@@ -175,8 +169,6 @@ export class CalculationService {
    * Busca pricing, margen, impuestos y descuento vigente en la DB.
    */
   async calculateCombo(dto: CalculateComboDto): Promise<PriceBreakdownDto> {
-    const now = new Date();
-
     // 1. Obtener pricing del combo
     const pricing = await this.comboPricingRepo.findOne({
       where: { comboId: dto.comboId },
@@ -186,21 +178,13 @@ export class CalculationService {
 
     const unitPrice = Number(pricing.unitPrice);
 
-    // 2. Descuento vigente del combo
+    // 2. Descuento asignado al combo (si existe = activo)
     const discountTarget = await this.discountComboRepo.findOne({
       where: { comboId: dto.comboId },
       relations: ['discount'],
     });
 
-    const activeDiscount =
-      discountTarget?.discount &&
-      this.isActive(
-        discountTarget.discount.startsAt,
-        discountTarget.discount.endsAt,
-        now,
-      )
-        ? discountTarget.discount
-        : null;
+    const activeDiscount = discountTarget?.discount ?? null;
 
     const discount = activeDiscount
       ? this.applyValue(unitPrice, activeDiscount.value, true)
@@ -253,21 +237,12 @@ export class CalculationService {
     value?: number,
     isPercentage?: boolean,
   ): number {
-    if (!value) return 0;
+    if (value == null) return 0;
+    if (isNaN(value))
+      throw new InternalServerErrorException(
+        `Valor de porcentaje inválido en cálculo de precio: ${value}`,
+      );
     return isPercentage ? base * (value / 100) : value;
-  }
-
-  /**
-   * Verifica si un descuento/cupón está vigente según sus fechas.
-   */
-  private isActive(
-    startsAt?: Date | null,
-    endsAt?: Date | null,
-    now = new Date(),
-  ): boolean {
-    if (startsAt && now < startsAt) return false;
-    if (endsAt && now > endsAt) return false;
-    return true;
   }
 
   private async fetchTaxesForProduct(productId: number): Promise<TaxEntity[]> {
@@ -337,10 +312,17 @@ export class CalculationService {
       taxesByProduct.get(pt.productId)!.push(pt);
     }
 
-    const itemsWithRef = items.map((item) => ({
-      productId: item.productId,
-      refPrice: (pricingMap.get(item.productId) ?? 0) * item.quantity,
-    }));
+    const itemsWithRef = items.map((item) => {
+      if (!pricingMap.has(item.productId)) {
+        throw new NotFoundException(
+          `El producto ${item.productId} del combo no tiene pricing configurado`,
+        );
+      }
+      return {
+        productId: item.productId,
+        refPrice: pricingMap.get(item.productId)! * item.quantity,
+      };
+    });
 
     const totalRef = itemsWithRef.reduce((acc, i) => acc + i.refPrice, 0);
 

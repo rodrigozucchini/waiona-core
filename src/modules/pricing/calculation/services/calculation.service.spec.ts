@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CalculationService } from '../../calculation/services/calculation.service';
 import { ProductPricingEntity } from '../../entities/product-pricing.entity';
 import { ComboPricingEntity } from '../../entities/combo-pricing.entity';
@@ -143,6 +146,19 @@ describe('CalculationService', () => {
         service.calculateProduct({ productId: 999 }),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should throw InternalServerErrorException if margin value is NaN', async () => {
+      productPricingRepo.findOne.mockResolvedValue(
+        mockProductPricing({ margin: { id: 1, value: NaN } }),
+      );
+      discountProductRepo.findOne.mockResolvedValue(null);
+      productTaxRepo.find.mockResolvedValue([]);
+      taxRepo.find.mockResolvedValue([]);
+
+      await expect(service.calculateProduct({ productId: 1 })).rejects.toThrow(
+        InternalServerErrorException,
+      );
+    });
   });
 
   // ==========================
@@ -256,7 +272,7 @@ describe('CalculationService', () => {
       expect(result.taxes).toBeCloseTo(80, 1);
     });
 
-    it('should skip items without pricing and apply only globals', async () => {
+    it('should throw NotFoundException if a combo item has no pricing configured', async () => {
       comboPricingRepo.findOne.mockResolvedValue(
         mockComboPricing({ unitPrice: 1000, margin: null }),
       );
@@ -264,13 +280,12 @@ describe('CalculationService', () => {
       taxRepo.find.mockResolvedValue([mockGlobalTax({ value: 21 })]);
 
       comboItemRepo.find.mockResolvedValue([{ productId: 99, quantity: 1 }]);
-      productPricingRepo.find.mockResolvedValue([]); // sin pricing → refPrice = 0
+      productPricingRepo.find.mockResolvedValue([]); // productId 99 sin pricing
       productTaxRepo.find.mockResolvedValue([]);
 
-      const result = await service.calculateCombo({ comboId: 1 });
-
-      // totalRef = 0 → solo globales: 21% de 1000 = 210
-      expect(result.taxes).toBeCloseTo(210, 1);
+      await expect(service.calculateCombo({ comboId: 1 })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException if combo has no pricing', async () => {
