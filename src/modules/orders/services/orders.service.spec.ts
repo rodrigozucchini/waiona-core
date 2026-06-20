@@ -13,8 +13,6 @@ import { OrderItemEntity } from '../entities/order-item.entity';
 import { ProductEntity } from '../../products/product/entities/product.entity';
 import { ComboEntity } from '../../products/combos/entities/combo.entity';
 import { CouponEntity } from '../../coupons/coupon/entities/coupon.entity';
-import { CouponProductTargetEntity } from '../../coupons/coupon-product-target/entities/coupon-product-target.entity';
-import { CouponComboTargetEntity } from '../../coupons/coupon-combo-target/entities/coupon-combo-target.entity';
 import { StockItemEntity } from '../../stocks/stock-item/entities/stock-item.entity';
 import { UserEntity } from '../../users/entities/user.entity';
 import { StockItemsService } from '../../stocks/stock-item/services/stock-item.service';
@@ -37,8 +35,6 @@ describe('OrdersService', () => {
   const mockProductRepo = () => ({ findOne: jest.fn() });
   const mockComboRepo = () => ({ findOne: jest.fn() });
   const mockCouponRepo = () => ({ findOne: jest.fn(), save: jest.fn() });
-  const mockCouponProductTargetRepo = () => ({ findOne: jest.fn() });
-  const mockCouponComboTargetRepo = () => ({ findOne: jest.fn() });
   const mockStockItemRepo = () => ({
     findOne: jest.fn(),
     find: jest.fn(),
@@ -70,8 +66,10 @@ describe('OrdersService', () => {
   };
   const mockEntityManager = {
     findOne: jest.fn(),
+    find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    softDelete: jest.fn(),
     getRepository: jest.fn(() => mockManagerRepo),
   };
   const mockDataSource = {
@@ -166,8 +164,6 @@ describe('OrdersService', () => {
   let orderRepo: any;
   let productRepo: any;
   let comboRepo: any;
-  let couponRepo: any;
-  let couponProductTargetRepo: any;
   let stockItemRepo: any;
   let userRepo: any;
   let stockService: any;
@@ -193,14 +189,6 @@ describe('OrdersService', () => {
           useFactory: mockCouponRepo,
         },
         {
-          provide: getRepositoryToken(CouponProductTargetEntity),
-          useFactory: mockCouponProductTargetRepo,
-        },
-        {
-          provide: getRepositoryToken(CouponComboTargetEntity),
-          useFactory: mockCouponComboTargetRepo,
-        },
-        {
           provide: getRepositoryToken(StockItemEntity),
           useFactory: mockStockItemRepo,
         },
@@ -216,10 +204,6 @@ describe('OrdersService', () => {
     orderRepo = module.get(getRepositoryToken(OrderEntity));
     productRepo = module.get(getRepositoryToken(ProductEntity));
     comboRepo = module.get(getRepositoryToken(ComboEntity));
-    couponRepo = module.get(getRepositoryToken(CouponEntity));
-    couponProductTargetRepo = module.get(
-      getRepositoryToken(CouponProductTargetEntity),
-    );
     stockItemRepo = module.get(getRepositoryToken(StockItemEntity));
     userRepo = module.get(getRepositoryToken(UserEntity));
     stockService = module.get(StockItemsService);
@@ -408,19 +392,7 @@ describe('OrdersService', () => {
       stockItemRepo.find.mockResolvedValue([mockStock()]);
       calcService.calculateProduct.mockResolvedValue(mockBreakdown());
       orderItemRepo.create.mockReturnValue({});
-      // computeOrderCouponDiscount: cupón válido no global, sin target para este producto → retorna 0
-      couponRepo.findOne.mockResolvedValueOnce({
-        id: 1,
-        code: 'NOAPLICA',
-        value: 10,
-        isGlobal: false,
-        usageLimit: null,
-        usageCount: 0,
-        startsAt: null,
-        endsAt: null,
-      });
-      couponProductTargetRepo.findOne.mockResolvedValueOnce(null);
-      // dentro de la transacción: cupón válido, sin uso previo, pero couponDiscount === 0
+      // dentro de la transacción: cupón válido no global, sin uso previo
       mockEntityManager.findOne
         .mockResolvedValueOnce({
           id: 1,
@@ -433,6 +405,8 @@ describe('OrdersService', () => {
           endsAt: null,
         })
         .mockResolvedValueOnce(null); // sin uso previo
+      // computeCouponDiscountWithManager: sin targets → descuento = 0
+      mockEntityManager.find.mockResolvedValue([]);
 
       await expect(
         service.create(1, { ...dto, couponCode: 'NOAPLICA' } as any),
