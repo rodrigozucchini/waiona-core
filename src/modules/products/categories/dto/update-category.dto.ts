@@ -1,7 +1,6 @@
 import {
   IsString,
   IsOptional,
-  IsBoolean,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -31,8 +30,4 @@ export class UpdateCategoryDto {
   })
   description?: string;
 
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean({ message: 'isActive debe ser un valor booleano' })
-  isActive?: boolean;
 }
