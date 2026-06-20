@@ -88,7 +88,7 @@ export class DiscountComboTargetService {
       );
     }
 
-    await this.repo.softDelete(entity.id);
+    await this.repo.delete(entity.id);
   }
 
   // ==========================
@@ -124,21 +124,14 @@ export class DiscountComboTargetService {
     }
   }
 
-  // 🔥 chequea que el combo no esté asociado a NINGÚN descuento activo (ni el target ni el descuento deben estar borrados)
   private async validateComboHasNoActiveDiscount(
     comboId: number,
   ): Promise<void> {
-    const existing = await this.repo
-      .createQueryBuilder('target')
-      .innerJoin('target.discount', 'discount')
-      .where('target.comboId = :comboId', { comboId })
-      .andWhere('target.deletedAt IS NULL')
-      .andWhere('discount.deletedAt IS NULL')
-      .getOne();
+    const existing = await this.repo.findOne({ where: { comboId } });
 
     if (existing) {
       throw new ConflictException(
-        `El combo ${comboId} ya tiene un descuento activo asignado`,
+        `El combo ${comboId} ya tiene un descuento asignado`,
       );
     }
   }
