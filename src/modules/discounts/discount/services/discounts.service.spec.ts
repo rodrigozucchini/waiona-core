@@ -18,7 +18,7 @@ describe('DiscountsService', () => {
     save: jest.fn(),
     softDelete: jest.fn(),
   });
-  const mockTargetRepo = () => ({ delete: jest.fn() });
+  const mockTargetRepo = () => ({ softDelete: jest.fn() });
 
   const mockDiscount = (overrides = {}): DiscountEntity => ({
     id: 1,
@@ -118,14 +118,14 @@ describe('DiscountsService', () => {
       const entity = mockDiscount();
       repo.findOne.mockResolvedValue(entity);
       repo.softDelete.mockResolvedValue(undefined);
-      productTargetRepo.delete.mockResolvedValue(undefined);
-      comboTargetRepo.delete.mockResolvedValue(undefined);
+      productTargetRepo.softDelete.mockResolvedValue(undefined);
+      comboTargetRepo.softDelete.mockResolvedValue(undefined);
       await service.remove(1);
       expect(repo.softDelete).toHaveBeenCalledWith(entity.id);
-      expect(productTargetRepo.delete).toHaveBeenCalledWith({
+      expect(productTargetRepo.softDelete).toHaveBeenCalledWith({
         discountId: entity.id,
       });
-      expect(comboTargetRepo.delete).toHaveBeenCalledWith({
+      expect(comboTargetRepo.softDelete).toHaveBeenCalledWith({
         discountId: entity.id,
       });
     });

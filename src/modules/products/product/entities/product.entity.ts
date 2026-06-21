@@ -17,6 +17,7 @@ import { ProductMeasurementUnit } from '../enums/product-measurement-unit.enum';
 @Index(['name'])
 @Index(['isActive'])
 @Index(['categoryId'])
+@Index(['sku'], { unique: true, where: '"deleted_at" IS NULL' })
 export class ProductEntity extends BaseEntity {
   // ==========================
   // Identificación

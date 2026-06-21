@@ -1,17 +1,33 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 
 import { ComboService } from '../../../products/combos/services/combo.service';
 import { ComboEntity } from '../../../products/combos/entities/combo.entity';
-import { ComboItemEntity } from '../../../products/combos/entities/combo-item.entity';
+import { ComboImageEntity } from '../../../products/combo-images/entities/combo-image.entity';
 import { ProductEntity } from '../../../products/product/entities/product.entity';
 import { CategoryEntity } from '../../../products/categories/entities/category.entity';
 import { ProductPricingEntity } from '../../../pricing/entities/product-pricing.entity';
+import { ComboPricingEntity } from '../../../pricing/entities/combo-pricing.entity';
+import { DiscountComboTargetEntity } from '../../../discounts/discount-combo-target/entities/discount-combo-target.entity';
+import { CouponComboTargetEntity } from '../../../coupons/coupon-combo-target/entities/coupon-combo-target.entity';
+import { OrderItemEntity } from '../../../orders/entities/order-item.entity';
+
+const mockCountRepo = () => ({ count: jest.fn() });
 
 describe('ComboService', () => {
   let service: ComboService;
+
+  let comboImageRepository: jest.Mocked<{ count: jest.Mock }>;
+  let comboPricingRepository: jest.Mocked<{ count: jest.Mock }>;
+  let discountComboTargetRepository: jest.Mocked<{ count: jest.Mock }>;
+  let couponComboTargetRepository: jest.Mocked<{ count: jest.Mock }>;
+  let orderItemRepository: jest.Mocked<{ count: jest.Mock }>;
 
   const mockCategory = { id: 1, name: 'Combos' };
 
@@ -49,9 +65,7 @@ describe('ComboService', () => {
   const mockComboRepo = {
     findAndCount: jest.fn(),
     findOne: jest.fn(),
-    softDelete: jest.fn(),
   };
-  const mockItemRepo = { find: jest.fn() };
   const mockProductRepo = { findOne: jest.fn(), findBy: jest.fn() };
   const mockCategoryRepo = { findOne: jest.fn() };
   const mockProductPricingRepo = { findBy: jest.fn() };
@@ -62,8 +76,8 @@ describe('ComboService', () => {
         ComboService,
         { provide: getRepositoryToken(ComboEntity), useValue: mockComboRepo },
         {
-          provide: getRepositoryToken(ComboItemEntity),
-          useValue: mockItemRepo,
+          provide: getRepositoryToken(ComboImageEntity),
+          useFactory: mockCountRepo,
         },
         {
           provide: getRepositoryToken(ProductEntity),
@@ -77,14 +91,48 @@ describe('ComboService', () => {
           provide: getRepositoryToken(ProductPricingEntity),
           useValue: mockProductPricingRepo,
         },
+        {
+          provide: getRepositoryToken(ComboPricingEntity),
+          useFactory: mockCountRepo,
+        },
+        {
+          provide: getRepositoryToken(DiscountComboTargetEntity),
+          useFactory: mockCountRepo,
+        },
+        {
+          provide: getRepositoryToken(CouponComboTargetEntity),
+          useFactory: mockCountRepo,
+        },
+        {
+          provide: getRepositoryToken(OrderItemEntity),
+          useFactory: mockCountRepo,
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
     service = module.get<ComboService>(ComboService);
+    comboImageRepository = module.get(getRepositoryToken(ComboImageEntity));
+    comboPricingRepository = module.get(getRepositoryToken(ComboPricingEntity));
+    discountComboTargetRepository = module.get(
+      getRepositoryToken(DiscountComboTargetEntity),
+    );
+    couponComboTargetRepository = module.get(
+      getRepositoryToken(CouponComboTargetEntity),
+    );
+    orderItemRepository = module.get(getRepositoryToken(OrderItemEntity));
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  // helper: mockea todos los count de asociaciones en 0
+  const mockAllCountsZero = () => {
+    comboImageRepository.count.mockResolvedValue(0);
+    comboPricingRepository.count.mockResolvedValue(0);
+    discountComboTargetRepository.count.mockResolvedValue(0);
+    couponComboTargetRepository.count.mockResolvedValue(0);
+    orderItemRepository.count.mockResolvedValue(0);
+  };
 
   // ==========================
   // findAll
@@ -178,7 +226,7 @@ describe('ComboService', () => {
       );
     });
 
-    it('should throw BadRequestException if product not found', async () => {
+    it('should throw BadRequestException if product not found or inactive (isActive=false)', async () => {
       const dto = {
         name: 'Combo',
         description: 'Desc',
@@ -273,21 +321,41 @@ describe('ComboService', () => {
   // ==========================
 
   describe('delete', () => {
-    it('should soft delete a combo', async () => {
-      const combo = mockCombo();
-
-      mockEntityManager.findOne.mockResolvedValue(combo);
-      mockEntityManager.softDelete.mockResolvedValue({} as any);
+    it('should soft delete combo and cascade items when no blocking associations', async () => {
+      mockComboRepo.findOne.mockResolvedValue(mockCombo());
+      mockAllCountsZero();
+      mockEntityManager.softDelete.mockResolvedValue({});
 
       await service.delete(1);
 
-      expect(mockEntityManager.softDelete).toHaveBeenCalled();
+      expect(mockEntityManager.softDelete).toHaveBeenCalledTimes(2);
     });
 
-    it('should throw NotFoundException if not found', async () => {
-      mockEntityManager.findOne.mockResolvedValue(null);
+    it('should throw NotFoundException if combo not found', async () => {
+      mockComboRepo.findOne.mockResolvedValue(null);
 
       await expect(service.delete(999)).rejects.toThrow(NotFoundException);
     });
+
+    it.each([
+      ['imágenes', () => comboImageRepository.count.mockResolvedValue(2)],
+      ['precio', () => comboPricingRepository.count.mockResolvedValue(1)],
+      [
+        'descuento',
+        () => discountComboTargetRepository.count.mockResolvedValue(1),
+      ],
+      ['cupones', () => couponComboTargetRepository.count.mockResolvedValue(1)],
+      ['órdenes', () => orderItemRepository.count.mockResolvedValue(3)],
+    ])(
+      'should throw ConflictException when combo has %s',
+      async (_, setupMock) => {
+        mockComboRepo.findOne.mockResolvedValue(mockCombo());
+        mockAllCountsZero();
+        setupMock();
+
+        await expect(service.delete(1)).rejects.toThrow(ConflictException);
+        expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      },
+    );
   });
 });

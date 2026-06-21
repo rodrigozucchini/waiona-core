@@ -14,7 +14,7 @@ describe('DiscountProductTargetService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    delete: jest.fn(),
+    softDelete: jest.fn(),
   });
   const mockDiscountRepo = () => ({ findOne: jest.fn() });
 
@@ -119,9 +119,9 @@ describe('DiscountProductTargetService', () => {
       const target = mockTarget();
       discountRepo.findOne.mockResolvedValue(mockDiscount());
       repo.findOne.mockResolvedValue(target);
-      repo.delete.mockResolvedValue({ affected: 1 });
+      repo.softDelete.mockResolvedValue({ affected: 1 });
       await service.remove(1, 1);
-      expect(repo.delete).toHaveBeenCalledWith(target.id);
+      expect(repo.softDelete).toHaveBeenCalledWith(target.id);
     });
 
     it('should throw NotFoundException if not found', async () => {

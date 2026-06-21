@@ -88,7 +88,7 @@ export class DiscountComboTargetService {
       );
     }
 
-    await this.repo.delete(entity.id);
+    await this.repo.softDelete(entity.id);
   }
 
   // ==========================

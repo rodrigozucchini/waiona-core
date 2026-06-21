@@ -88,7 +88,7 @@ export class DiscountProductTargetService {
       );
     }
 
-    await this.repo.delete(entity.id);
+    await this.repo.softDelete(entity.id);
   }
 
   // ==========================

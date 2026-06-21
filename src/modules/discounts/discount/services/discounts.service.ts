@@ -97,8 +97,8 @@ export class DiscountsService {
   async remove(id: number): Promise<void> {
     const discount = await this.findEntity(id);
     await this.discountRepository.softDelete(discount.id);
-    await this.productTargetRepo.delete({ discountId: discount.id });
-    await this.comboTargetRepo.delete({ discountId: discount.id });
+    await this.productTargetRepo.softDelete({ discountId: discount.id });
+    await this.comboTargetRepo.softDelete({ discountId: discount.id });
   }
 
   // ==========================

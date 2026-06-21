@@ -42,11 +42,18 @@ export class ComboImageService {
 
     await this.assertPositionFree(dto.comboId, dto.position);
 
-    const image = this.comboImageRepository.create(dto);
-
-    const saved = await this.comboImageRepository.save(image);
-
-    return new ComboImageResponseDto(saved);
+    try {
+      const image = this.comboImageRepository.create(dto);
+      const saved = await this.comboImageRepository.save(image);
+      return new ComboImageResponseDto(saved);
+    } catch (err) {
+      if (err instanceof QueryFailedError) {
+        throw new ConflictException(
+          `Ya existe una imagen en la posición ${dto.position} para este combo`,
+        );
+      }
+      throw err;
+    }
   }
 
   // ==========================
@@ -85,9 +92,18 @@ export class ComboImageService {
     }
 
     const merged = this.comboImageRepository.merge(image, dto);
-    const updated = await this.comboImageRepository.save(merged);
 
-    return new ComboImageResponseDto(updated);
+    try {
+      const updated = await this.comboImageRepository.save(merged);
+      return new ComboImageResponseDto(updated);
+    } catch (err) {
+      if (err instanceof QueryFailedError) {
+        throw new ConflictException(
+          `Ya existe una imagen en la posición ${dto.position} para este combo`,
+        );
+      }
+      throw err;
+    }
   }
 
   // ==========================
@@ -116,7 +132,7 @@ export class ComboImageService {
       where: { id: dto.comboId },
     });
     if (!stillExists) {
-      await this.storageService.delete(publicId);
+      await this.storageService.delete(publicId).catch(() => undefined);
       throw new NotFoundException(`Combo con id ${dto.comboId} no encontrado`);
     }
 
@@ -131,7 +147,7 @@ export class ComboImageService {
       const saved = await this.comboImageRepository.save(image);
       return new ComboImageResponseDto(saved);
     } catch (err) {
-      await this.storageService.delete(publicId);
+      await this.storageService.delete(publicId).catch(() => undefined);
       if (err instanceof QueryFailedError) {
         throw new ConflictException(
           `Ya existe una imagen en la posición ${dto.position} para este combo`,
@@ -147,10 +163,10 @@ export class ComboImageService {
 
   async remove(id: number): Promise<void> {
     const image = await this.findEntity(id);
-    if (image.publicId) {
-      await this.storageService.delete(image.publicId);
-    }
     await this.comboImageRepository.softDelete(image.id);
+    if (image.publicId) {
+      await this.storageService.delete(image.publicId).catch(() => undefined);
+    }
   }
 
   // ==========================
