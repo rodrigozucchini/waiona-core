@@ -28,6 +28,7 @@ export class CreateCategoryDto {
   @IsOptional()
   @Transform(({ value }) => value?.trim())
   @IsString({ message: 'La descripción debe ser texto' })
+  @IsNotEmpty({ message: 'La descripción no puede estar vacía' })
   @MinLength(5, { message: 'La descripción debe tener al menos 5 caracteres' })
   @MaxLength(255, {
     message: 'La descripción no puede superar los 255 caracteres',

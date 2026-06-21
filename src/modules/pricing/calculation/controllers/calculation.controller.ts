@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
@@ -29,6 +29,7 @@ export class CalculationController {
   @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post('preview')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Calcular precio con valores manuales (sin DB)' })
   @ApiResponse({ status: 200, type: PriceBreakdownDto })
   preview(@Body() dto: CalculatePreviewDto): PriceBreakdownDto {
@@ -42,6 +43,7 @@ export class CalculationController {
   @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN, RoleType.CLIENT)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post('product')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Calcular precio de un producto' })
   @ApiResponse({ status: 200, type: PriceBreakdownDto })
   @ApiResponse({ status: 404, description: 'Producto sin pricing configurado' })
@@ -58,6 +60,7 @@ export class CalculationController {
   @Roles(RoleType.SUPER_ADMIN, RoleType.ADMIN, RoleType.CLIENT)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post('combo')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Calcular precio de un combo' })
   @ApiResponse({ status: 200, type: PriceBreakdownDto })
   @ApiResponse({

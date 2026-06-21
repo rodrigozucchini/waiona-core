@@ -29,4 +29,5 @@ export class DiscountEntity extends BaseEntity {
     },
   })
   value: number;
+
 }
