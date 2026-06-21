@@ -232,7 +232,10 @@ describe('AuthService', () => {
   describe('refresh', () => {
     it('should revoke old token and return new tokens inside a transaction', async () => {
       const rt = mockRefreshToken();
-      const userDto = { id: 1, role: RoleType.CLIENT } as unknown as UserResponseDto;
+      const userDto = {
+        id: 1,
+        role: RoleType.CLIENT,
+      } as unknown as UserResponseDto;
       mockManagerRefreshRepo.findOne.mockResolvedValue(rt);
       mockManagerRefreshRepo.save.mockResolvedValue(rt);
       mockManagerRefreshRepo.create.mockReturnValue(mockRefreshToken());
@@ -251,7 +254,10 @@ describe('AuthService', () => {
       // válido). El mock no puede simular el rollback real de la DB, pero sí
       // verifica que el error se propaga y la transacción fue invocada.
       const rt = mockRefreshToken();
-      const userDto = { id: 1, role: RoleType.CLIENT } as unknown as UserResponseDto;
+      const userDto = {
+        id: 1,
+        role: RoleType.CLIENT,
+      } as unknown as UserResponseDto;
       mockManagerRefreshRepo.findOne.mockResolvedValue(rt);
       mockManagerRefreshRepo.save
         .mockResolvedValueOnce(rt)
