@@ -44,7 +44,7 @@ describe('MarginsController', () => {
 
   const mockMarginResponse = (overrides = {}) => ({
     id: 1,
-    name: 'Margen estándar',
+    name: 'MARGEN ESTÁNDAR',
     value: 20,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -61,7 +61,7 @@ describe('MarginsController', () => {
 
   describe('create', () => {
     it('should create a margin', async () => {
-      const dto = { name: 'Margen estándar', value: 20 };
+      const dto = { name: 'MARGEN ESTÁNDAR', value: 20 };
       const margin = mockMarginResponse();
       service.create.mockResolvedValue(margin);
 

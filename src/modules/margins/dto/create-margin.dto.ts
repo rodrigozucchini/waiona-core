@@ -21,16 +21,16 @@ export class CreateMarginDto {
 
   @ApiProperty({
     example: 20,
-    minimum: 0.01,
+    minimum: 0.1,
     maximum: 1000,
-    description: 'Porcentaje de margen. Mín 0.01, máx 1000. Máx 2 decimales.',
+    description: 'Porcentaje de margen. Mín 0.1, máx 1000. Máx 2 decimales.',
   })
   @Type(() => Number)
   @IsNumber(
     { maxDecimalPlaces: 2 },
     { message: 'El valor debe ser un número con hasta 2 decimales' },
   )
-  @Min(0.01, { message: 'El valor del margen debe ser mayor a 0' })
+  @Min(0.1, { message: 'El valor del margen debe ser mayor a 0' })
   @Max(1000, { message: 'El valor del margen no puede superar el 1000%' })
   value: number;
 }
