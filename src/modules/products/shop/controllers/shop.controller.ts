@@ -4,9 +4,7 @@ import {
   Query,
   Param,
   ParseIntPipe,
-  UseInterceptors,
 } from '@nestjs/common';
-import { CacheInterceptor, CacheKey, CacheTTL } from '@nestjs/cache-manager';
 import {
   ApiTags,
   ApiOperation,
@@ -31,9 +29,6 @@ export class ShopController {
   // ==========================
 
   @Get('categories')
-  @UseInterceptors(CacheInterceptor)
-  @CacheKey('shop:categories')
-  @CacheTTL(300_000)
   @ApiOperation({ summary: 'Árbol de categorías activas del catálogo' })
   @ApiResponse({ status: 200, type: [CategoryTreeResponseDto] })
   async getCategories(): Promise<CategoryTreeResponseDto[]> {
