@@ -17,10 +17,6 @@ import { CalculationModule } from './calculation/calculation.module';
   ],
   providers: [ProductPricingService, ComboPricingService],
   controllers: [ComboPricingController, ProductPricingController],
-  exports: [
-    ProductPricingService,
-    ComboPricingService,
-    CalculationModule,
-  ],
+  exports: [ProductPricingService, ComboPricingService, CalculationModule],
 })
 export class PricingModule {}

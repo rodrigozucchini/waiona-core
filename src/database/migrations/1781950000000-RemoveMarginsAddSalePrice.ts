@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class RemoveMarginsAddSalePrice1781950000000
-  implements MigrationInterface
-{
+export class RemoveMarginsAddSalePrice1781950000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Quitar FK de margin_id en product_pricing
     await queryRunner.query(
@@ -51,9 +49,7 @@ export class RemoveMarginsAddSalePrice1781950000000
     );
 
     // Eliminar tabla e índice de margins
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "IDX_margins_name_active"`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_margins_name_active"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "margins"`);
   }
 
