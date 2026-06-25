@@ -7,6 +7,7 @@ import {
 import {
   PG_UNIQUE_VIOLATION,
   PG_FK_VIOLATION,
+  PG_NUMERIC_OVERFLOW,
 } from '../../../common/constants/postgres-error-codes';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -61,6 +62,8 @@ export class ComboPricingService {
         throw new NotFoundException(
           `Combo con id ${dto.comboId} no encontrado`,
         );
+      if (err.code === PG_NUMERIC_OVERFLOW)
+        throw new BadRequestException('El valor del precio supera el máximo permitido');
       throw err;
     }
   }
